@@ -30,6 +30,7 @@ I build a macOS  app for quick text and image capture into Obsidian. Without ope
 - Multi-Vault Support
 - Dark/Light Mode auto-switching
 - Multiple Templates for different note types
+- Fixing the ugly corner bug at the bottom!
 
 ---
 
