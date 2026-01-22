@@ -15,11 +15,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Apple Silicon Runner (arm64)
+          # Apple Silicon (M1/M2/M3/M4)
           - os: macos-14
             arch: aarch64
-          # Intel Runner (x86_64)
-          - os: macos-13-large
+          # Intel Macs
+          - os: macos-15-intel        # ← NEU! Ersetzt macos-13
             arch: x86_64
 
     runs-on: ${{ matrix.os }}
@@ -43,7 +43,6 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
   
-      # Tauri Action baut das Bundle (dmg/app/zip etc.) und lädt es als Release-Asset hoch.
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -51,7 +50,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Collector ${{ github.ref_name }}"
-          releaseBody: "Automatisches Release-Build von GitHub Actions."
+          releaseBody: "First stable release of Collector - Quick capture for Obsidian on macOS"
           releaseDraft: false
           prerelease: false
           args: "--target ${{ matrix.arch }}-apple-darwin"
