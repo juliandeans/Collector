@@ -2,7 +2,7 @@
 name = "collector"
 version = "1.0.0"
 description = "Obsidian Quick Capture - Fast note capture for Obsidian"
-authors = ["Julian"]
+authors = ["Julian Dean"]
 license = "MIT"
 repository = ""
 edition = "2021"

@@ -207,9 +207,7 @@
           bind:value={settings.daily_note_format}
           placeholder="YYYY-MM-DD"
         />
-        <small
-          >Filename format (e.g. YYYY-MM-DD). Supports: YYYY, MM, DD</small
-        >
+        <small>Filename format (e.g. YYYY-MM-DD). Supports: YYYY, MM, DD</small>
       </div>
       <div class="field">
         <label for="entry_header">Entry Header</label>
@@ -272,7 +270,10 @@
           placeholder="600"
           inputmode="numeric"
         />
-        <small>Optional width in pixels for new image links (leave empty for no width)</small>
+        <small
+          >Optional width in pixels for new image links (leave empty for no
+          width)</small
+        >
       </div>
     </section>
 
@@ -305,7 +306,8 @@
             style="margin-top: 8px;"
           />
           <small
-            >This text will be inserted at the beginning of each new note (e.g. for frontmatter/properties)</small
+            >This text will be inserted at the beginning of each new note (e.g.
+            for frontmatter/properties)</small
           >
         {/if}
       </div>
@@ -481,9 +483,7 @@
           placeholder="Cmd+Shift+N"
           on:keydown={(e) => handleShortcutKeyDown(e, "global_shortcut")}
         />
-        <small
-          >Click in the field and press the desired key combination</small
-        >
+        <small>Click in the field and press the desired key combination</small>
       </div>
       <div class="field">
         <label for="capture_text_shortcut">Copy Text to Collector</label>
@@ -494,9 +494,7 @@
           placeholder="Cmd+Shift+C"
           on:keydown={(e) => handleShortcutKeyDown(e, "capture_text_shortcut")}
         />
-        <small
-          >Click in the field and press the desired key combination</small
-        >
+        <small>Click in the field and press the desired key combination</small>
       </div>
       <div class="field">
         <label for="save_to_daily_shortcut">Save to Daily Note</label>
@@ -507,9 +505,7 @@
           placeholder="Cmd+Enter"
           on:keydown={(e) => handleShortcutKeyDown(e, "save_to_daily_shortcut")}
         />
-        <small
-          >Click in the field and press the desired key combination</small
-        >
+        <small>Click in the field and press the desired key combination</small>
       </div>
       <div class="field">
         <label for="save_as_note_shortcut">Create New Note</label>
@@ -520,9 +516,7 @@
           placeholder="Cmd+Shift+Enter"
           on:keydown={(e) => handleShortcutKeyDown(e, "save_as_note_shortcut")}
         />
-        <small
-          >Click in the field and press the desired key combination</small
-        >
+        <small>Click in the field and press the desired key combination</small>
       </div>
       <div class="field">
         <label class="checkbox">
