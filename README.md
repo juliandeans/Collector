@@ -126,31 +126,22 @@ Esc	- Close without saving
 ## Troubleshooting
 ### Vault not found
 Vault name must exactly match Obsidian
-
-Vault must contain a .obsidian folder
-
+Vault must contain an obsidian folder
 Ensure Collector has read/write access
 
 ### Global shortcut does not work
 Check Accessibility permission
-
 Restart Collector
-
 Try a different shortcut (may be in use)
 
 ### Images are not saved
 Check image folder path in settings
-
 Ensure write permissions
-
 Folder is created automatically if missing
 
 ### Daily Note not created
 Path format must be valid
-
-App does not start
 Use right-click → Open
-
 Check System Settings → Privacy & Security
 
 ## 🛠️ Development
