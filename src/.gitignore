@@ -1,0 +1,89 @@
+# Rust/Cargo Build Files
+src-tauri/target/
+**/*.rs.bk
+*.pdb
+
+# Node/NPM
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Backups
+*.bak
+*.backup
+*~
+
+# Release artifacts
+*.dmg
+*.app
+*.zip
+
+# AI tooling / local folders
+.claude/
+
+# Build Outputs
+dist/
+dist-ssr/
+build/
+.svelte-kit/
+.output/
+*.local
+
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+*.pdf
+
+# IDE / Editors
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.fleet/
+.ijwg/
+
+# OS Files
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# macOS
+._*
+.Spotlight-V100
+.Trashes
+
+# Logs
+logs/
+*.log
+
+# Tauri
+src-tauri/target/
+src-tauri/WixTools/
+
+# Temporary Files
+*.tmp
+*.temp
+.cache/
+
+# Test Coverage
+coverage/
+.nyc_output/
+
+# Debug Files
+debug/
+*.dSYM/

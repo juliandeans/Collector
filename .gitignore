@@ -1,0 +1,53 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+.svelte-kit/
+.output/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE / Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Tauri
+src-tauri/target/
+src-tauri/Cargo.lock
+src-tauri/gen/
+
+# Rust
+**/*.rs.bk
+*.pdb
+
+# Logs
+logs/
+*.log
+
+# OS specific
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+
+# PDF files
+*.pdf

@@ -1,0 +1,7 @@
+Placeholder for app icons.
+
+Required icons:
+- icon.png (App icon, 512x512)
+- tray-icon.png (System tray icon, 22x22)
+
+For production, replace with actual icon files.

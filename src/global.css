@@ -1,0 +1,172 @@
+/* Quick Capture - Global Styles for Frosted Glass macOS Design */
+
+:root {
+  /* Window dimensions - from settings */
+  --window-width: 330px;
+  --window-height: 600px;
+  
+  /* Border radius - macOS style */
+  --border-radius: 14px;
+  
+  /* Colors - Light theme */
+  --background-color: rgba(255, 255, 255, 0.75);
+  --text-color: #1d1d1f;
+  --text-secondary: rgba(0, 0, 0, 0.6);
+  --placeholder-color: rgba(0, 0, 0, 0.35);
+  --border-color: rgba(0, 0, 0, 0.08);
+  
+  /* Accent color - purple */
+  --accent-color: #8b5cf6;
+  --accent-light: rgba(139, 92, 246, 0.12);
+  
+  /* System colors */
+  --success-color: #34c759;
+  --error-color: #ff3b30;
+  
+  /* Shadows - minimal */
+  --shadow-sm: 0 2px 8px rgba(179, 64, 64, 0.04);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.1);
+  
+  /* Typography - SF Pro */
+  --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', sans-serif;
+  --font-size: 15px;
+  --font-size-sm: 11px;
+  
+  /* Blur values */
+  --blur-strong: blur(60px);
+  --blur-medium: blur(40px);
+  --blur-light: blur(20px);
+  
+  /* Animation */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0.0, 0.2, 1);
+  --transition-base: 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+  --transition-slow: 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* Reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  
+  /* CRITICAL: Transparent background for frosted glass effect */
+  background: transparent;
+  
+  /* macOS font rendering */
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+#app {
+  height: 100%;
+  width: 100%;
+}
+
+/* Focus styles - purple accent */
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* Selection color - purple tint */
+::selection {
+  background: rgba(139, 92, 246, 0.2);
+  color: inherit;
+}
+
+/* Custom scrollbar - subtle, macOS style */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 3px;
+  transition: background var(--transition-fast);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Utility classes */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Animation utilities */
+.fade-in {
+  animation: fadeIn var(--transition-base) ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.slide-in {
+  animation: slideIn var(--transition-base) ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Frosted glass utility */
+.glass {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(60px) saturate(180%);
+  -webkit-backdrop-filter: blur(60px) saturate(180%);
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-md);
+}
+
+/* macOS vibrancy effect helper */
+.vibrancy-light {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+}
+
+.vibrancy-medium {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(60px);
+  -webkit-backdrop-filter: blur(60px);
+}
+
+.vibrancy-strong {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(80px) saturate(200%);
+  -webkit-backdrop-filter: blur(80px) saturate(200%);
+}
