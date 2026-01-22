@@ -123,29 +123,29 @@ Cmd + Enter -	Save to Daily Note
 Shift + Cmd + Enter - Create a new note 
 Esc	- Close without saving
 
-### Troubleshooting
-#### Vault not found
+## Troubleshooting
+### Vault not found
 Vault name must exactly match Obsidian
 
 Vault must contain a .obsidian folder
 
 Ensure Collector has read/write access
 
-#### Global shortcut does not work
+### Global shortcut does not work
 Check Accessibility permission
 
 Restart Collector
 
 Try a different shortcut (may be in use)
 
-#### Images are not saved
+### Images are not saved
 Check image folder path in settings
 
 Ensure write permissions
 
 Folder is created automatically if missing
 
-#### Daily Note not created
+### Daily Note not created
 Path format must be valid
 
 App does not start
