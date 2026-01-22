@@ -26,6 +26,11 @@ I build a macOS  app for quick text and image capture into Obsidian. Without ope
 - **Background App**  
   Runs quietly in the menu bar
 
+## Planned for 1.1
+- Multi-Vault Support
+- Dark/Light Mode auto-switching
+- Multiple Templates for different note types
+
 ---
 
 ## Requirements
