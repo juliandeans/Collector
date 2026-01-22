@@ -10,20 +10,8 @@ permissions:
 
 jobs:
   build-macos:
-    name: Build macOS (${{ matrix.arch }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Apple Silicon (M1/M2/M3/M4)
-          - os: macos-14
-            arch: aarch64
-          # Intel Macs
-          - os: macos-15-intel        # ← NEU! Ersetzt macos-13
-            arch: x86_64
-
-    runs-on: ${{ matrix.os }}
-
+    runs-on: macos-14  # Apple Silicon runner
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,7 +38,9 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Collector ${{ github.ref_name }}"
-          releaseBody: "First stable release of Collector - Quick capture for Obsidian on macOS"
+          releaseBody: |
+            First stable release of Collector - Quick capture for Obsidian on macOS
+            
+            **Note:** Built for Apple Silicon (M1/M2/M3/M4). Intel Macs can run this via Rosetta 2 (automatic).
           releaseDraft: false
           prerelease: false
-          args: "--target ${{ matrix.arch }}-apple-darwin"

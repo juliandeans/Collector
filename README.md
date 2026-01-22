@@ -31,6 +31,7 @@ I build a macOS  app for quick text and image capture into Obsidian. Without ope
 ## Requirements
 
 - macOS **11.0 (Big Sur)** or newer
+- **Apple Silicon (M1/M2/M3/M4)** or Intel Mac with Rosetta 2
 - Obsidian installed
 
 ---
