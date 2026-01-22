@@ -44,7 +44,7 @@ I build a macOS  app for quick text and image capture into Obsidian. Without ope
 
 ### Download
 
-Direkt **Download**: https://github.com/juliandeans/Collector/releases/download/v1.0.0/Collector_aarch64.app.tar.gz
+**[Direct Download](https://github.com/juliandeans/Collector/releases/latest/download/Collector_aarch64.app.tar.gz)** | [View All Releases](https://github.com/juliandeans/Collector/releases)
 
 1. Go to **GitHub → Releases**
 2. Download the latest `.dmg` file  
