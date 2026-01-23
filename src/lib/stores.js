@@ -17,7 +17,7 @@ export const defaultSettings = {
   default_image_width: '600',
   entry_header: '#### HH:mm',
   global_shortcut: 'Cmd+Shift+N',
-  capture_text_shortcut: 'Cmd+Shift+C',
+  
   compression_max_kb: 200,
   edge_detection_enabled: true,
   window_transparency: 55,

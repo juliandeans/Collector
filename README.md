@@ -65,6 +65,10 @@ I build a macOS  app for quick text and image capture into Obsidian. Without ope
 
 ---
 
+![Collector UI](public/screenshot/preview.gif)
+
+---
+
 ## ⚠️ macOS Security (First Launch)
 
 Because this app is not code-signed or notarized (no Apple Developer account),
