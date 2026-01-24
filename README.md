@@ -37,7 +37,7 @@ I build a macOS  app for quick text and image capture into Obsidian. Without ope
 ## Requirements
 
 - macOS **11.0 (Big Sur)** or newer
-- **Apple Silicon (M1/M2/M3/M4)** or Intel Mac with Rosetta 2
+- **Apple Silicon (M1/M2/M3/M4)**  (Intel Mac is work in progress!)
 - Obsidian installed
 
 ---
@@ -55,7 +55,6 @@ I build a macOS  app for quick text and image capture into Obsidian. Without ope
 1. Go to **GitHub → Releases**
 2. Download the latest `.dmg` file  
    - `aarch64` → Apple Silicon (M1/M2/M3/M4)
-   - `x86_64` → Intel Macs
 
 ### Install
 
