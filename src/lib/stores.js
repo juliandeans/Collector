@@ -26,8 +26,11 @@ export const defaultSettings = {
   window_brightness: 0,
   text_color: '#ffffff',
   notes_folder: 'Notes',
+  pinned_notes: [],
   save_to_daily_shortcut: 'Cmd+Enter',
   save_as_note_shortcut: 'Cmd+Shift+Enter',
+  reader_shortcut: 'Cmd+Shift+R',
+  reader_edge_enabled: true,
   note_filename_template: 'note-YYYY-MM-DD-HHmmss',
   note_template: '---\ncreated: <% tp.date.now("YYYY-MM-DD hh:mm") %>\nmodified: \ndaily: "[[<% tp.date.now("YYYY-MM-DD") %>]]"\ntags: inbox\ntype: inbox\n---',
 };

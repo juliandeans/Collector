@@ -61,6 +61,32 @@
     }
   }
 
+  async function addPinnedNotes() {
+    const selected = await open({
+      multiple: true,
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+      defaultPath: settings.vault_path || undefined,
+    });
+
+    if (selected) {
+      const paths = Array.isArray(selected) ? selected : [selected];
+      const existing = settings.pinned_notes ?? [];
+      settings.pinned_notes = [...new Set([...existing, ...paths])];
+      settings = { ...settings };
+    }
+  }
+
+  function removePinnedNote(pathToRemove) {
+    settings.pinned_notes = (settings.pinned_notes ?? []).filter(
+      (path) => path !== pathToRemove,
+    );
+    settings = { ...settings };
+  }
+
+  function getFilename(path) {
+    return path.split("/").pop()?.replace(/\.md$/i, "") || path;
+  }
+
   async function handleSave() {
     isSaving = true;
 
@@ -435,6 +461,62 @@
     </section>
 
     <section>
+      <h2>Reader Panel</h2>
+      <div class="field">
+        <div class="field-label">Pinned Notes</div>
+        <small
+          >These notes appear as tabs in the left reader panel. The Daily Note
+          is always included automatically.</small
+        >
+
+        {#if (settings.pinned_notes ?? []).length > 0}
+          <div class="note-list">
+            {#each settings.pinned_notes ?? [] as notePath}
+              <div class="note-list-item">
+                <div class="note-list-copy">
+                  <strong>{getFilename(notePath)}</strong>
+                  <small>{notePath}</small>
+                </div>
+                <button
+                  class="remove-note"
+                  type="button"
+                  on:click={() => removePinnedNote(notePath)}
+                >
+                  ✕
+                </button>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="empty-note-list">No pinned notes selected.</div>
+        {/if}
+
+        <button class="secondary" type="button" on:click={addPinnedNotes}
+          >+ Add Note</button
+        >
+      </div>
+
+      <div class="field">
+        <label for="reader_shortcut">Reader Shortcut</label>
+        <input
+          type="text"
+          id="reader_shortcut"
+          bind:value={settings.reader_shortcut}
+          placeholder="Cmd+Shift+R"
+          on:keydown={(e) => handleShortcutKeyDown(e, "reader_shortcut")}
+        />
+        <small>Click in the field and press the desired key combination</small>
+      </div>
+
+      <div class="field">
+        <label class="checkbox">
+          <input type="checkbox" bind:checked={settings.reader_edge_enabled} />
+          Open on left edge
+        </label>
+      </div>
+    </section>
+
+    <section>
       <h2>Font</h2>
       <div class="field">
         <label for="font_family">Font Family</label>
@@ -647,6 +729,12 @@
     margin-bottom: 4px;
   }
 
+  .field-label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
   .field small {
     display: block;
     color: #888;
@@ -807,5 +895,70 @@
   .path-picker button {
     padding: 8px 16px;
     white-space: nowrap;
+  }
+
+  .note-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 10px 0 12px;
+  }
+
+  .note-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .note-list-copy {
+    min-width: 0;
+  }
+
+  .note-list-copy strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+
+  .note-list-copy small {
+    display: block;
+    margin-top: 3px;
+    color: #6b7280;
+    overflow-wrap: anywhere;
+  }
+
+  .empty-note-list {
+    margin: 10px 0 12px;
+    padding: 12px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px dashed rgba(0, 0, 0, 0.08);
+    color: #6b7280;
+    font-size: 12px;
+  }
+
+  .remove-note {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .remove-note:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
   }
 </style>
