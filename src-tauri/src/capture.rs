@@ -28,7 +28,8 @@ fn generate_header(template: &str) -> String {
 pub fn build_daily_note_path(settings: &Settings) -> String {
     let now = Local::now();
 
-    let filename = settings.daily_note_format
+    let filename = settings
+        .daily_note_format
         .replace("YYYY", &now.format("%Y").to_string())
         .replace("MM", &now.format("%m").to_string())
         .replace("DD", &now.format("%d").to_string());
@@ -75,7 +76,8 @@ pub fn save_as_note(content: &str, settings: &Settings) -> Result<CaptureResult,
         content.to_string()
     };
 
-    fs::write(&file_path, final_content).map_err(|e| format!("Failed to write note file: {}", e))?;
+    fs::write(&file_path, final_content)
+        .map_err(|e| format!("Failed to write note file: {}", e))?;
 
     log::info!("Note saved (file={})", redact_path(&file_path));
 

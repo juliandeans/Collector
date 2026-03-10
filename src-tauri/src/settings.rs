@@ -43,6 +43,12 @@ pub struct Settings {
     pub save_to_daily_shortcut: String,
     #[serde(default = "default_save_as_note_shortcut")]
     pub save_as_note_shortcut: String,
+    #[serde(default)]
+    pub pinned_notes: Vec<String>,
+    #[serde(default = "default_reader_shortcut")]
+    pub reader_shortcut: String,
+    #[serde(default = "default_true")]
+    pub reader_edge_enabled: bool,
     #[serde(default = "default_note_filename_template")]
     pub note_filename_template: String,
     #[serde(default = "default_note_template")]
@@ -65,6 +71,10 @@ fn default_autostart_enabled() -> bool {
     false
 }
 fn default_edge_enabled() -> bool {
+    true
+}
+
+fn default_true() -> bool {
     true
 }
 
@@ -94,6 +104,10 @@ fn default_save_to_daily_shortcut() -> String {
 
 fn default_save_as_note_shortcut() -> String {
     "Cmd+Shift+Enter".to_string()
+}
+
+fn default_reader_shortcut() -> String {
+    "Cmd+Shift+R".to_string()
 }
 
 fn default_note_filename_template() -> String {
@@ -167,6 +181,9 @@ impl Default for Settings {
             notes_folder: default_notes_folder(),
             save_to_daily_shortcut: default_save_to_daily_shortcut(),
             save_as_note_shortcut: default_save_as_note_shortcut(),
+            pinned_notes: Vec::new(),
+            reader_shortcut: default_reader_shortcut(),
+            reader_edge_enabled: default_true(),
             note_filename_template: default_note_filename_template(),
             note_template: default_note_template(),
             window_transparency: default_window_transparency(),
@@ -194,12 +211,13 @@ impl Settings {
             let content = fs::read_to_string(&config_path)
                 .map_err(|e| format!("Failed to read config file: {}", e))?;
 
-            let mut settings = serde_json::from_str(&content).or_else(|e| -> Result<Settings, String> {
-                log::warn!("Config corrupted, using defaults: {}", e);
-                let defaults = Self::default();
-                let _ = defaults.save();
-                Ok(defaults)
-            })?;
+            let mut settings =
+                serde_json::from_str(&content).or_else(|e| -> Result<Settings, String> {
+                    log::warn!("Config corrupted, using defaults: {}", e);
+                    let defaults = Self::default();
+                    let _ = defaults.save();
+                    Ok(defaults)
+                })?;
 
             // Migration: convert old daily_note_path to new fields.
             if !settings.daily_note_path.is_empty() && settings.daily_note_folder.is_empty() {
@@ -209,15 +227,11 @@ impl Settings {
                     settings.daily_note_folder = path[..=last_slash].to_string();
                     let filename = &path[last_slash + 1..];
 
-                    settings.daily_note_format = filename
-                        .strip_suffix(".md")
-                        .unwrap_or(filename)
-                        .to_string();
+                    settings.daily_note_format =
+                        filename.strip_suffix(".md").unwrap_or(filename).to_string();
                 } else {
-                    settings.daily_note_format = path
-                        .strip_suffix(".md")
-                        .unwrap_or(path)
-                        .to_string();
+                    settings.daily_note_format =
+                        path.strip_suffix(".md").unwrap_or(path).to_string();
                 }
 
                 log::info!(
@@ -307,7 +321,9 @@ impl Settings {
                 .default_image_width
                 .trim()
                 .parse::<u32>()
-                .map_err(|_| "default_image_width must be empty or a positive number".to_string())?;
+                .map_err(|_| {
+                    "default_image_width must be empty or a positive number".to_string()
+                })?;
             if width == 0 {
                 return Err("default_image_width must be empty or a positive number".to_string());
             }
@@ -343,6 +359,10 @@ impl Settings {
 
         if !self.save_as_note_shortcut.trim().is_empty() {
             crate::shortcuts::validate_shortcut(&self.save_as_note_shortcut)?;
+        }
+
+        if !self.reader_shortcut.trim().is_empty() {
+            crate::shortcuts::validate_shortcut(&self.reader_shortcut)?;
         }
 
         if self.window_transparency > 100 {

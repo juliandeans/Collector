@@ -3,8 +3,8 @@ use image::{DynamicImage, ImageFormat};
 use serde::Serialize;
 use std::fs;
 use std::io::Cursor;
-use std::path::{Path, PathBuf};
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
 use crate::log_safety::{redact_path, summarize_bytes};
 use crate::settings::Settings;
@@ -177,7 +177,10 @@ pub fn is_supported_image(path: &Path) -> bool {
 /// Returns the markdown link to insert
 /// Process a dropped file
 /// Returns the markdown link to insert
-pub fn process_dropped_file(file_path: &str, settings: &Settings) -> Result<ProcessedImage, String> {
+pub fn process_dropped_file(
+    file_path: &str,
+    settings: &Settings,
+) -> Result<ProcessedImage, String> {
     let source_path = Path::new(file_path);
 
     // Check if it's a supported image
@@ -212,8 +215,8 @@ pub fn process_dropped_file_from_bytes(
     let temp_path = temp_dir.join(format!("tauri_drop_{}", original_filename));
 
     // Write bytes to temp file
-    let mut file = fs::File::create(&temp_path)
-        .map_err(|e| format!("Failed to create temp file: {}", e))?;
+    let mut file =
+        fs::File::create(&temp_path).map_err(|e| format!("Failed to create temp file: {}", e))?;
     file.write_all(&bytes)
         .map_err(|e| format!("Failed to write temp file: {}", e))?;
     drop(file); // Close file before processing

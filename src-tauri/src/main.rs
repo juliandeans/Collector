@@ -12,6 +12,7 @@ mod selected_text;
 mod settings;
 mod shortcuts;
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -115,6 +116,14 @@ async fn save_settings(
         }
     }
 
+    if let Some(reader_window) = app.get_webview_window("reader") {
+        if let Err(e) = reader_window.emit("settings_changed", &new_settings) {
+            log::warn!("Failed to emit settings_changed to reader window: {}", e);
+        } else {
+            log::info!("Settings changed event emitted to reader window");
+        }
+    }
+
     match state.shortcut_manager.update(&app, &new_settings).await {
         Ok(_) => log::info!("Global shortcut updated"),
         Err(e) => log::warn!("Failed to update global shortcut (non-fatal): {}", e),
@@ -178,6 +187,69 @@ async fn append_to_daily_note(
 }
 
 #[tauri::command]
+async fn read_note_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))
+}
+
+#[tauri::command]
+async fn write_note_file(path: String, content: String) -> Result<(), String> {
+    std::fs::write(&path, content).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+#[tauri::command]
+async fn list_vault_notes(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let settings = state.settings.read().await;
+    let vault_path = PathBuf::from(&settings.vault_path);
+
+    let mut notes = Vec::new();
+    collect_md_files(&vault_path, &vault_path, &mut notes);
+
+    Ok(serde_json::json!(notes))
+}
+
+fn collect_md_files(base: &PathBuf, dir: &PathBuf, out: &mut Vec<serde_json::Value>) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path
+                .file_name()
+                .map(|n| n.to_string_lossy().starts_with('.'))
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            if path.is_dir() {
+                collect_md_files(base, &path, out);
+            } else if path.extension().map(|e| e == "md").unwrap_or(false) {
+                let name = path
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                let relative = path
+                    .strip_prefix(base)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .to_string();
+                out.push(serde_json::json!({
+                    "path": path.to_string_lossy(),
+                    "name": name,
+                    "relative_path": relative,
+                }));
+            }
+        }
+    }
+}
+
+#[tauri::command]
+async fn get_daily_note_path(state: tauri::State<'_, AppState>) -> Result<String, String> {
+    let settings = state.settings.read().await.clone();
+    let daily_path = capture::build_daily_note_path(&settings);
+    let file_path = PathBuf::from(&settings.vault_path).join(daily_path);
+    Ok(file_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 async fn save_image(
     file_path: String,
     state: tauri::State<'_, AppState>,
@@ -186,7 +258,10 @@ async fn save_image(
 
     let result = image_handler::process_dropped_file(&file_path, &settings)?;
 
-    log::info!("Image saved (link_chars={})", result.markdown.chars().count());
+    log::info!(
+        "Image saved (link_chars={})",
+        result.markdown.chars().count()
+    );
     Ok(result)
 }
 
@@ -291,6 +366,37 @@ async fn show_capture(app: AppHandle, state: tauri::State<'_, AppState>) -> Resu
 }
 
 #[tauri::command]
+async fn show_reader(app: AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("reader") {
+        let settings = state.settings.read().await;
+        let screen = window
+            .current_monitor()
+            .map_err(|e| e.to_string())?
+            .ok_or("No monitor")?;
+        let scale = screen.scale_factor();
+        let screen_size = screen.size();
+        let screen_h = screen_size.height as f64 / scale;
+        let win_h = settings.window_height as f64;
+        let y = ((screen_h - win_h) / 2.0).max(0.0);
+        window
+            .set_position(tauri::LogicalPosition::new(8.0, y))
+            .map_err(|e| e.to_string())?;
+        configure_macos_window(&window, settings.border_radius as f64);
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn hide_reader(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("reader") {
+        let _ = window.hide();
+    }
+    Ok(())
+}
+
+#[tauri::command]
 async fn get_window_info(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
     let settings = state.settings.read().await;
     Ok(serde_json::json!({
@@ -349,7 +455,10 @@ fn configure_macos_window(window: &tauri::WebviewWindow, corner_radius: f64) {
     let ns_window_ptr = match window.ns_window() {
         Ok(ptr) => ptr,
         Err(e) => {
-            log::warn!("Failed to get ns_window: {} - window might not be fully initialized yet", e);
+            log::warn!(
+                "Failed to get ns_window: {} - window might not be fully initialized yet",
+                e
+            );
             return;
         }
     };
@@ -400,13 +509,15 @@ fn configure_macos_window(window: &tauri::WebviewWindow, corner_radius: f64) {
 
         let _: () = msg_send![ns_window, invalidateShadow];
 
-        log::info!("macOS window configured with corner radius: {}", corner_radius);
+        log::info!(
+            "macOS window configured with corner radius: {}",
+            corner_radius
+        );
     }
 }
 
 #[cfg(not(target_os = "macos"))]
-fn configure_macos_window(_window: &tauri::WebviewWindow, _corner_radius: f64) {
-}
+fn configure_macos_window(_window: &tauri::WebviewWindow, _corner_radius: f64) {}
 
 fn position_window_logical(
     window: &tauri::WebviewWindow,
@@ -592,6 +703,15 @@ fn main() {
                 log::info!("Capture window initialized from config (transparent: true, dragDropEnabled: false)");
             }
 
+            if let Some(window) = app.get_webview_window("reader") {
+                let window_clone = window.clone();
+                let border_radius = settings.border_radius;
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    configure_macos_window(&window_clone, border_radius as f64);
+                });
+            }
+
             log::info!("Quick Capture setup complete");
             Ok(())
         })
@@ -601,6 +721,10 @@ fn main() {
             save_settings,
             save_as_note,
             append_to_daily_note,
+            read_note_file,
+            write_note_file,
+            list_vault_notes,
+            get_daily_note_path,
             save_image,
             save_image_from_bytes,
             toggle_edge_detection,
@@ -608,6 +732,8 @@ fn main() {
             is_autostart_enabled,
             hide_capture,
             show_capture,
+            show_reader,
+            hide_reader,
             get_window_info,
             open_settings,
             close_settings,

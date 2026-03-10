@@ -18,6 +18,7 @@ export default defineConfig(async () => ({
       input: {
         main: resolve(__dirname, 'index.html'),
         settings: resolve(__dirname, 'settings.html'),
+        reader: resolve(__dirname, 'reader.html'),
       },
     },
   },

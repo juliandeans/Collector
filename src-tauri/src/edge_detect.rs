@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Manager, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::RwLock;
 
 use crate::settings::Settings;
@@ -55,7 +55,10 @@ impl EdgeDetector {
         let mut s = self.settings.write().await;
         *s = settings;
 
-        log::info!("Edge detection settings updated, enabled: {}", self.enabled.read().await);
+        log::info!(
+            "Edge detection settings updated, enabled: {}",
+            self.enabled.read().await
+        );
     }
 
     /// Enable or disable edge detection
@@ -171,13 +174,8 @@ impl EdgeDetector {
 
                     // Position and show window
                     if let Some(window) = app.get_webview_window("capture") {
-                        let _ = window
-                            .set_size(tauri::LogicalSize { width, height });
-                        let _ =
-                            window.set_position(tauri::LogicalPosition {
-                                x,
-                                y,
-                            });
+                        let _ = window.set_size(tauri::LogicalSize { width, height });
+                        let _ = window.set_position(tauri::LogicalPosition { x, y });
                         let _ = window.show();
                         let _ = window.set_focus();
                     }

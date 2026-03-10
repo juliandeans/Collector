@@ -106,9 +106,7 @@ fn write_clipboard_string(value: &str) {
 
 #[cfg(target_os = "macos")]
 fn synthesize_copy() -> bool {
-    use core_graphics::event::{
-        CGEvent, CGEventFlags, CGEventTapLocation, CGKeyCode,
-    };
+    use core_graphics::event::{CGEvent, CGEventFlags, CGEventTapLocation, CGKeyCode};
     use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
     // Check if we have accessibility permissions
@@ -186,7 +184,10 @@ fn check_accessibility_permissions() -> bool {
     match core_graphics::event::CGEvent::new(src) {
         Ok(_) => true,
         Err(e) => {
-            log::error!("Failed to create CGEvent: {:?} - likely missing accessibility permissions", e);
+            log::error!(
+                "Failed to create CGEvent: {:?} - likely missing accessibility permissions",
+                e
+            );
             false
         }
     }

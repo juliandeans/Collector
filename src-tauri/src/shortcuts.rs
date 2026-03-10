@@ -44,13 +44,11 @@ impl ShortcutManager {
         }
 
         log::info!("Parsing shortcut: '{}'", shortcut_str);
-        let shortcut: Shortcut = shortcut_str
-            .parse()
-            .map_err(|e| {
-                let err_msg = format!("Invalid shortcut '{}': {:?}", shortcut_str, e);
-                log::error!("{}", err_msg);
-                err_msg
-            })?;
+        let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
+            let err_msg = format!("Invalid shortcut '{}': {:?}", shortcut_str, e);
+            log::error!("{}", err_msg);
+            err_msg
+        })?;
 
         log::info!("Registering shortcut handler...");
         let app_handle = app.clone();
@@ -102,7 +100,10 @@ impl ShortcutManager {
         settings: &Settings,
     ) -> Result<(), String> {
         let shortcut_str = normalize_shortcut(&settings.capture_text_shortcut);
-        log::info!("Attempting to register capture_text shortcut: '{}'", shortcut_str);
+        log::info!(
+            "Attempting to register capture_text shortcut: '{}'",
+            shortcut_str
+        );
 
         // Skip if shortcut is empty
         if shortcut_str.trim().is_empty() {
@@ -126,13 +127,11 @@ impl ShortcutManager {
         }
 
         log::info!("Parsing capture_text shortcut: '{}'", shortcut_str);
-        let shortcut: Shortcut = shortcut_str
-            .parse()
-            .map_err(|e| {
-                let err_msg = format!("Invalid capture_text shortcut '{}': {:?}", shortcut_str, e);
-                log::error!("{}", err_msg);
-                err_msg
-            })?;
+        let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
+            let err_msg = format!("Invalid capture_text shortcut '{}': {:?}", shortcut_str, e);
+            log::error!("{}", err_msg);
+            err_msg
+        })?;
 
         log::info!("Registering capture_text shortcut handler...");
         let app_handle = app.clone();
@@ -145,17 +144,15 @@ impl ShortcutManager {
                         // WICHTIG: Capture text FIRST, before opening window
                         // Otherwise the window steals focus and Cmd+C goes to the wrong app
                         log::info!("Capturing selected text (BEFORE opening window)...");
-                        let selected =
-                            tauri::async_runtime::spawn_blocking(crate::selected_text::capture_selected_text)
-                                .await
-                                .ok()
-                                .flatten()
-                                .unwrap_or_default();
+                        let selected = tauri::async_runtime::spawn_blocking(
+                            crate::selected_text::capture_selected_text,
+                        )
+                        .await
+                        .ok()
+                        .flatten()
+                        .unwrap_or_default();
 
-                        log::info!(
-                            "Captured text length={}",
-                            summarize_text_len(&selected)
-                        );
+                        log::info!("Captured text length={}", summarize_text_len(&selected));
 
                         // NOW open/focus capture window
                         let _ = app_handle2.emit("show_capture", ());
@@ -179,13 +176,19 @@ impl ShortcutManager {
                 }
             })
             .map_err(|e| {
-                let err_msg = format!("Failed to register capture_text shortcut '{}': {:?}", shortcut_str, e);
+                let err_msg = format!(
+                    "Failed to register capture_text shortcut '{}': {:?}",
+                    shortcut_str, e
+                );
                 log::error!("{}", err_msg);
                 err_msg
             })?;
 
         *self.current_shortcut.lock().await = Some(shortcut_str.clone());
-        log::info!("Capture text shortcut successfully registered: {}", shortcut_str);
+        log::info!(
+            "Capture text shortcut successfully registered: {}",
+            shortcut_str
+        );
         Ok(())
     }
 
@@ -195,7 +198,10 @@ impl ShortcutManager {
         settings: &Settings,
     ) -> Result<(), String> {
         let shortcut_str = normalize_shortcut(&settings.save_as_note_shortcut);
-        log::info!("Attempting to register save_as_note shortcut: '{}'", shortcut_str);
+        log::info!(
+            "Attempting to register save_as_note shortcut: '{}'",
+            shortcut_str
+        );
 
         // Skip if shortcut is empty
         if shortcut_str.trim().is_empty() {
@@ -219,13 +225,11 @@ impl ShortcutManager {
         }
 
         log::info!("Parsing save_as_note shortcut: '{}'", shortcut_str);
-        let shortcut: Shortcut = shortcut_str
-            .parse()
-            .map_err(|e| {
-                let err_msg = format!("Invalid save_as_note shortcut '{}': {:?}", shortcut_str, e);
-                log::error!("{}", err_msg);
-                err_msg
-            })?;
+        let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
+            let err_msg = format!("Invalid save_as_note shortcut '{}': {:?}", shortcut_str, e);
+            log::error!("{}", err_msg);
+            err_msg
+        })?;
 
         log::info!("Registering save_as_note shortcut handler...");
         let app_handle = app.clone();
@@ -237,13 +241,19 @@ impl ShortcutManager {
                 }
             })
             .map_err(|e| {
-                let err_msg = format!("Failed to register save_as_note shortcut '{}': {:?}", shortcut_str, e);
+                let err_msg = format!(
+                    "Failed to register save_as_note shortcut '{}': {:?}",
+                    shortcut_str, e
+                );
                 log::error!("{}", err_msg);
                 err_msg
             })?;
 
         *self.current_shortcut.lock().await = Some(shortcut_str.clone());
-        log::info!("Save as note shortcut successfully registered: {}", shortcut_str);
+        log::info!(
+            "Save as note shortcut successfully registered: {}",
+            shortcut_str
+        );
         Ok(())
     }
 }
@@ -284,12 +294,68 @@ pub fn validate_shortcut(shortcut: &str) -> Result<(), String> {
     // Check for valid modifiers
     let valid_modifiers = ["CommandOrControl", "Shift", "Alt", "Super"];
     let valid_keys = [
-        "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
-        "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
-        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-        "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
-        "Space", "Tab", "Enter", "Escape", "Backspace", "Delete",
-        "Up", "Down", "Left", "Right", "Home", "End", "PageUp", "PageDown",
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "R",
+        "S",
+        "T",
+        "U",
+        "V",
+        "W",
+        "X",
+        "Y",
+        "Z",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "F7",
+        "F8",
+        "F9",
+        "F10",
+        "F11",
+        "F12",
+        "Space",
+        "Tab",
+        "Enter",
+        "Escape",
+        "Backspace",
+        "Delete",
+        "Up",
+        "Down",
+        "Left",
+        "Right",
+        "Home",
+        "End",
+        "PageUp",
+        "PageDown",
     ];
 
     let mut has_modifier = false;
