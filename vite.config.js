@@ -1,35 +1,21 @@
-import {
-  defineConfig
-} from "vite";
-import {
-  svelte
-} from "@sveltejs/vite-plugin-svelte";
-import {
-  resolve
-} from "path";
+import { defineConfig } from "vite";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 
-// https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [svelte()],
-
-  // Multi-page app configuration
-  build: {
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'index.html'),
-        settings: resolve(__dirname, 'settings.html'),
-        reader: resolve(__dirname, 'reader.html'),
-      },
-    },
-  },
-
-  // Vite options tailored for Tauri development
   clearScreen: false,
   server: {
     port: 1420,
     strictPort: true,
-    watch: {
-      ignored: ["**/src-tauri/**"],
+    watch: { ignored: ["**/src-tauri/**"] },
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        reader: "reader.html",
+        settings: "settings.html",
+      },
     },
   },
-}));
+});

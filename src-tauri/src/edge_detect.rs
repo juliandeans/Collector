@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use tokio::sync::RwLock;
 
 use crate::settings::Settings;
@@ -106,6 +106,7 @@ impl EdgeDetector {
     async fn poll_loop(&self, app: AppHandle) {
         let poll_interval = Duration::from_millis(50);
         let mut trigger_start: Option<Instant> = None;
+        let mut trigger_target: Option<&'static str> = None;
         let trigger_delay = Duration::from_millis(50);
 
         log::info!("Edge detection polling started");
@@ -113,21 +114,17 @@ impl EdgeDetector {
         loop {
             tokio::time::sleep(poll_interval).await;
 
-            // Check if enabled
-            if !*self.enabled.read().await {
-                trigger_start = None;
-                continue;
-            }
-
             // Check if in cooldown
             if self.is_in_cooldown().await {
                 trigger_start = None;
+                trigger_target = None;
                 continue;
             }
 
             // Check if window is already open
             if *self.is_window_open.read().await {
                 trigger_start = None;
+                trigger_target = None;
                 continue;
             }
 
@@ -136,58 +133,39 @@ impl EdgeDetector {
             let screen = get_primary_screen_bounds();
 
             let settings = self.settings.read().await;
-            let edge_zone = 5; // 5px trigger zone
+            if !settings.edge_detection_enabled && !settings.reader_edge_enabled {
+                trigger_start = None;
+                trigger_target = None;
+                continue;
+            }
+            let edge_zone = 5;
+            let at_left_edge = mouse_pos.0 <= edge_zone;
+            let at_right_edge = mouse_pos.0 >= screen.width - edge_zone;
 
-            // Check if mouse is at the configured edge
-            let at_edge = match settings.edge_side.as_str() {
-                "right" => mouse_pos.0 >= screen.width - edge_zone,
-                "left" => mouse_pos.0 <= edge_zone,
-                _ => false,
+            let edge_target = if at_left_edge && settings.reader_edge_enabled {
+                Some("show_reader")
+            } else if at_right_edge && settings.edge_detection_enabled {
+                Some("show_capture")
+            } else {
+                None
             };
 
             drop(settings); // Release lock early
 
-            if at_edge {
-                // Mouse is at edge
-                if trigger_start.is_none() {
-                    // Start timing
+            if let Some(target) = edge_target {
+                if trigger_start.is_none() || trigger_target != Some(target) {
                     trigger_start = Some(Instant::now());
+                    trigger_target = Some(target);
                 } else if trigger_start.unwrap().elapsed() >= trigger_delay {
-                    // Delay passed, trigger window
-                    log::info!("Edge triggered! Opening capture window");
-
-                    // Mark window as open FIRST to prevent re-triggering
+                    log::info!("Edge triggered! Emitting {}", target);
                     *self.is_window_open.write().await = true;
-
-                    // Get settings for positioning
-                    let settings = self.settings.read().await;
-                    let width = settings.window_width as f64;
-                    let height = settings.window_height as f64;
-                    let edge_side = settings.edge_side.clone();
-                    drop(settings);
-
-                    let x = match edge_side.as_str() {
-                        "left" => 0.0,
-                        _ => screen.width as f64 - width,
-                    };
-                    let y = (screen.height as f64 - height) / 2.0;
-
-                    // Position and show window
-                    if let Some(window) = app.get_webview_window("capture") {
-                        let _ = window.set_size(tauri::LogicalSize { width, height });
-                        let _ = window.set_position(tauri::LogicalPosition { x, y });
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
-
-                    // Emit event for frontend to update UI state
-                    let _ = app.emit("show_capture", ());
-
+                    let _ = app.emit(target, ());
                     trigger_start = None;
+                    trigger_target = None;
                 }
             } else {
-                // Mouse not at edge, reset trigger
                 trigger_start = None;
+                trigger_target = None;
             }
         }
     }

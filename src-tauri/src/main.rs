@@ -17,7 +17,7 @@ use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager,
+    AppHandle, Emitter, Listener, LogicalPosition, LogicalSize, Manager,
 };
 use tauri_plugin_autostart::ManagerExt;
 use tokio::sync::RwLock;
@@ -365,8 +365,20 @@ async fn show_capture(app: AppHandle, state: tauri::State<'_, AppState>) -> Resu
     Ok(())
 }
 
-#[tauri::command]
-async fn show_reader(app: AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
+async fn show_capture_internal(app: &AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    if let Some(window) = app.get_webview_window("capture") {
+        let settings = state.settings.read().await;
+        position_window_logical(&window, &settings)?;
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    state.edge_detector.set_window_open(true).await;
+    Ok(())
+}
+
+async fn show_reader_internal(app: &AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
     if let Some(window) = app.get_webview_window("reader") {
         let settings = state.settings.read().await;
         let screen = window
@@ -379,20 +391,30 @@ async fn show_reader(app: AppHandle, state: tauri::State<'_, AppState>) -> Resul
         let win_h = settings.window_height as f64;
         let y = ((screen_h - win_h) / 2.0).max(0.0);
         window
-            .set_position(tauri::LogicalPosition::new(8.0, y))
+            .set_size(LogicalSize::new(380.0, settings.window_height as f64))
+            .map_err(|e| e.to_string())?;
+        window
+            .set_position(LogicalPosition::new(8.0, y))
             .map_err(|e| e.to_string())?;
         configure_macos_window(&window, settings.border_radius as f64);
         let _ = window.show();
         let _ = window.set_focus();
     }
+    state.edge_detector.set_window_open(true).await;
     Ok(())
 }
 
 #[tauri::command]
-async fn hide_reader(app: AppHandle) -> Result<(), String> {
+async fn show_reader(app: AppHandle, _state: tauri::State<'_, AppState>) -> Result<(), String> {
+    show_reader_internal(&app).await
+}
+
+#[tauri::command]
+async fn hide_reader(app: AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("reader") {
         let _ = window.hide();
     }
+    state.edge_detector.set_window_open(false).await;
     Ok(())
 }
 
@@ -633,6 +655,24 @@ fn main() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
         .setup(move |app| {
             let app_handle = app.handle().clone();
+            app_handle.listen("show_capture", {
+                let app_handle = app_handle.clone();
+                move |_| {
+                    let app = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let _ = show_capture_internal(&app).await;
+                    });
+                }
+            });
+            app_handle.listen("show_reader", {
+                let app_handle = app_handle.clone();
+                move |_| {
+                    let app = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let _ = show_reader_internal(&app).await;
+                    });
+                }
+            });
 
             let menu = create_tray_menu(&app_handle);
             let settings_for_tray = settings.clone();
