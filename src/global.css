@@ -170,3 +170,274 @@ html, body {
   backdrop-filter: blur(80px) saturate(200%);
   -webkit-backdrop-filter: blur(80px) saturate(200%);
 }
+
+/* ── Shared Panel Shell ─────────────────────────────── */
+
+.panel-shell {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  position: relative;
+}
+
+.panel-backdrop {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--border-radius);
+  backdrop-filter: var(--blur-strong) saturate(var(--window-saturation, 200%));
+  -webkit-backdrop-filter: var(--blur-strong)
+    saturate(var(--window-saturation, 200%));
+  z-index: 0;
+  pointer-events: none;
+}
+
+.panel-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ── Drag Region / Tab Bar ──────────────────────────── */
+
+.panel-tabbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px 0;
+  min-height: 40px;
+  flex-shrink: 0;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.panel-tab {
+  padding: 4px 10px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px 6px 0 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-app-region: no-drag;
+}
+
+.panel-tab:hover {
+  color: var(--text-color);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.panel-tab.active {
+  color: var(--accent-color);
+  box-shadow: inset 0 -2px 0 var(--accent-color);
+}
+
+.panel-tab-close {
+  margin-left: 4px;
+  opacity: 0;
+  font-size: 10px;
+  line-height: 1;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0 2px;
+}
+
+.panel-tab:hover .panel-tab-close {
+  opacity: 0.6;
+}
+
+.panel-tab-close:hover {
+  opacity: 1 !important;
+  color: var(--error-color);
+}
+
+/* ── Hybrid Editor ──────────────────────────────────── */
+
+.editor-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.editor-line {
+  min-height: 1.5em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  cursor: text;
+  line-height: 1.6;
+  word-break: break-word;
+  transition: background var(--transition-fast);
+}
+
+.editor-line:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.editor-line.focused {
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.editor-line input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  outline: none;
+  padding: 0;
+}
+
+.editor-line h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin: 4px 0;
+}
+
+.editor-line h2 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 3px 0;
+}
+
+.editor-line h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 2px 0;
+}
+
+.editor-line code {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: "SF Mono", monospace;
+  font-size: 0.88em;
+}
+
+.editor-line strong {
+  font-weight: 600;
+}
+
+.editor-line em {
+  font-style: italic;
+}
+
+.editor-line a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.editor-line a:hover {
+  text-decoration: underline;
+}
+
+.editor-checkbox {
+  margin-right: 6px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+/* ── Command Palette Overlay ────────────────────────── */
+
+.palette-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 60px;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(4px);
+  border-radius: var(--border-radius);
+}
+
+.palette-box {
+  width: calc(100% - 32px);
+  max-height: 70%;
+  background: var(--background-color);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.palette-input {
+  border: none;
+  background: transparent;
+  padding: 12px 16px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-color);
+  outline: none;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.palette-results {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.palette-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: background var(--transition-fast);
+}
+
+.palette-item:hover,
+.palette-item.selected {
+  background: var(--accent-light);
+}
+
+.palette-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.palette-item-path {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ── Saved Indicator ────────────────────────────────── */
+
+.saved-indicator {
+  position: absolute;
+  bottom: 12px;
+  right: 14px;
+  font-size: 11px;
+  color: var(--success-color);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.saved-indicator.visible {
+  opacity: 1;
+}
