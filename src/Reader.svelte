@@ -215,6 +215,8 @@
     path,
     label = "",
     icon = "",
+    isPinned = kind === "daily" || kind === "pinned",
+    history = [],
     existingTab = null,
   }) {
     const fallbackLabel =
@@ -229,6 +231,8 @@
       loaded: existingTab?.loaded ?? false,
       missing: existingTab?.missing ?? false,
       missingMessage: existingTab?.missingMessage ?? "",
+      isPinned: existingTab?.isPinned ?? isPinned,
+      history: [...(existingTab?.history ?? history)],
     };
   }
 
@@ -460,7 +464,12 @@
     html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
     html = html.replace(/`(.+?)`/g, "<code>$1</code>");
-    html = html.replace(/\[\[(.+?)\]\]/g, '<span class="wikilink">[[$1]]</span>');
+    html = html.replace(/\[\[([^\]]+)\]\]/g, (_, inner) => {
+      const [rawTarget = "", rawDisplay = ""] = inner.split("|");
+      const target = rawTarget.trim();
+      const display = (rawDisplay || rawTarget).trim();
+      return `<span class="wikilink" data-target="${escAttr(target)}">[[${escHtml(display)}]]</span>`;
+    });
     html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>');
     html = html.replace(/\u0000IMG(\d+)\u0000/g, (_, index) => {
       return imageTokens[Number(index)] ?? "";
@@ -535,8 +544,69 @@
     return lines.map((line) => markdownLineToHtml(line)).join("");
   }
 
+  function imageNodeToMarkdown(node) {
+    const alt = node.getAttribute?.("alt") ?? "";
+    const style = node.getAttribute?.("style") ?? "";
+    const widthMatch = style.match(/width:\s*(\d+)px/i);
+    const width = widthMatch ? widthMatch[1] : null;
+    const isWikilink = !alt.includes("http") && !alt.startsWith("/");
+    if (isWikilink) {
+      return width ? `![[${alt}|${width}]]` : `![[${alt}]]`;
+    }
+
+    return `![${alt}](${alt})`;
+  }
+
   function elementInnerToMarkdown(el) {
-    return serializeChildren(el);
+    let result = "";
+
+    el.childNodes.forEach((node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        result += node.textContent ?? "";
+        return;
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return;
+      }
+
+      const tag = node.tagName?.toLowerCase();
+      const text = node.innerText ?? node.textContent ?? "";
+
+      if (tag === "img") {
+        result += imageNodeToMarkdown(node);
+        return;
+      }
+
+      if (tag === "strong" || tag === "b") {
+        result += `**${text}**`;
+        return;
+      }
+
+      if (tag === "em" || tag === "i") {
+        result += `*${text}*`;
+        return;
+      }
+
+      if (tag === "code") {
+        result += `\`${text}\``;
+        return;
+      }
+
+      if (tag === "a") {
+        result += `[${text}](${node.href})`;
+        return;
+      }
+
+      if (tag === "span" && node.classList?.contains("wikilink")) {
+        result += `[[${node.dataset.target ?? text}]]`;
+        return;
+      }
+
+      result += text;
+    });
+
+    return result;
   }
 
   function elementToMarkdownLine(el) {
@@ -569,16 +639,17 @@
     if (tag === "p") {
       const checkbox = el.querySelector('input[type="checkbox"]');
       if (checkbox) {
-        const text = inner.replace(/^\s*/, "");
+        const text = (el.innerText ?? "").trim();
         return `${checkbox.checked ? "- [x] " : "- [ ] "}${text}`;
       }
 
       if (el.classList.contains("list-item")) {
-        return `- ${inner}`;
+        return `- ${elementInnerToMarkdown(el)}`;
       }
 
-      if (!inner.trim()) return "";
-      return elementInnerToMarkdown(el);
+      const paragraphMarkdown = elementInnerToMarkdown(el);
+      if (!paragraphMarkdown.trim()) return "";
+      return paragraphMarkdown;
     }
 
     return inner;
@@ -649,9 +720,11 @@
     if (!selection || selection.rangeCount === 0) return;
 
     const node = selection.getRangeAt(0).startContainer;
+    const anchorEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    if (anchorEl?.closest?.(".wikilink")) return;
     if (!editorRef.contains(node)) return;
 
-    let el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    let el = anchorEl;
     while (el && el !== editorRef && el.parentElement !== editorRef) {
       el = el.parentElement;
     }
@@ -694,13 +767,17 @@
       return `\`${serializeChildren(element)}\``;
     }
 
+    if (tag === "img") {
+      return imageNodeToMarkdown(element);
+    }
+
     if (tag === "a") {
       const href = element.getAttribute("href") ?? "";
       return `[${serializeChildren(element)}](${href})`;
     }
 
     if (tag === "span" && element.classList.contains("wikilink")) {
-      return element.textContent ?? "";
+      return `[[${element.dataset.target ?? element.textContent ?? ""}]]`;
     }
 
     return serializeChildren(element);
@@ -803,6 +880,11 @@
         return;
       }
 
+      if (tag === "img") {
+        lines.push(imageNodeToMarkdown(element));
+        return;
+      }
+
       if (tag === "p" || tag === "div") {
         const checkbox = element.querySelector('input[type="checkbox"]');
         if (checkbox) {
@@ -813,11 +895,11 @@
         }
 
         if (element.classList.contains("list-item")) {
-          lines.push(`- ${serializeChildren(element).trim()}`);
+          lines.push(`- ${elementInnerToMarkdown(element).trim()}`);
           return;
         }
 
-        const text = serializeChildren(element).trim();
+        const text = elementInnerToMarkdown(element).trim();
         const hasOnlyBreak =
           element.childNodes.length === 1 &&
           element.firstChild?.nodeType === Node.ELEMENT_NODE &&
@@ -1194,6 +1276,117 @@
     }
   }
 
+  async function resolveWikilink(target) {
+    const withoutDisplay = target.split("|")[0].trim();
+    const cleanTarget = withoutDisplay.split("#")[0].trim();
+    if (!cleanTarget) return null;
+
+    await ensureVaultNotes();
+
+    const normalizedTarget = cleanTarget.toLowerCase().replace(/\\/g, "/");
+    const withExtension = normalizedTarget.endsWith(".md")
+      ? normalizedTarget
+      : `${normalizedTarget}.md`;
+
+    let found = vaultNotes.find((note) => {
+      const relativePath = note.relative_path.toLowerCase().replace(/\\/g, "/");
+      return (
+        note.name.toLowerCase() === normalizedTarget ||
+        relativePath === normalizedTarget ||
+        relativePath === withExtension
+      );
+    });
+
+    if (!found) {
+      found = vaultNotes.find((note) =>
+        note.name.toLowerCase().includes(normalizedTarget),
+      );
+    }
+
+    return found ?? null;
+  }
+
+  async function navigateToWikilink(target, forceNewTab = false) {
+    const note = await resolveWikilink(target);
+    if (!note) {
+      showStatus(`Note not found: [[${target}]]`, "error", 2200);
+      return;
+    }
+
+    const currentTab = tabs[activeTabIndex];
+    if (!currentTab) return;
+
+    const openNewTab = forceNewTab || currentTab.isPinned;
+
+    if (openNewTab) {
+      const existingIndex = tabs.findIndex((tab) => tab.path === note.path);
+      if (existingIndex >= 0) {
+        await activateTab(existingIndex, true);
+        return;
+      }
+
+      tabs = [
+        ...tabs,
+        createTab({
+          kind: "opened",
+          path: note.path,
+          label: note.name,
+          isPinned: false,
+          history: [],
+        }),
+      ];
+      await activateTab(tabs.length - 1, true);
+      return;
+    }
+
+    await forceSave(false);
+    replaceTab(activeTabIndex, {
+      path: note.path,
+      label: note.name,
+      content: "",
+      loaded: false,
+      missing: false,
+      missingMessage: "",
+      history: [...(currentTab.history ?? []), currentTab.path],
+      isPinned: false,
+    });
+    await loadTab(activeTabIndex, true);
+  }
+
+  function handleEditorMouseDown(event) {
+    const wikilink = event.target?.closest?.(".wikilink");
+    if (!wikilink) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const target = wikilink.dataset.target;
+    if (!target) return;
+
+    navigateToWikilink(target, event.metaKey || event.ctrlKey);
+  }
+
+  async function navigateBack() {
+    const currentTab = tabs[activeTabIndex];
+    if (!currentTab?.history?.length) return;
+
+    await forceSave(false);
+    const previousPath = currentTab.history[currentTab.history.length - 1];
+    const note = vaultNotes.find((entry) => entry.path === previousPath);
+
+    replaceTab(activeTabIndex, {
+      path: previousPath,
+      label: note?.name ?? fileLabel(previousPath),
+      content: "",
+      loaded: false,
+      missing: false,
+      missingMessage: "",
+      history: currentTab.history.slice(0, -1),
+      isPinned: false,
+    });
+    await loadTab(activeTabIndex, true);
+  }
+
   async function openPalette() {
     await ensureVaultNotes();
     showPalette = true;
@@ -1223,6 +1416,8 @@
         kind: "opened",
         path: note.path,
         label: note.name,
+        isPinned: false,
+        history: [],
       }),
     ];
 
@@ -1332,6 +1527,7 @@
         kind: "daily",
         path: dailyPath,
         label: "Daily",
+        isPinned: true,
         existingTab:
           previousTabs.find((tab) => tab.kind === "daily") ??
           existingByPath.get(dailyPath),
@@ -1342,6 +1538,7 @@
           path: note.path,
           label: note.label,
           icon: note.icon,
+          isPinned: true,
           existingTab: existingByPath.get(note.path),
         }),
       ),
@@ -1388,6 +1585,7 @@
   onMount(async () => {
     try {
       await buildInitialTabs();
+      await ensureVaultNotes();
 
       unlistenShowReader = await listen("show_reader", async () => {
         finalizeActiveBlock();
@@ -1476,6 +1674,18 @@
         +
       </button>
 
+      {#if tabs[activeTabIndex]?.history?.length > 0}
+        <button
+          class="back-button"
+          type="button"
+          title="Back"
+          on:mousedown|stopPropagation
+          on:click|stopPropagation={navigateBack}
+        >
+          ←
+        </button>
+      {/if}
+
       <div class="tab-list">
         {#each tabs as tab, index (tab.path)}
           <button
@@ -1561,6 +1771,7 @@
       data-placeholder="Start writing..."
       on:input={handleInput}
       on:keydown={handleKeydown}
+      on:mousedown={handleEditorMouseDown}
       on:blur={handleEditorBlur}
       on:compositionstart={handleCompositionStart}
       on:compositionend={handleCompositionEnd}
@@ -1843,6 +2054,31 @@
       transform var(--transition-fast);
   }
 
+  .back-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+    transition:
+      background var(--transition-fast),
+      color var(--transition-fast);
+    -webkit-app-region: no-drag;
+  }
+
+  .back-button:hover {
+    background: rgba(0, 0, 0, 0.08);
+    color: var(--app-text-color, #ffffff);
+  }
+
   .tab-action:hover,
   .tab-button:hover,
   .palette-item:hover {
@@ -2004,7 +2240,17 @@
 
   .editor-body :global(.wikilink) {
     color: var(--accent-color);
-    opacity: 0.85;
+    opacity: 0.9;
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+    transition:
+      border-color 0.15s ease,
+      opacity 0.15s ease;
+  }
+
+  .editor-body :global(.wikilink:hover) {
+    opacity: 1;
+    border-bottom-color: var(--accent-color);
   }
 
   .editor-body :global(.md-image) {
