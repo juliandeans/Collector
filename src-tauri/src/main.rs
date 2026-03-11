@@ -12,7 +12,7 @@ mod selected_text;
 mod settings;
 mod shortcuts;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -214,6 +214,68 @@ async fn read_note_file(path: String) -> Result<String, String> {
 #[tauri::command]
 async fn write_note_file(path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+fn find_file_in_vault(dir: &Path, filename: &str) -> Option<PathBuf> {
+    let entries = std::fs::read_dir(dir).ok()?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        if path
+            .file_name()
+            .map(|name| name.to_string_lossy().starts_with('.'))
+            .unwrap_or(false)
+        {
+            continue;
+        }
+
+        if path.is_dir() {
+            if let Some(found) = find_file_in_vault(&path, filename) {
+                return Some(found);
+            }
+        } else if path
+            .file_name()
+            .map(|name| name.to_string_lossy().eq_ignore_ascii_case(filename))
+            .unwrap_or(false)
+        {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+#[tauri::command]
+async fn resolve_image_path(
+    filename: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let settings = state.settings.read().await;
+    let vault_path = PathBuf::from(&settings.vault_path);
+    let candidate_path = PathBuf::from(&filename);
+
+    if candidate_path.is_absolute() {
+        return Ok(filename);
+    }
+
+    if filename.contains('/') || filename.contains('\\') {
+        let resolved = vault_path.join(&filename);
+        if resolved.exists() {
+            return Ok(resolved.to_string_lossy().to_string());
+        }
+    }
+
+    let bare_name = candidate_path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| filename.clone());
+
+    if let Some(found) = find_file_in_vault(&vault_path, &bare_name) {
+        return Ok(found.to_string_lossy().to_string());
+    }
+
+    Ok(vault_path.join(&filename).to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -808,6 +870,7 @@ fn main() {
             append_to_daily_note,
             read_note_file,
             write_note_file,
+            resolve_image_path,
             list_vault_notes,
             get_daily_note_path,
             save_image,

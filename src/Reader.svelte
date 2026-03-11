@@ -1,5 +1,5 @@
 <script>
-  import { invoke } from "@tauri-apps/api/core";
+  import { convertFileSrc, invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
   import { getReaderIconComponent } from "./lib/reader-icons.js";
@@ -15,7 +15,9 @@
   let strippedFrontmatter = "";
   let codeblockMap = new Map();
   let hiddenBlockMap = new Map();
+  const imagePathCache = new Map();
   let appSettings = {
+    vault_path: "",
     background_color: "#1e1e2e",
     font_family: "-apple-system, BlinkMacSystemFont, SF Pro Display",
     font_size: 15,
@@ -54,6 +56,7 @@
   let savedIndicatorTimeout;
   let unlistenShowReader;
   let unlistenSettingsChanged;
+  let renderRequestId = 0;
 
   $: activeTab = tabs[activeTabIndex] ?? null;
   $: fileMissing = missingFileMessage.trim() !== "";
@@ -261,6 +264,7 @@
   function applySettings(settings) {
     appSettings = {
       ...appSettings,
+      vault_path: settings.vault_path ?? appSettings.vault_path,
       background_color:
         settings.background_color ?? appSettings.background_color,
       font_family: settings.font_family ?? appSettings.font_family,
@@ -380,13 +384,87 @@
       .replace(/>/g, "&gt;");
   }
 
+  function escAttr(text = "") {
+    return escHtml(text).replace(/"/g, "&quot;");
+  }
+
+  async function resolveImagePath(rawPath = "") {
+    const cleanPath = rawPath.split("|")[0]?.trim() ?? "";
+    if (!cleanPath) return "";
+
+    if (imagePathCache.has(cleanPath)) {
+      return imagePathCache.get(cleanPath);
+    }
+
+    try {
+      const absolutePath = await invoke("resolve_image_path", {
+        filename: cleanPath,
+      });
+      const src = convertFileSrc(absolutePath);
+      imagePathCache.set(cleanPath, src);
+      return src;
+    } catch (error) {
+      console.warn("Could not resolve image path:", cleanPath, error);
+      return "";
+    }
+  }
+
+  async function resolveImagesInText(text = "") {
+    const wikiImageRegex = /!\[\[([^\]]+)\]\]/g;
+    const mdImageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    const imagePaths = new Set();
+    let match;
+
+    while ((match = wikiImageRegex.exec(text)) !== null) {
+      imagePaths.add(match[1].split("|")[0].trim());
+    }
+
+    while ((match = mdImageRegex.exec(text)) !== null) {
+      imagePaths.add(match[2].trim());
+    }
+
+    await Promise.all(
+      [...imagePaths]
+        .filter((path) => path)
+        .map((path) => resolveImagePath(path)),
+    );
+
+    return text;
+  }
+
   function inlineMarkdown(text = "") {
-    let html = escHtml(text);
+    const imageTokens = [];
+    let html = text;
+
+    html = html.replace(/!\[\[([^\]]+)\]\]/g, (_, inner) => {
+      const [rawPath = "", rawWidth = ""] = inner.split("|");
+      const cleanPath = rawPath.trim();
+      const widthValue = rawWidth.trim();
+      const src = imagePathCache.get(cleanPath) ?? "";
+      const style = widthValue
+        ? `width:${Number.isNaN(Number(widthValue)) ? widthValue : `${widthValue}px`};max-width:100%;`
+        : "max-width:100%;";
+      const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(cleanPath)}" style="${escAttr(style)}" class="md-image" loading="lazy">`;
+      imageTokens.push(imageTag);
+      return `\u0000IMG${imageTokens.length - 1}\u0000`;
+    });
+
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, path) => {
+      const src = imagePathCache.get(path.trim()) ?? "";
+      const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(alt)}" style="max-width:100%;" class="md-image" loading="lazy">`;
+      imageTokens.push(imageTag);
+      return `\u0000IMG${imageTokens.length - 1}\u0000`;
+    });
+
+    html = escHtml(html);
     html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
     html = html.replace(/`(.+?)`/g, "<code>$1</code>");
     html = html.replace(/\[\[(.+?)\]\]/g, '<span class="wikilink">[[$1]]</span>');
-    html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>');
+    html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>');
+    html = html.replace(/\u0000IMG(\d+)\u0000/g, (_, index) => {
+      return imageTokens[Number(index)] ?? "";
+    });
     return html;
   }
 
@@ -816,15 +894,21 @@
     return restored;
   }
 
-  function renderContentToEditor(raw = "") {
+  async function renderContentToEditor(raw = "") {
     const processed = preprocessContent(raw);
     blocks = parseRawBlocks(processed);
     activeParagraphEl = null;
 
     if (!editorRef) return;
 
+    const requestId = ++renderRequestId;
     isRenderingContent = true;
-    editorRef.innerHTML = markdownToHtml(processed);
+    const resolvedText = await resolveImagesInText(processed);
+    if (requestId !== renderRequestId || !editorRef) {
+      isRenderingContent = false;
+      return;
+    }
+    editorRef.innerHTML = markdownToHtml(resolvedText);
     console.log(
       "[CB] Pills in DOM:",
       editorRef.querySelectorAll(".codeblock-pill").length,
@@ -833,10 +917,11 @@
     isRenderingContent = false;
   }
 
-  function loadEditorContent(raw = "") {
+  async function loadEditorContent(raw = "") {
     finalizeActiveBlock();
     rawContent = normalizeNewlines(raw);
-    renderContentToEditor(rawContent);
+    imagePathCache.clear();
+    await renderContentToEditor(rawContent);
   }
 
   async function loadTab(index, forceReload = false) {
@@ -844,7 +929,7 @@
     if (!tab) return;
 
     if (!forceReload && tab.loaded) {
-      loadEditorContent(tab.content);
+      await loadEditorContent(tab.content);
       missingFileMessage = tab.missing ? tab.missingMessage || "" : "";
       return;
     }
@@ -859,7 +944,7 @@
       });
 
       if (index === activeTabIndex) {
-        loadEditorContent(content);
+        await loadEditorContent(content);
         missingFileMessage = "";
       }
     } catch (error) {
@@ -876,7 +961,7 @@
       });
 
       if (index === activeTabIndex) {
-        loadEditorContent("");
+        await loadEditorContent("");
         missingFileMessage = missingMessage;
       }
 
@@ -1287,7 +1372,7 @@
       return;
     }
 
-    loadEditorContent(currentTab.content);
+    await loadEditorContent(currentTab.content);
     missingFileMessage = currentTab.missing ? currentTab.missingMessage || "" : "";
   }
 
@@ -1338,7 +1423,8 @@
 
         if (filtersChanged) {
           finalizeActiveBlock();
-          renderContentToEditor(rawContent);
+          imagePathCache.clear();
+          await renderContentToEditor(rawContent);
         }
       });
 
@@ -1919,6 +2005,23 @@
   .editor-body :global(.wikilink) {
     color: var(--accent-color);
     opacity: 0.85;
+  }
+
+  .editor-body :global(.md-image) {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 8px 0;
+    border-radius: 6px;
+    cursor: default;
+  }
+
+  .editor-body :global(p:has(.md-image)) {
+    margin: 4px 0;
+  }
+
+  .editor-body :global(.md-image[src=""]) {
+    display: none;
   }
 
   .editor-body :global(.codeblock-pill) {
