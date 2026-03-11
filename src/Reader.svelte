@@ -7,14 +7,14 @@
   let tabs = [];
   let activeTabIndex = 0;
   let blocks = [""];
-  let focusedBlock = null;
   let showPalette = false;
   let paletteQuery = "";
   let vaultNotes = [];
   let isSaving = false;
-  let lastSaved = null;
   let rawContent = "";
-  let visibleBlocks = [];
+  let strippedFrontmatter = "";
+  let codeblockMap = new Map();
+  let hiddenBlockMap = new Map();
   let appSettings = {
     background_color: "#1e1e2e",
     font_family: "-apple-system, BlinkMacSystemFont, SF Pro Display",
@@ -42,8 +42,11 @@
     tabIndex: -1,
   };
 
+  let editorRef;
+  let scrollRef;
   let paletteInputRef;
-  let blockInputRefs = [];
+  let isComposing = false;
+  let isRenderingContent = false;
   let saveTimeout;
   let pendingSave = null;
   let statusTimeout;
@@ -52,6 +55,7 @@
   let unlistenSettingsChanged;
 
   $: activeTab = tabs[activeTabIndex] ?? null;
+  $: fileMissing = missingFileMessage.trim() !== "";
   $: filteredVaultNotes = vaultNotes.filter((note) => {
     const query = paletteQuery.trim().toLowerCase();
     if (!query) return true;
@@ -160,72 +164,6 @@
   function isObsidianComment(block) {
     const trimmed = block.trim();
     return trimmed.startsWith("%%") && trimmed.endsWith("%%");
-  }
-
-  function getVisibleBlocksFromRaw(content = rawContent) {
-    const allBlocks = parseRawBlocks(content);
-    const nextVisibleBlocks = [];
-
-    allBlocks.forEach((block, originalIndex) => {
-      const isHidden =
-        (appSettings.reader_hide_frontmatter &&
-          isFrontmatterBlock(block, originalIndex)) ||
-        (appSettings.reader_hide_dataview && isCodeBlock(block)) ||
-        (appSettings.reader_hide_obsidian_comments && isObsidianComment(block));
-
-      if (!isHidden) {
-        nextVisibleBlocks.push({ content: block, originalIndex });
-      }
-    });
-
-    return { allBlocks, nextVisibleBlocks };
-  }
-
-  function getContentForSave(nextBlocks = blocks) {
-    const allBlocks = parseRawBlocks(rawContent);
-
-    visibleBlocks.forEach((visibleBlock, index) => {
-      const replacement = nextBlocks[index] ?? "";
-      if (visibleBlock.originalIndex >= allBlocks.length) {
-        allBlocks.push(replacement);
-      } else {
-        allBlocks[visibleBlock.originalIndex] = replacement;
-      }
-    });
-
-    return allBlocks.join("\n\n");
-  }
-
-  function loadContent(raw = "") {
-    rawContent = normalizeNewlines(raw);
-    const { allBlocks, nextVisibleBlocks } =
-      getVisibleBlocksFromRaw(rawContent);
-
-    visibleBlocks =
-      nextVisibleBlocks.length > 0
-        ? nextVisibleBlocks
-        : [{ content: "", originalIndex: allBlocks.length }];
-
-    blocks = visibleBlocks.map((block) => block.content);
-    focusedBlock = null;
-    blockInputRefs = [];
-  }
-
-  function autosize(node) {
-    const resize = () => {
-      node.style.height = "auto";
-      node.style.height = `${node.scrollHeight}px`;
-    };
-
-    node.addEventListener("input", resize);
-    setTimeout(resize, 0);
-
-    return {
-      update: resize,
-      destroy() {
-        node.removeEventListener("input", resize);
-      },
-    };
   }
 
   function fileLabel(path) {
@@ -370,24 +308,339 @@
     });
   }
 
-  function updateBlocks(nextBlocks, shouldScheduleSave = true) {
-    blocks = nextBlocks.length > 0 ? nextBlocks : [""];
-    rawContent = getContentForSave(blocks);
-    updateActiveTabContent(rawContent);
-    if (shouldScheduleSave) {
-      scheduleSave();
+  function preprocessContent(raw = "") {
+    const normalized = normalizeNewlines(raw);
+    const allBlocks = parseRawBlocks(normalized);
+    const visibleBlocks = [];
+
+    strippedFrontmatter = "";
+    codeblockMap = new Map();
+    hiddenBlockMap = new Map();
+
+    allBlocks.forEach((block, originalIndex) => {
+      if (
+        appSettings.reader_hide_frontmatter &&
+        isFrontmatterBlock(block, originalIndex)
+      ) {
+        strippedFrontmatter = block;
+        return;
+      }
+
+      if (appSettings.reader_hide_dataview && isCodeBlock(block)) {
+        const codeblockId = `__CB_${codeblockMap.size}__`;
+        const firstLine = block.split("\n")[0]?.trim() ?? "```";
+        const lang = firstLine.slice(3).trim();
+        codeblockMap.set(codeblockId, block);
+        visibleBlocks.push(`\u200B${codeblockId}:${lang}`);
+        return;
+      }
+
+      if (appSettings.reader_hide_obsidian_comments && isObsidianComment(block)) {
+        const hiddenId = `__HD_${hiddenBlockMap.size}__`;
+        hiddenBlockMap.set(hiddenId, block);
+        visibleBlocks.push(`\u200B${hiddenId}`);
+        return;
+      }
+
+      visibleBlocks.push(block);
+    });
+
+    return visibleBlocks.join("\n\n");
+  }
+
+  function escHtml(text = "") {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function inlineMarkdown(text = "") {
+    let html = escHtml(text);
+    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+    html = html.replace(/`(.+?)`/g, "<code>$1</code>");
+    html = html.replace(/\[\[(.+?)\]\]/g, '<span class="wikilink">[[$1]]</span>');
+    html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>');
+    return html;
+  }
+
+  function markdownToHtml(text = "") {
+    if (!text.trim()) return "";
+
+    const lines = normalizeNewlines(text).split("\n");
+    const htmlLines = lines.map((line) => {
+      const codeblockMatch = line.match(/^\u200B(__CB_\d+__):(.*)$/);
+      if (codeblockMatch) {
+        const [, id, langValue] = codeblockMatch;
+        const lang = langValue.trim() || "code";
+        return `<div class="codeblock-pill" data-cbid="${id}" contenteditable="false"><span class="codeblock-icon"></span><span class="codeblock-lang">${escHtml(lang)}</span><span class="codeblock-hint">hidden</span></div>`;
+      }
+
+      const hiddenMatch = line.match(/^\u200B(__HD_\d+__)$/);
+      if (hiddenMatch) {
+        return `<div class="hidden-marker" data-hidden-id="${hiddenMatch[1]}" contenteditable="false"></div>`;
+      }
+
+      if (/^### /.test(line)) return `<h3>${escHtml(line.slice(4))}</h3>`;
+      if (/^## /.test(line)) return `<h2>${escHtml(line.slice(3))}</h2>`;
+      if (/^# /.test(line)) return `<h1>${escHtml(line.slice(2))}</h1>`;
+      if (line.trim() === "") return "<p><br></p>";
+      if (/^---+$/.test(line.trim())) return "<hr>";
+
+      if (/^- \[ \] /.test(line)) {
+        const label = line.slice(6);
+        return `<p><input type="checkbox" class="md-checkbox" contenteditable="false"> ${inlineMarkdown(label)}</p>`;
+      }
+
+      if (/^- \[x\] /i.test(line)) {
+        const label = line.slice(6);
+        return `<p><input type="checkbox" class="md-checkbox" contenteditable="false" checked> ${inlineMarkdown(label)}</p>`;
+      }
+
+      if (/^> /.test(line)) {
+        return `<blockquote>${inlineMarkdown(line.slice(2))}</blockquote>`;
+      }
+
+      if (/^- /.test(line)) {
+        return `<p class="list-item">${inlineMarkdown(line.slice(2))}</p>`;
+      }
+
+      return `<p>${inlineMarkdown(line)}</p>`;
+    });
+
+    return htmlLines.join("");
+  }
+
+  function serializeInline(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return (node.textContent ?? "").replace(/\u00A0/g, " ");
     }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return "";
+    }
+
+    const element = node;
+    const tag = element.tagName.toLowerCase();
+
+    if (tag === "br") return "";
+    if (tag === "input") return "";
+
+    if (tag === "strong" || tag === "b") {
+      return `**${serializeChildren(element)}**`;
+    }
+
+    if (tag === "em" || tag === "i") {
+      return `*${serializeChildren(element)}*`;
+    }
+
+    if (tag === "code") {
+      return `\`${serializeChildren(element)}\``;
+    }
+
+    if (tag === "a") {
+      const href = element.getAttribute("href") ?? "";
+      return `[${serializeChildren(element)}](${href})`;
+    }
+
+    if (tag === "span" && element.classList.contains("wikilink")) {
+      return element.textContent ?? "";
+    }
+
+    return serializeChildren(element);
+  }
+
+  function serializeChildren(node, { skipCheckbox = false } = {}) {
+    let result = "";
+
+    node.childNodes.forEach((child) => {
+      if (
+        skipCheckbox &&
+        child.nodeType === Node.ELEMENT_NODE &&
+        child.tagName.toLowerCase() === "input"
+      ) {
+        return;
+      }
+
+      result += serializeInline(child);
+    });
+
+    return result.replace(/\u200B/g, "");
+  }
+
+  function htmlToMarkdown(el) {
+    const lines = [];
+
+    el.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = (child.textContent ?? "").trim();
+        if (text) {
+          lines.push(text);
+        }
+        return;
+      }
+
+      if (child.nodeType !== Node.ELEMENT_NODE) return;
+
+      const element = child;
+      const tag = element.tagName.toLowerCase();
+
+      if (tag === "h1") {
+        lines.push(`# ${serializeChildren(element).trim()}`);
+        return;
+      }
+
+      if (tag === "h2") {
+        lines.push(`## ${serializeChildren(element).trim()}`);
+        return;
+      }
+
+      if (tag === "h3") {
+        lines.push(`### ${serializeChildren(element).trim()}`);
+        return;
+      }
+
+      if (tag === "hr") {
+        lines.push("---");
+        return;
+      }
+
+      if (tag === "blockquote") {
+        lines.push(`> ${serializeChildren(element).trim()}`);
+        return;
+      }
+
+      if (tag === "div" && element.classList.contains("codeblock-pill")) {
+        const id = element.dataset.cbid;
+        if (id) {
+          lines.push(id);
+        }
+        return;
+      }
+
+      if (tag === "div" && element.classList.contains("hidden-marker")) {
+        const hiddenId = element.dataset.hiddenId;
+        if (hiddenId) {
+          lines.push(hiddenId);
+        }
+        return;
+      }
+
+      if (tag === "p" || tag === "div") {
+        const checkbox = element.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+          const checked = checkbox.checked;
+          const text = serializeChildren(element, { skipCheckbox: true }).trim();
+          lines.push(`${checked ? "- [x] " : "- [ ] "}${text}`);
+          return;
+        }
+
+        if (element.classList.contains("list-item")) {
+          lines.push(`- ${serializeChildren(element).trim()}`);
+          return;
+        }
+
+        const text = serializeChildren(element).trim();
+        const hasOnlyBreak =
+          element.childNodes.length === 1 &&
+          element.firstChild?.nodeType === Node.ELEMENT_NODE &&
+          element.firstChild?.tagName.toLowerCase() === "br";
+
+        if (!text && hasOnlyBreak) {
+          lines.push("");
+          return;
+        }
+
+        if (!text && !element.textContent?.trim()) {
+          lines.push("");
+          return;
+        }
+
+        lines.push(text);
+        return;
+      }
+
+      const fallbackText = serializeChildren(element).trim();
+      if (fallbackText) {
+        lines.push(fallbackText);
+      }
+    });
+
+    return lines.join("\n");
+  }
+
+  function restoreCodeblocks(markdown = "") {
+    let restored = markdown;
+
+    codeblockMap.forEach((block, id) => {
+      const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      restored = restored.replace(new RegExp(`(?:\\u200B)?${escaped}(?::[^\\n]*)?`, "g"), block);
+    });
+
+    return restored;
+  }
+
+  function restoreHiddenBlocks(markdown = "") {
+    let restored = markdown;
+
+    hiddenBlockMap.forEach((block, id) => {
+      const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      restored = restored.replace(new RegExp(`(?:\\u200B)?${escaped}`, "g"), block);
+    });
+
+    return restored;
+  }
+
+  function getCurrentMarkdown() {
+    if (!editorRef) {
+      return preprocessContent(rawContent);
+    }
+
+    return normalizeNewlines(htmlToMarkdown(editorRef));
+  }
+
+  function composeContentFromMarkdown(markdown = "") {
+    const normalized = normalizeNewlines(markdown);
+    blocks = parseRawBlocks(normalized);
+
+    const withHiddenBlocks = restoreHiddenBlocks(normalized);
+    const restored = restoreCodeblocks(withHiddenBlocks);
+    const frontmatter = strippedFrontmatter.trim();
+
+    if (frontmatter && restored.trim()) {
+      return `${frontmatter}\n\n${restored}`;
+    }
+
+    if (frontmatter) {
+      return frontmatter;
+    }
+
+    return restored;
+  }
+
+  function renderContentToEditor(raw = "") {
+    const processed = preprocessContent(raw);
+    blocks = parseRawBlocks(processed);
+
+    if (!editorRef) return;
+
+    isRenderingContent = true;
+    editorRef.innerHTML = markdownToHtml(processed);
+    isRenderingContent = false;
+  }
+
+  function loadEditorContent(raw = "") {
+    rawContent = normalizeNewlines(raw);
+    renderContentToEditor(rawContent);
   }
 
   async function loadTab(index, forceReload = false) {
     const tab = tabs[index];
     if (!tab) return;
 
-    focusedBlock = null;
-    blockInputRefs = [];
-
     if (!forceReload && tab.loaded) {
-      loadContent(tab.content);
+      loadEditorContent(tab.content);
       missingFileMessage = tab.missing ? tab.missingMessage || "" : "";
       return;
     }
@@ -400,8 +653,9 @@
         missing: false,
         missingMessage: "",
       });
+
       if (index === activeTabIndex) {
-        loadContent(content);
+        loadEditorContent(content);
         missingFileMessage = "";
       }
     } catch (error) {
@@ -418,7 +672,7 @@
       });
 
       if (index === activeTabIndex) {
-        loadContent("");
+        loadEditorContent("");
         missingFileMessage = missingMessage;
       }
 
@@ -432,6 +686,7 @@
     if (index !== activeTabIndex) {
       await flushPendingSave(false);
     }
+
     activeTabIndex = index;
     await loadTab(index, forceReload);
   }
@@ -459,15 +714,17 @@
         missingMessage: "",
         loaded: true,
       });
+
       if (index === activeTabIndex) {
         missingFileMessage = "";
       }
-      lastSaved = new Date();
+
       showSavedIndicator = true;
       clearTimeout(savedIndicatorTimeout);
       savedIndicatorTimeout = setTimeout(() => {
         showSavedIndicator = false;
       }, 1500);
+
       if (showConfirmation) {
         showStatus("Saved ✓", "success");
       }
@@ -478,27 +735,13 @@
     }
   }
 
-  async function saveCurrentTab(showConfirmation = true) {
-    if (!activeTab) return;
-
+  function scheduleSave(content = rawContent) {
     clearTimeout(saveTimeout);
-    saveTimeout = null;
-    pendingSave = null;
-
-    const content = getContentForSave();
-    updateActiveTabContent(content);
-    rawContent = content;
-    await saveTabByIndex(activeTabIndex, content, showConfirmation);
-  }
-
-  function scheduleSave() {
-    clearTimeout(saveTimeout);
-    const content = getContentForSave();
-    rawContent = content;
     pendingSave = {
       index: activeTabIndex,
       content,
     };
+
     saveTimeout = setTimeout(() => {
       const job = pendingSave;
       saveTimeout = null;
@@ -511,6 +754,7 @@
 
   async function flushPendingSave(showConfirmation = false) {
     if (!saveTimeout || !pendingSave) return;
+
     clearTimeout(saveTimeout);
     saveTimeout = null;
     const job = pendingSave;
@@ -518,19 +762,65 @@
     await saveTabByIndex(job.index, job.content, showConfirmation);
   }
 
-  function focusBlock(index) {
-    focusedBlock = index;
-    setTimeout(() => {
-      const input = blockInputRefs[index];
-      if (input) {
-        input.focus();
-        input.setSelectionRange(input.value.length, input.value.length);
-      }
-    }, 0);
+  async function forceSave(showConfirmation = true) {
+    if (!activeTab) return;
+
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
+    pendingSave = null;
+
+    const markdown = getCurrentMarkdown();
+    const content = composeContentFromMarkdown(markdown);
+    rawContent = content;
+    updateActiveTabContent(content);
+    await saveTabByIndex(activeTabIndex, content, showConfirmation);
   }
 
-  function blurBlock() {
-    focusedBlock = null;
+  async function saveCurrentTab(showConfirmation = true) {
+    await forceSave(showConfirmation);
+  }
+
+  function handleInput() {
+    if (isComposing || isRenderingContent || !editorRef) return;
+
+    const markdown = getCurrentMarkdown();
+    const content = composeContentFromMarkdown(markdown);
+    rawContent = content;
+    updateActiveTabContent(content);
+    scheduleSave(content);
+  }
+
+  function handleCompositionStart() {
+    isComposing = true;
+  }
+
+  function handleCompositionEnd() {
+    isComposing = false;
+    handleInput();
+  }
+
+  async function handleKeydown(event) {
+    const key = event.key.toLowerCase();
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      await hideReader();
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && key === "s") {
+      event.preventDefault();
+      event.stopPropagation();
+      await forceSave();
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && key === "k") {
+      event.preventDefault();
+      event.stopPropagation();
+      await openPalette();
+    }
   }
 
   function closeTabContextMenu() {
@@ -560,115 +850,6 @@
     };
   }
 
-  function handleBlockInput(index) {
-    blocks = [...blocks];
-    rawContent = getContentForSave(blocks);
-    updateActiveTabContent(rawContent);
-    scheduleSave();
-  }
-
-  function handleBlockKeydown(event, index) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      focusedBlock = null;
-      return;
-    }
-
-    if (event.metaKey && event.key.toLowerCase() === "s") {
-      event.preventDefault();
-      event.stopPropagation();
-      saveCurrentTab();
-    }
-  }
-
-  function escapeHtml(text = "") {
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
-  function renderInlineMarkdown(text = "") {
-    let html = escapeHtml(text);
-    html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-    html = html.replace(
-      /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
-    );
-    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
-    return html;
-  }
-
-  function parseHeading(line) {
-    const match = line.match(/^(#{1,3})\s+(.*)$/);
-    if (!match) return null;
-    return {
-      level: match[1].length,
-      text: match[2],
-    };
-  }
-
-  function parseCheckbox(line) {
-    const match = line.match(/^- \[( |x|X)\]\s?(.*)$/);
-    if (!match) return null;
-    return {
-      checked: match[1].toLowerCase() === "x",
-      text: match[2],
-    };
-  }
-
-  function isSpacerBlock(block) {
-    return block.trim() === "";
-  }
-
-  function getBlockLines(block) {
-    return block.split("\n").map((line) => {
-      const heading = parseHeading(line);
-      const checkbox = parseCheckbox(line);
-
-      if (line.trim() === "") {
-        return { type: "spacer" };
-      }
-
-      if (checkbox) {
-        return {
-          type: "checkbox",
-          checked: checkbox.checked,
-          html: renderInlineMarkdown(checkbox.text || "Task"),
-        };
-      }
-
-      if (heading) {
-        return {
-          type: "heading",
-          level: heading.level,
-          html: renderInlineMarkdown(heading.text),
-        };
-      }
-
-      return {
-        type: "text",
-        html: renderInlineMarkdown(line),
-      };
-    });
-  }
-
-  async function toggleCheckbox(blockIndex, lineIndex) {
-    const nextBlocks = [...blocks];
-    const blockLines = nextBlocks[blockIndex].split("\n");
-    const checkbox = parseCheckbox(blockLines[lineIndex]);
-    if (!checkbox) return;
-
-    const marker = checkbox.checked ? " " : "x";
-    blockLines[lineIndex] = `- [${marker}] ${checkbox.text}`;
-    nextBlocks[blockIndex] = blockLines.join("\n");
-    updateBlocks(nextBlocks, false);
-    await saveCurrentTab();
-  }
-
   async function closeActiveTab() {
     if (activeTabIndex === 0 || !activeTab) return;
 
@@ -690,7 +871,9 @@
 
     const nextTabs = tabs.filter((_, tabIndex) => tabIndex !== index);
     const nextIndex =
-      activeTabIndex > index ? activeTabIndex - 1 : Math.min(activeTabIndex, nextTabs.length - 1);
+      activeTabIndex > index
+        ? activeTabIndex - 1
+        : Math.min(activeTabIndex, nextTabs.length - 1);
 
     tabs = nextTabs;
     activeTabIndex = Math.max(nextIndex, 0);
@@ -791,6 +974,8 @@
   }
 
   async function handleGlobalKeydown(event) {
+    const key = event.key.toLowerCase();
+
     if (tabContextMenu.open && event.key === "Escape") {
       event.preventDefault();
       closeTabContextMenu();
@@ -804,25 +989,25 @@
       }
     }
 
-    if (event.metaKey && event.key.toLowerCase() === "k") {
-      event.preventDefault();
-      await openPalette();
-      return;
-    }
-
-    if (event.metaKey && event.key.toLowerCase() === "w") {
+    if ((event.metaKey || event.ctrlKey) && key === "w") {
       event.preventDefault();
       await closeActiveTab();
       return;
     }
 
-    if (event.metaKey && event.key.toLowerCase() === "s") {
+    if ((event.metaKey || event.ctrlKey) && key === "k") {
       event.preventDefault();
-      await saveCurrentTab();
+      await openPalette();
       return;
     }
 
-    if (event.metaKey && /^[1-9]$/.test(event.key)) {
+    if ((event.metaKey || event.ctrlKey) && key === "s") {
+      event.preventDefault();
+      await forceSave();
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key)) {
       event.preventDefault();
       const tabIndex = Number(event.key) - 1;
       if (tabs[tabIndex]) {
@@ -896,7 +1081,7 @@
       return;
     }
 
-    loadContent(currentTab.content);
+    loadEditorContent(currentTab.content);
     missingFileMessage = currentTab.missing ? currentTab.missingMessage || "" : "";
   }
 
@@ -945,7 +1130,7 @@
         }
 
         if (filtersChanged) {
-          loadContent(rawContent);
+          renderContentToEditor(rawContent);
         }
       });
 
@@ -985,7 +1170,6 @@
 
   <div class="reader-topbar" data-tauri-drag-region>
     <div class="tab-strip">
-      <!-- <div class="drag-handle" aria-hidden="true">≡</div> -->
       <button
         class="tab-action"
         type="button"
@@ -1037,7 +1221,7 @@
         on:mousedown|stopPropagation
         on:click|stopPropagation={hideReader}
       >
-        ✕
+        x
       </button>
     </div>
   </div>
@@ -1060,91 +1244,30 @@
           role="menuitem"
           on:click={() => closeTabByIndex(tabContextMenu.tabIndex)}
         >
-          Schließen
+          Schliessen
         </button>
       </div>
     </div>
   {/if}
 
-  <div
-    class="editor-scroll"
-    role="button"
-    tabindex="0"
-    on:click={(event) => {
-      if (event.target === event.currentTarget) {
-        focusBlock(blocks.length - 1);
-      }
-    }}
-    on:keydown={(event) => {
-      if (
-        event.target === event.currentTarget &&
-        (event.key === "Enter" || event.key === " ")
-      ) {
-        event.preventDefault();
-        focusBlock(blocks.length - 1);
-      }
-    }}
-  >
-    {#if missingFileMessage}
+  <div class="editor-scroll" bind:this={scrollRef}>
+    {#if fileMissing}
       <div class="missing-file-banner">{missingFileMessage}</div>
     {/if}
-
-    {#each blocks as block, index}
-      <div class="block-row">
-        {#if focusedBlock === index}
-          <textarea
-            bind:this={blockInputRefs[index]}
-            bind:value={blocks[index]}
-            class="block-input"
-            spellcheck="false"
-            rows={blocks[index].split("\n").length || 1}
-            style="resize: none; overflow: hidden;"
-            use:autosize
-            on:blur={blurBlock}
-            on:input={() => handleBlockInput(index)}
-            on:keydown={(event) => handleBlockKeydown(event, index)}
-          ></textarea>
-        {:else if isSpacerBlock(block)}
-          <div class="editor-spacer" aria-hidden="true"></div>
-        {:else}
-          <button
-            class="block-display"
-            type="button"
-            on:click={() => focusBlock(index)}
-          >
-            {#each getBlockLines(block) as blockLine, lineIndex}
-              {#if blockLine.type === "spacer"}
-                <span class="block-line-spacer"></span>
-              {:else if blockLine.type === "checkbox"}
-                <span class="block-line checkbox-line">
-                  <button
-                    class="checkbox-toggle"
-                    class:checked={blockLine.checked}
-                    type="button"
-                    on:click|stopPropagation={() =>
-                      toggleCheckbox(index, lineIndex)}
-                  ></button>
-                  <span class:checked={blockLine.checked}
-                    >{@html blockLine.html}</span
-                  >
-                </span>
-              {:else if blockLine.type === "heading"}
-                <span
-                  class="block-line heading"
-                  class:level-1={blockLine.level === 1}
-                  class:level-2={blockLine.level === 2}
-                  class:level-3={blockLine.level === 3}
-                >
-                  {@html blockLine.html}
-                </span>
-              {:else}
-                <span class="block-line">{@html blockLine.html}</span>
-              {/if}
-            {/each}
-          </button>
-        {/if}
-      </div>
-    {/each}
+    <div
+      class="editor-body"
+      contenteditable="true"
+      bind:this={editorRef}
+      spellcheck="true"
+      role="textbox"
+      aria-multiline="true"
+      tabindex="0"
+      data-placeholder="Start writing..."
+      on:input={handleInput}
+      on:keydown={handleKeydown}
+      on:compositionstart={handleCompositionStart}
+      on:compositionend={handleCompositionEnd}
+    ></div>
   </div>
 
   {#if showPalette}
@@ -1240,13 +1363,6 @@
       0 8px 32px rgba(0, 0, 0, 0.08),
       0 2px 8px rgba(0, 0, 0, 0.04);
     overflow: clip;
-    font-family: var(
-      --app-font-family,
-      -apple-system,
-      BlinkMacSystemFont,
-      "SF Pro Display",
-      sans-serif
-    );
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
   }
@@ -1325,7 +1441,6 @@
 
   .tab-button,
   .tab-action,
-  .block-display,
   .palette-item {
     border: 0;
     background: transparent;
@@ -1433,9 +1548,7 @@
 
   .tab-action:hover,
   .tab-button:hover,
-  .block-display:hover,
-  .palette-item:hover,
-  .checkbox-toggle:hover {
+  .palette-item:hover {
     background: rgba(255, 255, 255, 0.08);
   }
 
@@ -1463,12 +1576,11 @@
     position: relative;
     flex: 1;
     overflow-y: auto;
-    padding: 12px 16px 16px;
     background: transparent;
   }
 
   .missing-file-banner {
-    margin-bottom: 12px;
+    margin: 12px 16px 0;
     padding: 10px 12px;
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.05);
@@ -1477,126 +1589,141 @@
     border: 0.5px solid rgba(255, 255, 255, 0.08);
   }
 
-  .block-row + .block-row {
-    margin-top: 8px;
-  }
-
-  .block-display,
-  .block-input {
-    width: 100%;
-    padding: 7px 10px;
-    border-radius: 10px;
-    text-align: left;
-  }
-
-  .block-display {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    cursor: text;
-    color: var(--app-text-color, #ffffff);
-  }
-
-  .editor-spacer {
-    height: 0.8em;
-  }
-
-  .block-line-spacer {
-    display: block;
-    height: 0.8em;
-  }
-
-  .block-input {
-    width: 100%;
-    min-height: 32px;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--app-text-color, #ffffff);
+  .editor-body {
+    min-height: 100%;
+    padding: 16px 20px 40px;
     outline: none;
-    resize: none;
-    font: inherit;
-    line-height: 1.6;
-    overflow: hidden;
-    field-sizing: content;
-  }
-
-  .block-line {
-    display: block;
-    min-height: 1.5em;
-    line-height: 1.6;
-    white-space: pre-wrap;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+    line-height: 1.7;
     word-break: break-word;
+    white-space: pre-wrap;
+    caret-color: var(--accent-color);
+    -webkit-user-modify: read-write;
   }
 
-  .block-line.heading {
-    font-weight: 600;
+  .editor-body[data-placeholder]:empty::before {
+    content: attr(data-placeholder);
+    color: var(--placeholder-color);
+    pointer-events: none;
   }
 
-  .block-line.level-1 {
-    font-size: 1.55rem;
-    line-height: 1.2;
+  .editor-body :global(p) {
+    margin: 0;
+    min-height: 1.7em;
   }
 
-  .block-line.level-2 {
-    font-size: 1.25rem;
+  .editor-body :global(h1) {
+    margin: 8px 0 4px;
+    font-size: 1.5em;
+    font-weight: 700;
     line-height: 1.25;
   }
 
-  .block-line.level-3 {
-    font-size: 1.05rem;
+  .editor-body :global(h2) {
+    margin: 6px 0 3px;
+    font-size: 1.25em;
+    font-weight: 600;
     line-height: 1.3;
-    letter-spacing: 0.01em;
   }
 
-  .checkbox-line {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
+  .editor-body :global(h3) {
+    margin: 4px 0 2px;
+    font-size: 1.1em;
+    font-weight: 600;
+    line-height: 1.35;
   }
 
-  .checkbox-toggle {
-    width: 18px;
-    height: 18px;
-    margin-top: 7px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    background: rgba(255, 255, 255, 0.04);
-    cursor: pointer;
-    flex: 0 0 auto;
+  .editor-body :global(blockquote) {
+    margin: 2px 0;
+    padding-left: 12px;
+    border-left: 3px solid var(--accent-color);
+    color: var(--text-secondary);
   }
 
-  .checkbox-toggle.checked {
-    background: var(--accent-color);
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+  .editor-body :global(code) {
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.08);
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 0.88em;
   }
 
-  .checkbox-toggle.checked::after {
-    content: "✓";
-    display: block;
-    color: #101218;
-    font-size: 11px;
-    line-height: 16px;
-    text-align: center;
-    font-weight: 700;
+  .editor-body :global(strong) {
+    font-weight: 600;
   }
 
-  .checkbox-line .checked {
-    color: rgba(255, 255, 255, 0.52);
-    text-decoration: line-through;
+  .editor-body :global(em) {
+    font-style: italic;
   }
 
-  :global(.reader-container a) {
+  .editor-body :global(a) {
     color: var(--accent-color);
     text-decoration: none;
   }
 
-  :global(.reader-container code) {
-    padding: 2px 6px;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.12);
-    font-family: "SF Mono", Monaco, monospace;
-    font-size: 0.92em;
+  .editor-body :global(hr) {
+    margin: 8px 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .editor-body :global(p.list-item)::before {
+    content: "•";
+    margin-right: 8px;
+    color: var(--text-secondary);
+  }
+
+  .editor-body :global(.md-checkbox) {
+    margin-right: 6px;
+    accent-color: var(--accent-color);
+    cursor: pointer;
+  }
+
+  .editor-body :global(.wikilink) {
+    color: var(--accent-color);
+    opacity: 0.85;
+  }
+
+  .editor-body :global(.codeblock-pill) {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.78);
+    cursor: default;
+  }
+
+  .editor-body :global(.codeblock-pill):hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .editor-body :global(.codeblock-icon) {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--accent-color);
+    opacity: 0.85;
+  }
+
+  .editor-body :global(.codeblock-lang) {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: lowercase;
+  }
+
+  .editor-body :global(.codeblock-hint) {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .editor-body :global(.hidden-marker) {
+    display: none;
   }
 
   .palette-backdrop {
@@ -1770,15 +1897,6 @@
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
-  }
-
-  .save-indicator {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.72);
-  }
-
-  .save-indicator.busy {
-    color: rgba(255, 255, 255, 0.9);
   }
 
   .editor-scroll::-webkit-scrollbar,
