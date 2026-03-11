@@ -449,7 +449,7 @@ async fn open_settings(app: AppHandle) -> Result<(), String> {
         let settings_window =
             WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("settings.html".into()))
                 .title("Collector - Einstellungen")
-                .inner_size(520.0, 680.0)
+                .inner_size(980.0, 720.0)
                 .resizable(true)
                 .center()
                 .build()

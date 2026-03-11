@@ -66,8 +66,8 @@
         "label": "settings",
         "title": "Collector - Einstellungen",
         "url": "settings.html",
-        "width": 520,
-        "height": 680,
+        "width": 980,
+        "height": 720,
         "visible": false,
         "resizable": true,
         "center": true

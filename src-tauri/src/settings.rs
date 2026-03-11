@@ -49,6 +49,12 @@ pub struct Settings {
     pub reader_shortcut: String,
     #[serde(default = "default_true")]
     pub reader_edge_enabled: bool,
+    #[serde(default = "default_true")]
+    pub reader_hide_frontmatter: bool,
+    #[serde(default = "default_true")]
+    pub reader_hide_dataview: bool,
+    #[serde(default = "default_true")]
+    pub reader_hide_obsidian_comments: bool,
     #[serde(default = "default_note_filename_template")]
     pub note_filename_template: String,
     #[serde(default = "default_note_template")]
@@ -184,6 +190,9 @@ impl Default for Settings {
             pinned_notes: Vec::new(),
             reader_shortcut: default_reader_shortcut(),
             reader_edge_enabled: default_true(),
+            reader_hide_frontmatter: default_true(),
+            reader_hide_dataview: default_true(),
+            reader_hide_obsidian_comments: default_true(),
             note_filename_template: default_note_filename_template(),
             note_template: default_note_template(),
             window_transparency: default_window_transparency(),

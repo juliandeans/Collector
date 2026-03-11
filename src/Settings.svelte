@@ -12,8 +12,41 @@
   let statusMessage = "";
   let statusType = "";
   let showTemplateEditor = false;
+  let activePanel = "obsidian";
 
   const systemFonts = getSystemFonts();
+  const settingsPanels = [
+    {
+      id: "obsidian",
+      label: "Obsidian Integration",
+      description: "Vault, daily notes and capture defaults",
+    },
+    {
+      id: "images",
+      label: "Images",
+      description: "Screenshot folder and image defaults",
+    },
+    {
+      id: "look",
+      label: "Look",
+      description: "Window appearance and typography",
+    },
+    {
+      id: "note-window",
+      label: "Note Window",
+      description: "Defaults for newly created notes",
+    },
+    {
+      id: "reader-window",
+      label: "Reader Window",
+      description: "Pinned notes and reader filters",
+    },
+    {
+      id: "shortcuts",
+      label: "Shortcuts",
+      description: "Keyboard and edge-trigger actions",
+    },
+  ];
 
   async function loadSettings() {
     try {
@@ -189,428 +222,549 @@
   </header>
 
   <main>
-    <section>
-      <h2>Obsidian Integration</h2>
-      <div class="field">
-        <label for="vault_name">Vault Name</label>
-        <input
-          type="text"
-          id="vault_name"
-          bind:value={settings.vault_name}
-          placeholder="Vault"
-        />
-        <small>Name of your Obsidian vault</small>
-      </div>
-      <div class="field">
-        <label for="vault_path">Vault Path</label>
-        <div class="path-picker">
-          <input
-            type="text"
-            id="vault_path"
-            bind:value={settings.vault_path}
-            placeholder="/Users/username/Vault"
-            readonly
-          />
-          <button class="secondary" on:click={pickVaultPath}>Choose...</button>
-        </div>
-        <small>Full path to your Obsidian vault</small>
-      </div>
-      <div class="field">
-        <label for="daily_note_folder">Daily Note Path</label>
-        <input
-          type="text"
-          id="daily_note_folder"
-          bind:value={settings.daily_note_folder}
-          placeholder="Journal/Notes/"
-        />
-        <small>Relative path in vault for daily notes</small>
-      </div>
-      <div class="field">
-        <label for="daily_note_format">Daily Note Format</label>
-        <input
-          type="text"
-          id="daily_note_format"
-          bind:value={settings.daily_note_format}
-          placeholder="YYYY-MM-DD"
-        />
-        <small>Filename format (e.g. YYYY-MM-DD). Supports: YYYY, MM, DD</small>
-      </div>
-      <div class="field">
-        <label for="entry_header">Entry Header</label>
-        <input
-          type="text"
-          id="entry_header"
-          bind:value={settings.entry_header}
-          placeholder="#### HH:mm"
-        />
-        <small>Markdown header for each entry (HH:mm for time)</small>
-      </div>
-    </section>
-
-    <section>
-      <h2>Images</h2>
-      <div class="field">
-        <label for="screenshot_path">Image Folder</label>
-        <div class="path-picker">
-          <input
-            type="text"
-            id="screenshot_path"
-            bind:value={settings.screenshot_path}
-            placeholder="/Users/username/Vault/Images/Screenshots"
-            readonly
-          />
-          <button class="secondary" on:click={pickScreenshotPath}
-            >Choose...</button
-          >
-        </div>
-        <small>Folder for images (will be created automatically)</small>
-      </div>
-      <div class="field">
-        <label for="image_filename">Filename Template</label>
-        <input
-          type="text"
-          id="image_filename"
-          bind:value={settings.image_filename}
-          placeholder="screenshot-YYYY-MM-DD-HHmmss"
-        />
-        <small>Supports: YYYY, MM, DD, HH, mm, ss</small>
-      </div>
-      <div class="field">
-        <label for="compression_max_kb">Max. Image Size (KB)</label>
-        <input
-          type="number"
-          id="compression_max_kb"
-          bind:value={settings.compression_max_kb}
-          min="50"
-          max="1000"
-          step="50"
-        />
-        <small>Images will be compressed to this size</small>
-      </div>
-      <div class="field">
-        <label for="default_image_width">Default Image Width</label>
-        <input
-          type="text"
-          id="default_image_width"
-          bind:value={settings.default_image_width}
-          placeholder="600"
-          inputmode="numeric"
-        />
-        <small
-          >Optional width in pixels for new image links (leave empty for no
-          width)</small
-        >
-      </div>
-    </section>
-
-    <section>
-      <h2>New Note</h2>
-      <div class="field">
-        <label for="notes_folder">Notes Folder</label>
-        <input
-          type="text"
-          id="notes_folder"
-          bind:value={settings.notes_folder}
-          placeholder="Notes/"
-        />
-        <small>Relative path in vault for new notes</small>
-      </div>
-      <div class="field">
-        <label for="note_template">Template Text</label>
-        <button
-          class="secondary"
-          on:click={() => (showTemplateEditor = !showTemplateEditor)}
-        >
-          {showTemplateEditor ? "Hide Template" : "Edit Template"}
-        </button>
-        {#if showTemplateEditor}
-          <textarea
-            id="note_template"
-            bind:value={settings.note_template}
-            placeholder="---&#10;created: <% tp.date.now(&quot;YYYY-MM-DD hh:mm&quot;) %>&#10;modified: &#10;daily: &quot;[[<% tp.date.now(&quot;YYYY-MM-DD&quot;) %>]]&quot;&#10;tags: inbox&#10;type: inbox&#10;---"
-            rows="8"
-            style="margin-top: 8px;"
-          />
-          <small
-            >This text will be inserted at the beginning of each new note (e.g.
-            for frontmatter/properties)</small
-          >
-        {/if}
-      </div>
-    </section>
-
-    <section>
-      <h2>Window</h2>
-      <div class="field">
-        <fieldset class="radio-group">
-          <legend>Screen Edge</legend>
-          <label class="radio"
-            ><input type="radio" bind:group={settings.edge_side} value="left" />
-            Left</label
-          >
-          <label class="radio"
-            ><input
-              type="radio"
-              bind:group={settings.edge_side}
-              value="right"
-            /> Right</label
-          >
-        </fieldset>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="window_width">Width (px)</label>
-          <input
-            type="number"
-            id="window_width"
-            bind:value={settings.window_width}
-            min="200"
-            max="800"
-          />
-        </div>
-        <div class="field">
-          <label for="window_height">Height (px)</label>
-          <input
-            type="number"
-            id="window_height"
-            bind:value={settings.window_height}
-            min="80"
-            max="400"
-          />
-        </div>
-      </div>
-      <div class="field">
-        <label for="border_radius"
-          >Corner Radius: {settings.border_radius}px</label
-        >
-        <input
-          type="range"
-          id="border_radius"
-          bind:value={settings.border_radius}
-          min="0"
-          max="12"
-        />
-      </div>
-      <div class="field">
-        <label for="background_color">Background Color</label>
-        <div class="color-input">
-          <input
-            type="color"
-            id="background_color"
-            bind:value={settings.background_color}
-          />
-          <input
-            type="text"
-            bind:value={settings.background_color}
-            pattern="^#[0-9A-Fa-f]{6}$"
-          />
-        </div>
-      </div>
-      <div class="field">
-        <label for="window_transparency"
-          >Transparency: {settings.window_transparency ?? 55}%</label
-        >
-        <input
-          type="range"
-          id="window_transparency"
-          bind:value={settings.window_transparency}
-          min="0"
-          max="100"
-        />
-        <small>Transparency of window background</small>
-      </div>
-      <div class="field">
-        <label for="window_blur">Blur: {settings.window_blur ?? 80}px</label>
-        <input
-          type="range"
-          id="window_blur"
-          bind:value={settings.window_blur}
-          min="0"
-          max="200"
-        />
-        <small>Background blur effect</small>
-      </div>
-      <div class="field">
-        <label for="window_saturation"
-          >Saturation: {settings.window_saturation ?? 200}%</label
-        >
-        <input
-          type="range"
-          id="window_saturation"
-          bind:value={settings.window_saturation}
-          min="0"
-          max="300"
-        />
-        <small>Background color intensity</small>
-      </div>
-      <div class="field">
-        <label for="window_brightness"
-          >Brightness: {(settings.window_brightness ?? 0 > 0)
-            ? ""
-            : ""}{settings.window_brightness ?? 0}</label
-        >
-        <input
-          type="range"
-          id="window_brightness"
-          bind:value={settings.window_brightness}
-          min="-100"
-          max="100"
-        />
-        <small>Brightens dark areas or darkens light areas</small>
-      </div>
-    </section>
-
-    <section>
-      <h2>Reader Panel</h2>
-      <div class="field">
-        <div class="field-label">Pinned Notes</div>
-        <small
-          >These notes appear as tabs in the left reader panel. The Daily Note
-          is always included automatically.</small
-        >
-
-        {#if (settings.pinned_notes ?? []).length > 0}
-          <div class="note-list">
-            {#each settings.pinned_notes ?? [] as notePath}
-              <div class="note-list-item">
-                <div class="note-list-copy">
-                  <strong>{getFilename(notePath)}</strong>
-                  <small>{notePath}</small>
-                </div>
-                <button
-                  class="remove-note"
-                  type="button"
-                  on:click={() => removePinnedNote(notePath)}
-                >
-                  ✕
-                </button>
-              </div>
-            {/each}
-          </div>
-        {:else}
-          <div class="empty-note-list">No pinned notes selected.</div>
-        {/if}
-
-        <button class="secondary" type="button" on:click={addPinnedNotes}
-          >+ Add Note</button
-        >
-      </div>
-
-      <div class="field">
-        <label for="reader_shortcut">Reader Shortcut</label>
-        <input
-          type="text"
-          id="reader_shortcut"
-          bind:value={settings.reader_shortcut}
-          placeholder="Cmd+Shift+R"
-          on:keydown={(e) => handleShortcutKeyDown(e, "reader_shortcut")}
-        />
-        <small>Click in the field and press the desired key combination</small>
-      </div>
-
-      <div class="field">
-        <label class="checkbox">
-          <input type="checkbox" bind:checked={settings.reader_edge_enabled} />
-          Open on left edge
-        </label>
-      </div>
-    </section>
-
-    <section>
-      <h2>Font</h2>
-      <div class="field">
-        <label for="font_family">Font Family</label>
-        <select id="font_family" bind:value={settings.font_family}>
-          {#each systemFonts as font}
-            <option value={font}>{font}</option>
+    <div class="settings-layout">
+      <aside class="settings-sidebar">
+        <nav class="settings-nav" aria-label="Settings sections">
+          {#each settingsPanels as panel}
+            <button
+              class="nav-item"
+              class:active={activePanel === panel.id}
+              type="button"
+              on:click={() => (activePanel = panel.id)}
+            >
+              <span class="nav-item-label">{panel.label}</span>
+              <span class="nav-item-description">{panel.description}</span>
+            </button>
           {/each}
-        </select>
-      </div>
-      <div class="field">
-        <label for="font_size">Font Size: {settings.font_size}px</label>
-        <input
-          type="range"
-          id="font_size"
-          bind:value={settings.font_size}
-          min="10"
-          max="20"
-        />
-      </div>
-      <div class="field">
-        <label for="text_color">Text Color</label>
-        <div class="color-input">
-          <input
-            type="color"
-            id="text_color"
-            bind:value={settings.text_color}
-          />
-          <input
-            type="text"
-            bind:value={settings.text_color}
-            pattern="^#[0-9A-Fa-f]{6}$"
-          />
-        </div>
-        <small>Default: White (#ffffff)</small>
-      </div>
-    </section>
+        </nav>
+      </aside>
 
-    <section>
-      <h2>Shortcuts</h2>
-      <div class="field">
-        <label for="global_shortcut">Open Window</label>
-        <input
-          type="text"
-          id="global_shortcut"
-          bind:value={settings.global_shortcut}
-          placeholder="Cmd+Shift+N"
-          on:keydown={(e) => handleShortcutKeyDown(e, "global_shortcut")}
-        />
-        <small>Click in the field and press the desired key combination</small>
+      <div class="settings-content">
+        {#if activePanel === "obsidian"}
+          <section>
+            <h2>Obsidian Integration</h2>
+            <p class="section-description">
+              Configure your vault, daily note location and the default header
+              Collector inserts into captures.
+            </p>
+
+            <div class="field">
+              <label for="vault_name">Vault Name</label>
+              <input
+                type="text"
+                id="vault_name"
+                bind:value={settings.vault_name}
+                placeholder="Vault"
+              />
+              <small>Name of your Obsidian vault</small>
+            </div>
+            <div class="field">
+              <label for="vault_path">Vault Path</label>
+              <div class="path-picker">
+                <input
+                  type="text"
+                  id="vault_path"
+                  bind:value={settings.vault_path}
+                  placeholder="/Users/username/Vault"
+                  readonly
+                />
+                <button class="secondary" on:click={pickVaultPath}
+                  >Choose...</button
+                >
+              </div>
+              <small>Full path to your Obsidian vault</small>
+            </div>
+            <div class="field">
+              <label for="daily_note_folder">Daily Note Path</label>
+              <input
+                type="text"
+                id="daily_note_folder"
+                bind:value={settings.daily_note_folder}
+                placeholder="Journal/Notes/"
+              />
+              <small>Relative path in vault for daily notes</small>
+            </div>
+            <div class="field">
+              <label for="daily_note_format">Daily Note Format</label>
+              <input
+                type="text"
+                id="daily_note_format"
+                bind:value={settings.daily_note_format}
+                placeholder="YYYY-MM-DD"
+              />
+              <small
+                >Filename format (e.g. YYYY-MM-DD). Supports: YYYY, MM, DD</small
+              >
+            </div>
+            <div class="field">
+              <label for="entry_header">Entry Header</label>
+              <input
+                type="text"
+                id="entry_header"
+                bind:value={settings.entry_header}
+                placeholder="#### HH:mm"
+              />
+              <small>Markdown header for each entry (HH:mm for time)</small>
+            </div>
+          </section>
+        {:else if activePanel === "images"}
+          <section>
+            <h2>Images</h2>
+            <p class="section-description">
+              Control where screenshots are stored and how new image embeds are
+              created.
+            </p>
+
+            <div class="field">
+              <label for="screenshot_path">Image Folder</label>
+              <div class="path-picker">
+                <input
+                  type="text"
+                  id="screenshot_path"
+                  bind:value={settings.screenshot_path}
+                  placeholder="/Users/username/Vault/Images/Screenshots"
+                  readonly
+                />
+                <button class="secondary" on:click={pickScreenshotPath}
+                  >Choose...</button
+                >
+              </div>
+              <small>Folder for images (will be created automatically)</small>
+            </div>
+            <div class="field">
+              <label for="image_filename">Filename Template</label>
+              <input
+                type="text"
+                id="image_filename"
+                bind:value={settings.image_filename}
+                placeholder="screenshot-YYYY-MM-DD-HHmmss"
+              />
+              <small>Supports: YYYY, MM, DD, HH, mm, ss</small>
+            </div>
+            <div class="field">
+              <label for="compression_max_kb">Max. Image Size (KB)</label>
+              <input
+                type="number"
+                id="compression_max_kb"
+                bind:value={settings.compression_max_kb}
+                min="50"
+                max="1000"
+                step="50"
+              />
+              <small>Images will be compressed to this size</small>
+            </div>
+            <div class="field">
+              <label for="default_image_width">Default Image Width</label>
+              <input
+                type="text"
+                id="default_image_width"
+                bind:value={settings.default_image_width}
+                placeholder="600"
+                inputmode="numeric"
+              />
+              <small
+                >Optional width in pixels for new image links (leave empty for
+                no width)</small
+              >
+            </div>
+          </section>
+        {:else if activePanel === "look"}
+          <section>
+            <h2>Window</h2>
+            <p class="section-description">
+              Shared appearance settings for the capture and reader windows.
+            </p>
+
+            <div class="field">
+              <fieldset class="radio-group">
+                <legend>Screen Edge</legend>
+                <label class="radio"
+                  ><input
+                    type="radio"
+                    bind:group={settings.edge_side}
+                    value="left"
+                  />
+                  Left</label
+                >
+                <label class="radio"
+                  ><input
+                    type="radio"
+                    bind:group={settings.edge_side}
+                    value="right"
+                  />
+                  Right</label
+                >
+              </fieldset>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="window_width">Width (px)</label>
+                <input
+                  type="number"
+                  id="window_width"
+                  bind:value={settings.window_width}
+                  min="200"
+                  max="800"
+                />
+              </div>
+              <div class="field">
+                <label for="window_height">Height (px)</label>
+                <input
+                  type="number"
+                  id="window_height"
+                  bind:value={settings.window_height}
+                  min="80"
+                  max="400"
+                />
+              </div>
+            </div>
+            <div class="field">
+              <label for="border_radius"
+                >Corner Radius: {settings.border_radius}px</label
+              >
+              <input
+                type="range"
+                id="border_radius"
+                bind:value={settings.border_radius}
+                min="0"
+                max="12"
+              />
+            </div>
+            <div class="field">
+              <label for="background_color">Background Color</label>
+              <div class="color-input">
+                <input
+                  type="color"
+                  id="background_color"
+                  bind:value={settings.background_color}
+                />
+                <input
+                  type="text"
+                  bind:value={settings.background_color}
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                />
+              </div>
+            </div>
+            <div class="field">
+              <label for="window_transparency"
+                >Transparency: {settings.window_transparency ?? 55}%</label
+              >
+              <input
+                type="range"
+                id="window_transparency"
+                bind:value={settings.window_transparency}
+                min="0"
+                max="100"
+              />
+              <small>Transparency of window background</small>
+            </div>
+            <div class="field">
+              <label for="window_blur"
+                >Blur: {settings.window_blur ?? 80}px</label
+              >
+              <input
+                type="range"
+                id="window_blur"
+                bind:value={settings.window_blur}
+                min="0"
+                max="200"
+              />
+              <small>Background blur effect</small>
+            </div>
+            <div class="field">
+              <label for="window_saturation"
+                >Saturation: {settings.window_saturation ?? 200}%</label
+              >
+              <input
+                type="range"
+                id="window_saturation"
+                bind:value={settings.window_saturation}
+                min="0"
+                max="300"
+              />
+              <small>Background color intensity</small>
+            </div>
+            <div class="field">
+              <label for="window_brightness"
+                >Brightness: {(settings.window_brightness ?? 0 > 0)
+                  ? ""
+                  : ""}{settings.window_brightness ?? 0}</label
+              >
+              <input
+                type="range"
+                id="window_brightness"
+                bind:value={settings.window_brightness}
+                min="-100"
+                max="100"
+              />
+              <small>Brightens dark areas or darkens light areas</small>
+            </div>
+          </section>
+
+          <section>
+            <h2>Font</h2>
+            <p class="section-description">
+              Typography for both floating windows.
+            </p>
+
+            <div class="field">
+              <label for="font_family">Font Family</label>
+              <select id="font_family" bind:value={settings.font_family}>
+                {#each systemFonts as font}
+                  <option value={font}>{font}</option>
+                {/each}
+              </select>
+            </div>
+            <div class="field">
+              <label for="font_size">Font Size: {settings.font_size}px</label>
+              <input
+                type="range"
+                id="font_size"
+                bind:value={settings.font_size}
+                min="10"
+                max="20"
+              />
+            </div>
+            <div class="field">
+              <label for="text_color">Text Color</label>
+              <div class="color-input">
+                <input
+                  type="color"
+                  id="text_color"
+                  bind:value={settings.text_color}
+                />
+                <input
+                  type="text"
+                  bind:value={settings.text_color}
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                />
+              </div>
+              <small>Default: White (#ffffff)</small>
+            </div>
+          </section>
+        {:else if activePanel === "note-window"}
+          <section>
+            <h2>New Notes</h2>
+            <p class="section-description">
+              Defaults used when Collector creates a new note file.
+            </p>
+
+            <div class="field">
+              <label for="notes_folder">Notes Folder</label>
+              <input
+                type="text"
+                id="notes_folder"
+                bind:value={settings.notes_folder}
+                placeholder="Notes/"
+              />
+              <small>Relative path in vault for new notes</small>
+            </div>
+            <div class="field">
+              <label for="note_template">Template Text</label>
+              <button
+                class="secondary"
+                on:click={() => (showTemplateEditor = !showTemplateEditor)}
+              >
+                {showTemplateEditor ? "Hide Template" : "Edit Template"}
+              </button>
+              {#if showTemplateEditor}
+                <textarea
+                  id="note_template"
+                  bind:value={settings.note_template}
+                  placeholder="---&#10;created: <% tp.date.now(&quot;YYYY-MM-DD hh:mm&quot;) %>&#10;modified: &#10;daily: &quot;[[<% tp.date.now(&quot;YYYY-MM-DD&quot;) %>]]&quot;&#10;tags: inbox&#10;type: inbox&#10;---"
+                  rows="8"
+                  style="margin-top: 8px;"
+                />
+                <small
+                  >This text will be inserted at the beginning of each new note
+                  (e.g. for frontmatter/properties)</small
+                >
+              {/if}
+            </div>
+          </section>
+        {:else if activePanel === "reader-window"}
+          <section>
+            <h2>Reader Panel</h2>
+            <p class="section-description">
+              Configure the left reader window and the tabs shown there by
+              default.
+            </p>
+
+            <div class="field">
+              <div class="field-label">Pinned Notes</div>
+              <small
+                >These notes appear as tabs in the left reader panel. The Daily
+                Note is always included automatically.</small
+              >
+
+              {#if (settings.pinned_notes ?? []).length > 0}
+                <div class="note-list">
+                  {#each settings.pinned_notes ?? [] as notePath}
+                    <div class="note-list-item">
+                      <div class="note-list-copy">
+                        <strong>{getFilename(notePath)}</strong>
+                        <small>{notePath}</small>
+                      </div>
+                      <button
+                        class="remove-note"
+                        type="button"
+                        on:click={() => removePinnedNote(notePath)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <div class="empty-note-list">No pinned notes selected.</div>
+              {/if}
+
+              <button class="secondary" type="button" on:click={addPinnedNotes}
+                >+ Add Note</button
+              >
+            </div>
+
+            <div class="field">
+              <label for="reader_shortcut">Reader Shortcut</label>
+              <input
+                type="text"
+                id="reader_shortcut"
+                bind:value={settings.reader_shortcut}
+                placeholder="Cmd+Shift+R"
+                on:keydown={(e) => handleShortcutKeyDown(e, "reader_shortcut")}
+              />
+              <small
+                >Click in the field and press the desired key combination</small
+              >
+            </div>
+
+            <div class="field">
+              <label class="checkbox">
+                <input
+                  type="checkbox"
+                  bind:checked={settings.reader_edge_enabled}
+                />
+                Open on left edge
+              </label>
+            </div>
+          </section>
+
+          <section>
+            <h2>Reader – Content Filters</h2>
+            <p class="section-description">
+              Choose which elements are hidden in the Reader panel. They are
+              never deleted, only hidden from view.
+            </p>
+
+            <div class="field">
+              <label class="checkbox">
+                <input
+                  type="checkbox"
+                  bind:checked={settings.reader_hide_frontmatter}
+                />
+                Hide YAML Frontmatter
+              </label>
+              <small>Hides the --- metadata block at the top of notes</small>
+            </div>
+
+            <div class="field">
+              <label class="checkbox">
+                <input
+                  type="checkbox"
+                  bind:checked={settings.reader_hide_dataview}
+                />
+                Hide Code Blocks (Dataview, JS, etc.)
+              </label>
+              <small>Hides all ```language ... ``` code blocks</small>
+            </div>
+
+            <div class="field">
+              <label class="checkbox">
+                <input
+                  type="checkbox"
+                  bind:checked={settings.reader_hide_obsidian_comments}
+                />
+                Hide Obsidian Comments
+              </label>
+              <small>Hides %% ... %% comment blocks</small>
+            </div>
+          </section>
+        {:else if activePanel === "shortcuts"}
+          <section>
+            <h2>Shortcuts</h2>
+            <p class="section-description">
+              Keyboard shortcuts and edge behavior for both windows.
+            </p>
+
+            <div class="field">
+              <label for="global_shortcut">Open Window</label>
+              <input
+                type="text"
+                id="global_shortcut"
+                bind:value={settings.global_shortcut}
+                placeholder="Cmd+Shift+N"
+                on:keydown={(e) => handleShortcutKeyDown(e, "global_shortcut")}
+              />
+              <small
+                >Click in the field and press the desired key combination</small
+              >
+            </div>
+            <div class="field">
+              <label for="capture_text_shortcut">Copy Text to Collector</label>
+              <input
+                type="text"
+                id="capture_text_shortcut"
+                bind:value={settings.capture_text_shortcut}
+                placeholder="Cmd+Shift+C"
+                on:keydown={(e) =>
+                  handleShortcutKeyDown(e, "capture_text_shortcut")}
+              />
+              <small
+                >Click in the field and press the desired key combination</small
+              >
+            </div>
+            <div class="field">
+              <label for="save_to_daily_shortcut">Save to Daily Note</label>
+              <input
+                type="text"
+                id="save_to_daily_shortcut"
+                bind:value={settings.save_to_daily_shortcut}
+                placeholder="Cmd+Enter"
+                on:keydown={(e) =>
+                  handleShortcutKeyDown(e, "save_to_daily_shortcut")}
+              />
+              <small
+                >Click in the field and press the desired key combination</small
+              >
+            </div>
+            <div class="field">
+              <label for="save_as_note_shortcut">Create New Note</label>
+              <input
+                type="text"
+                id="save_as_note_shortcut"
+                bind:value={settings.save_as_note_shortcut}
+                placeholder="Cmd+Shift+Enter"
+                on:keydown={(e) =>
+                  handleShortcutKeyDown(e, "save_as_note_shortcut")}
+              />
+              <small
+                >Click in the field and press the desired key combination</small
+              >
+            </div>
+            <div class="field">
+              <label class="checkbox">
+                <input
+                  type="checkbox"
+                  bind:checked={settings.edge_detection_enabled}
+                />
+                Edge Detection Enabled
+              </label>
+              <small>Window opens when moving mouse to screen edge</small>
+            </div>
+          </section>
+        {/if}
       </div>
-      <div class="field">
-        <label for="capture_text_shortcut">Copy Text to Collector</label>
-        <input
-          type="text"
-          id="capture_text_shortcut"
-          bind:value={settings.capture_text_shortcut}
-          placeholder="Cmd+Shift+C"
-          on:keydown={(e) => handleShortcutKeyDown(e, "capture_text_shortcut")}
-        />
-        <small>Click in the field and press the desired key combination</small>
-      </div>
-      <div class="field">
-        <label for="save_to_daily_shortcut">Save to Daily Note</label>
-        <input
-          type="text"
-          id="save_to_daily_shortcut"
-          bind:value={settings.save_to_daily_shortcut}
-          placeholder="Cmd+Enter"
-          on:keydown={(e) => handleShortcutKeyDown(e, "save_to_daily_shortcut")}
-        />
-        <small>Click in the field and press the desired key combination</small>
-      </div>
-      <div class="field">
-        <label for="save_as_note_shortcut">Create New Note</label>
-        <input
-          type="text"
-          id="save_as_note_shortcut"
-          bind:value={settings.save_as_note_shortcut}
-          placeholder="Cmd+Shift+Enter"
-          on:keydown={(e) => handleShortcutKeyDown(e, "save_as_note_shortcut")}
-        />
-        <small>Click in the field and press the desired key combination</small>
-      </div>
-      <div class="field">
-        <label class="checkbox">
-          <input
-            type="checkbox"
-            bind:checked={settings.edge_detection_enabled}
-          />
-          Edge Detection Enabled
-        </label>
-        <small>Window opens when moving mouse to screen edge</small>
-      </div>
-    </section>
+    </div>
   </main>
 
   <footer>
@@ -686,8 +840,83 @@
 
   main {
     flex: 1;
-    overflow-y: auto;
     padding: 20px 24px;
+    overflow: hidden;
+  }
+
+  .settings-layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 20px;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .settings-sidebar {
+    min-height: 0;
+  }
+
+  .settings-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+  }
+
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    color: #374151;
+    text-align: left;
+    transition:
+      transform 0.18s ease,
+      box-shadow 0.18s ease,
+      border-color 0.18s ease,
+      background 0.18s ease;
+  }
+
+  .nav-item:hover {
+    border-color: rgba(139, 92, 246, 0.18);
+    box-shadow: inset 0px 0px 6px 2px rgba(15, 23, 42, 0.06);
+  }
+
+  .nav-item.active {
+    background: linear-gradient(
+      170deg,
+      rgba(139, 92, 246, 0.06) 0%,
+      rgba(255, 255, 255, 0.96) 100%
+    );
+
+    box-shadow: inset 0px 0px 6px 2px rgba(15, 23, 42, 0.06);
+  }
+
+  .nav-item-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .nav-item-description {
+    font-size: 11px;
+    line-height: 1.45;
+    color: #6b7280;
+  }
+
+  .settings-content {
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
   }
 
   section {
@@ -698,13 +927,12 @@
     padding: 20px;
     margin-bottom: 16px;
     border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
     transition: all 0.2s ease;
   }
 
   section:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    border-color: rgba(0, 0, 0, 0.1);
+    border-color: rgba(1, 1, 1, 0.1);
   }
 
   section h2 {
@@ -777,8 +1005,12 @@
   select:focus,
   textarea:focus {
     outline: none;
-    border-color: #8b5cf6;
-    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+    box-shadow: inset 0px 0px 6px 1px rgba(15, 23, 42, 0.06);
+    background: linear-gradient(
+      170deg,
+      rgba(139, 92, 246, 0.05) 20%,
+      rgba(255, 255, 255, 0.04) 80%
+    );
   }
 
   input[type="range"] {
@@ -818,6 +1050,13 @@
     padding: 0;
     margin: 0 0 6px 0;
     font-weight: 500;
+  }
+
+  .section-description {
+    margin: 0 0 14px;
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.45;
   }
 
   .radio,
@@ -960,5 +1199,36 @@
   .remove-note:hover {
     background: rgba(239, 68, 68, 0.1);
     color: #dc2626;
+  }
+
+  @media (max-width: 860px) {
+    main {
+      overflow-y: auto;
+    }
+
+    .settings-layout {
+      grid-template-columns: 1fr;
+      height: auto;
+    }
+
+    .settings-sidebar {
+      overflow-x: auto;
+    }
+
+    .settings-nav {
+      position: static;
+      flex-direction: row;
+      align-items: stretch;
+      padding-bottom: 4px;
+    }
+
+    .nav-item {
+      min-width: 220px;
+    }
+
+    .settings-content {
+      overflow: visible;
+      padding-right: 0;
+    }
   }
 </style>

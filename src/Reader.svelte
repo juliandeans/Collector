@@ -12,6 +12,8 @@
   let vaultNotes = [];
   let isSaving = false;
   let lastSaved = null;
+  let rawContent = "";
+  let visibleBlocks = [];
   let appSettings = {
     background_color: "#1e1e2e",
     font_family: "-apple-system, BlinkMacSystemFont, SF Pro Display",
@@ -22,6 +24,9 @@
     window_saturation: 200,
     window_brightness: 0,
     text_color: "#ffffff",
+    reader_hide_frontmatter: true,
+    reader_hide_dataview: true,
+    reader_hide_obsidian_comments: true,
   };
   let statusMessage = "";
   let statusType = "";
@@ -63,17 +68,136 @@
     return ` brightness(${brightnessValue}) contrast(${contrastValue})`;
   })();
 
-  function splitIntoBlocks(content = "") {
-    const normalized = content.replace(/\r\n/g, "\n");
-    return normalized.length > 0 ? normalized.split(/\n\n+/) : [""];
+  function normalizeNewlines(content = "") {
+    return content.replace(/\r\n/g, "\n");
   }
 
-  function getFileContent(nextBlocks = blocks) {
-    return nextBlocks.join("\n\n");
+  function parseRawBlocks(content = "") {
+    const normalized = normalizeNewlines(content);
+    if (!normalized) return [""];
+
+    const lines = normalized.split("\n");
+    const parsedBlocks = [];
+    let current = [];
+    let inFrontmatter = false;
+    let inCodeBlock = false;
+    let inObsidianComment = false;
+
+    const pushCurrent = () => {
+      if (current.length === 0) return;
+      parsedBlocks.push(current.join("\n"));
+      current = [];
+    };
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      const trimmed = line.trim();
+
+      if (index === 0 && trimmed === "---") {
+        pushCurrent();
+        current.push(line);
+        inFrontmatter = true;
+        continue;
+      }
+
+      if (inFrontmatter) {
+        current.push(line);
+        if (trimmed === "---" && current.length > 1) {
+          pushCurrent();
+          inFrontmatter = false;
+        }
+        continue;
+      }
+
+      if (!inCodeBlock && !inObsidianComment && trimmed === "") {
+        pushCurrent();
+        continue;
+      }
+
+      current.push(line);
+
+      if (!inObsidianComment && trimmed.startsWith("```")) {
+        inCodeBlock = !inCodeBlock;
+        continue;
+      }
+
+      if (!inCodeBlock && trimmed.startsWith("%%")) {
+        if (inObsidianComment) {
+          inObsidianComment = false;
+        } else if (!trimmed.endsWith("%%") || trimmed === "%%") {
+          inObsidianComment = true;
+        }
+        continue;
+      }
+
+      if (inObsidianComment && trimmed.endsWith("%%")) {
+        inObsidianComment = false;
+      }
+    }
+
+    pushCurrent();
+    return parsedBlocks.length > 0 ? parsedBlocks : [""];
+  }
+
+  function isFrontmatterBlock(block, index) {
+    const trimmed = block.trim();
+    return index === 0 && trimmed.startsWith("---") && trimmed.endsWith("---");
+  }
+
+  function isCodeBlock(block) {
+    const trimmed = block.trim();
+    return trimmed.startsWith("```") && trimmed.endsWith("```");
+  }
+
+  function isObsidianComment(block) {
+    const trimmed = block.trim();
+    return trimmed.startsWith("%%") && trimmed.endsWith("%%");
+  }
+
+  function getVisibleBlocksFromRaw(content = rawContent) {
+    const allBlocks = parseRawBlocks(content);
+    const nextVisibleBlocks = [];
+
+    allBlocks.forEach((block, originalIndex) => {
+      const isHidden =
+        (appSettings.reader_hide_frontmatter &&
+          isFrontmatterBlock(block, originalIndex)) ||
+        (appSettings.reader_hide_dataview && isCodeBlock(block)) ||
+        (appSettings.reader_hide_obsidian_comments && isObsidianComment(block));
+
+      if (!isHidden) {
+        nextVisibleBlocks.push({ content: block, originalIndex });
+      }
+    });
+
+    return { allBlocks, nextVisibleBlocks };
+  }
+
+  function getContentForSave(nextBlocks = blocks) {
+    const allBlocks = parseRawBlocks(rawContent);
+
+    visibleBlocks.forEach((visibleBlock, index) => {
+      const replacement = nextBlocks[index] ?? "";
+      if (visibleBlock.originalIndex >= allBlocks.length) {
+        allBlocks.push(replacement);
+      } else {
+        allBlocks[visibleBlock.originalIndex] = replacement;
+      }
+    });
+
+    return allBlocks.join("\n\n");
   }
 
   function loadContent(raw = "") {
-    blocks = splitIntoBlocks(raw);
+    rawContent = normalizeNewlines(raw);
+    const { allBlocks, nextVisibleBlocks } = getVisibleBlocksFromRaw(rawContent);
+
+    visibleBlocks =
+      nextVisibleBlocks.length > 0
+        ? nextVisibleBlocks
+        : [{ content: "", originalIndex: allBlocks.length }];
+
+    blocks = visibleBlocks.map((block) => block.content);
     focusedBlock = null;
     blockInputRefs = [];
   }
@@ -138,6 +262,21 @@
       window_saturation: settings.window_saturation ?? appSettings.window_saturation,
       window_brightness: settings.window_brightness ?? appSettings.window_brightness,
       text_color: settings.text_color ?? appSettings.text_color,
+      reader_hide_frontmatter:
+        settings.reader_hide_frontmatter ?? appSettings.reader_hide_frontmatter,
+      reader_hide_dataview:
+        settings.reader_hide_dataview ?? appSettings.reader_hide_dataview,
+      reader_hide_obsidian_comments:
+        settings.reader_hide_obsidian_comments ??
+        appSettings.reader_hide_obsidian_comments,
+    };
+  }
+
+  function getReaderFilterSettings(settings = appSettings) {
+    return {
+      reader_hide_frontmatter: settings.reader_hide_frontmatter,
+      reader_hide_dataview: settings.reader_hide_dataview,
+      reader_hide_obsidian_comments: settings.reader_hide_obsidian_comments,
     };
   }
 
@@ -157,7 +296,8 @@
 
   function updateBlocks(nextBlocks, shouldScheduleSave = true) {
     blocks = nextBlocks.length > 0 ? nextBlocks : [""];
-    updateActiveTabContent(getFileContent(blocks));
+    rawContent = getContentForSave(blocks);
+    updateActiveTabContent(rawContent);
     if (shouldScheduleSave) {
       scheduleSave();
     }
@@ -269,16 +409,19 @@
     saveTimeout = null;
     pendingSave = null;
 
-    const content = getFileContent();
+    const content = getContentForSave();
     updateActiveTabContent(content);
+    rawContent = content;
     await saveTabByIndex(activeTabIndex, content, showConfirmation);
   }
 
   function scheduleSave() {
     clearTimeout(saveTimeout);
+    const content = getContentForSave();
+    rawContent = content;
     pendingSave = {
       index: activeTabIndex,
-      content: getFileContent(),
+      content,
     };
     saveTimeout = setTimeout(() => {
       const job = pendingSave;
@@ -316,7 +459,8 @@
 
   function handleBlockInput(index) {
     blocks = [...blocks];
-    updateActiveTabContent(getFileContent(blocks));
+    rawContent = getContentForSave(blocks);
+    updateActiveTabContent(rawContent);
     scheduleSave();
   }
 
@@ -611,7 +755,20 @@
       });
 
       unlistenSettingsChanged = await listen("settings_changed", (event) => {
+        const previousFilters = getReaderFilterSettings();
         applySettings(event.payload);
+        const nextFilters = getReaderFilterSettings();
+
+        if (
+          previousFilters.reader_hide_frontmatter !==
+            nextFilters.reader_hide_frontmatter ||
+          previousFilters.reader_hide_dataview !==
+            nextFilters.reader_hide_dataview ||
+          previousFilters.reader_hide_obsidian_comments !==
+            nextFilters.reader_hide_obsidian_comments
+        ) {
+          loadContent(rawContent);
+        }
       });
 
       window.addEventListener("keydown", handleGlobalKeydown);
