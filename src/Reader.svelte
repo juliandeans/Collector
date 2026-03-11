@@ -1192,6 +1192,13 @@
       event.preventDefault();
       event.stopPropagation();
       await openPalette();
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && key === "p") {
+      event.preventDefault();
+      event.stopPropagation();
+      await openPalette();
     }
   }
 
@@ -1482,6 +1489,12 @@
     }
 
     if ((event.metaKey || event.ctrlKey) && key === "k") {
+      event.preventDefault();
+      await openPalette();
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && key === "p") {
       event.preventDefault();
       await openPalette();
       return;
