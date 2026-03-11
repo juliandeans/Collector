@@ -35,6 +35,12 @@
   let missingFileMessage = "";
   let selectedPaletteIndex = 0;
   let showSavedIndicator = false;
+  let tabContextMenu = {
+    open: false,
+    x: 0,
+    y: 0,
+    tabIndex: -1,
+  };
 
   let paletteInputRef;
   let blockInputRefs = [];
@@ -527,6 +533,33 @@
     focusedBlock = null;
   }
 
+  function closeTabContextMenu() {
+    tabContextMenu = {
+      open: false,
+      x: 0,
+      y: 0,
+      tabIndex: -1,
+    };
+  }
+
+  function openTabContextMenu(event, index) {
+    const tab = tabs[index];
+    if (!tab || tab.kind !== "opened") {
+      closeTabContextMenu();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    tabContextMenu = {
+      open: true,
+      x: event.clientX,
+      y: event.clientY,
+      tabIndex: index,
+    };
+  }
+
   function handleBlockInput(index) {
     blocks = [...blocks];
     rawContent = getContentForSave(blocks);
@@ -648,6 +681,25 @@
     await loadTab(nextIndex);
   }
 
+  async function closeTabByIndex(index) {
+    const tab = tabs[index];
+    if (!tab || tab.kind !== "opened") return;
+
+    closeTabContextMenu();
+    await flushPendingSave(false);
+
+    const nextTabs = tabs.filter((_, tabIndex) => tabIndex !== index);
+    const nextIndex =
+      activeTabIndex > index ? activeTabIndex - 1 : Math.min(activeTabIndex, nextTabs.length - 1);
+
+    tabs = nextTabs;
+    activeTabIndex = Math.max(nextIndex, 0);
+
+    if (tabs[activeTabIndex]) {
+      await loadTab(activeTabIndex);
+    }
+  }
+
   async function hideReader() {
     await flushPendingSave(false);
 
@@ -739,6 +791,12 @@
   }
 
   async function handleGlobalKeydown(event) {
+    if (tabContextMenu.open && event.key === "Escape") {
+      event.preventDefault();
+      closeTabContextMenu();
+      return;
+    }
+
     if (showPalette) {
       handlePaletteKeydown(event);
       if (["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(event.key)) {
@@ -947,6 +1005,8 @@
             title={tab.path}
             on:mousedown|stopPropagation
             on:click|stopPropagation={() => activateTab(index)}
+            on:contextmenu|stopPropagation={(event) =>
+              openTabContextMenu(event, index)}
           >
             {#if getTabIcon(tab)}
               <span class="tab-icon" aria-hidden="true">
@@ -981,6 +1041,30 @@
       </button>
     </div>
   </div>
+
+  {#if tabContextMenu.open}
+    <div
+      class="tab-context-backdrop"
+      role="presentation"
+      on:click={closeTabContextMenu}
+      on:contextmenu|preventDefault={closeTabContextMenu}
+    >
+      <div
+        class="tab-context-menu"
+        role="menu"
+        style={`left: ${tabContextMenu.x}px; top: ${tabContextMenu.y}px;`}
+      >
+        <button
+          class="tab-context-item"
+          type="button"
+          role="menuitem"
+          on:click={() => closeTabByIndex(tabContextMenu.tabIndex)}
+        >
+          Schließen
+        </button>
+      </div>
+    </div>
+  {/if}
 
   <div
     class="editor-scroll"
@@ -1277,6 +1361,47 @@
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .tab-context-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 115;
+  }
+
+  .tab-context-menu {
+    position: absolute;
+    min-width: 140px;
+    padding: 6px;
+    border-radius: 12px;
+    background: color-mix(
+      in srgb,
+      var(--app-background, #1e1e2e) 82%,
+      rgba(0, 0, 0, 0.22)
+    );
+    color: var(--app-text-color, #ffffff);
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 18px 40px rgba(0, 0, 0, 0.28),
+      0 6px 16px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(20px) saturate(130%);
+    -webkit-backdrop-filter: blur(20px) saturate(130%);
+  }
+
+  .tab-context-item {
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 8px;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    border: 0;
+    background: transparent;
+  }
+
+  .tab-context-item:hover {
+    background: rgba(255, 255, 255, 0.08);
   }
 
   .tab-button.active {
