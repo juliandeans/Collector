@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
+  import { getReaderIconComponent } from "./lib/reader-icons.js";
 
   let tabs = [];
   let activeTabIndex = 0;
@@ -232,7 +233,7 @@
         if (typeof entry === "string") {
           return {
             path: entry,
-            label: "",
+            label: fileLabel(entry),
             icon: "",
           };
         }
@@ -268,7 +269,8 @@
     icon = "",
     existingTab = null,
   }) {
-    const fallbackLabel = kind === "daily" ? "Daily" : fileLabel(path);
+    const fallbackLabel =
+      kind === "daily" ? "Daily" : kind === "pinned" ? "" : fileLabel(path);
 
     return {
       kind,
@@ -280,6 +282,10 @@
       missing: existingTab?.missing ?? false,
       missingMessage: existingTab?.missingMessage ?? "",
     };
+  }
+
+  function getTabIcon(tab) {
+    return getReaderIconComponent(tab?.icon);
   }
 
   function normalizeError(error) {
@@ -903,6 +909,7 @@
 
 <div
   class="reader-container"
+  class:palette-open={showPalette}
   style="
     --app-background: {appSettings.background_color};
     --app-font-family: {appSettings.font_family};
@@ -941,8 +948,14 @@
             on:mousedown|stopPropagation
             on:click|stopPropagation={() => activateTab(index)}
           >
-            {#if tab.icon}
-              <span class="tab-icon">{tab.icon}</span>
+            {#if getTabIcon(tab)}
+              <span class="tab-icon" aria-hidden="true">
+                <svelte:component
+                  this={getTabIcon(tab)}
+                  size={14}
+                  strokeWidth={1.9}
+                />
+              </span>
             {/if}
             <span class="tab-label">{tab.label}</span>
           </button>
@@ -1154,6 +1167,26 @@
     -webkit-transform: translateZ(0);
   }
 
+  .accent-line,
+  .reader-topbar,
+  .editor-scroll,
+  .status-toast {
+    transition:
+      filter 0.18s ease,
+      opacity 0.18s ease,
+      transform 0.18s ease;
+  }
+
+  .reader-container.palette-open .accent-line,
+  .reader-container.palette-open .reader-topbar,
+  .reader-container.palette-open .editor-scroll,
+  .reader-container.palette-open .status-toast {
+    filter: blur(10px) saturate(0.82) brightness(0.62);
+    opacity: 0.5;
+    transform: scale(0.992);
+    pointer-events: none;
+  }
+
   .accent-line {
     height: 2px;
     background: linear-gradient(
@@ -1235,6 +1268,9 @@
   .tab-icon {
     flex: 0 0 auto;
     line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .tab-label {
@@ -1445,9 +1481,28 @@
     align-items: flex-start;
     justify-content: center;
     padding: 52px 14px 14px;
-    background: rgba(0, 0, 0, 0.12);
-    backdrop-filter: blur(14px) saturate(120%);
-    -webkit-backdrop-filter: blur(14px) saturate(120%);
+    z-index: 120;
+    background: color-mix(
+      in srgb,
+      var(--app-background, #1e1e2e) 56%,
+      rgba(0, 0, 0, 0.58)
+    );
+    backdrop-filter: blur(28px) saturate(135%) brightness(0.74);
+    -webkit-backdrop-filter: blur(28px) saturate(135%) brightness(0.74);
+  }
+
+  .palette-backdrop::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.04) 0%,
+        rgba(0, 0, 0, 0.08) 100%
+      ),
+      rgba(0, 0, 0, 0.26);
+    pointer-events: none;
   }
 
   .palette {
@@ -1478,10 +1533,11 @@
     );
     border: 0.5px solid rgba(0, 0, 0, 0.08);
     box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.08),
-      0 2px 8px rgba(0, 0, 0, 0.04);
+      0 18px 48px rgba(0, 0, 0, 0.24),
+      0 6px 18px rgba(0, 0, 0, 0.14);
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
+    z-index: 1;
   }
 
   .palette::before {

@@ -3,6 +3,7 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
+  import { getReaderIconComponent, readerIconOptions } from "./lib/reader-icons.js";
   import { getSystemFonts } from "./lib/utils.js";
   import { defaultSettings } from "./lib/stores.js";
 
@@ -54,7 +55,7 @@
         if (typeof entry === "string") {
           return {
             path: entry,
-            label: "",
+            label: getFilename(entry),
             icon: "",
           };
         }
@@ -133,7 +134,7 @@
         .filter((path) => !existingByPath.has(path))
         .map((path) => ({
           path,
-          label: "",
+          label: getFilename(path),
           icon: "",
         }));
 
@@ -656,19 +657,6 @@
                       <div class="note-list-copy">
                         <div class="note-list-editors">
                           <input
-                            class="pinned-note-icon"
-                            type="text"
-                            value={note.icon}
-                            placeholder="📝"
-                            maxlength="8"
-                            on:input={(event) =>
-                              updatePinnedNote(
-                                note.path,
-                                "icon",
-                                event.currentTarget.value,
-                              )}
-                          />
-                          <input
                             class="pinned-note-label"
                             type="text"
                             value={note.label}
@@ -680,6 +668,29 @@
                                 event.currentTarget.value,
                               )}
                           />
+                        </div>
+                        <div class="pinned-note-icons">
+                          {#each readerIconOptions as iconOption}
+                            <button
+                              class="icon-choice"
+                              class:selected={note.icon === iconOption.id}
+                              type="button"
+                              title={iconOption.label}
+                              aria-label={iconOption.label}
+                              on:click={() =>
+                                updatePinnedNote(note.path, "icon", iconOption.id)}
+                            >
+                              {#if iconOption.component}
+                                <svelte:component
+                                  this={getReaderIconComponent(iconOption.id)}
+                                  size={14}
+                                  strokeWidth={1.9}
+                                />
+                              {:else}
+                                <span class="icon-choice-none">-</span>
+                              {/if}
+                            </button>
+                          {/each}
                         </div>
                         <small>{note.path}</small>
                       </div>
@@ -1241,26 +1252,51 @@
   }
 
   .note-list-editors {
-    display: grid;
-    grid-template-columns: 52px minmax(0, 1fr);
-    gap: 8px;
-    align-items: center;
+    display: block;
   }
 
-  .pinned-note-icon,
   .pinned-note-label {
     width: 100%;
-  }
-
-  .pinned-note-icon {
-    text-align: center;
-    font-size: 15px;
-    padding-left: 8px;
-    padding-right: 8px;
-  }
-
-  .pinned-note-label {
     font-weight: 600;
+  }
+
+  .pinned-note-icons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .icon-choice {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.72);
+    color: #6b7280;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none;
+  }
+
+  .icon-choice:hover {
+    color: #374151;
+    border-color: rgba(139, 92, 246, 0.22);
+    background: rgba(139, 92, 246, 0.08);
+    transform: none;
+  }
+
+  .icon-choice.selected {
+    color: #7c3aed;
+    border-color: rgba(124, 58, 237, 0.28);
+    background: rgba(139, 92, 246, 0.14);
+  }
+
+  .icon-choice-none {
+    font-size: 14px;
+    line-height: 1;
   }
 
   .note-list-copy small {
