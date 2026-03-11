@@ -310,43 +310,67 @@
   }
 
   function preprocessContent(raw = "") {
-    const normalized = normalizeNewlines(raw);
-    const allBlocks = parseRawBlocks(normalized);
-    const visibleBlocks = [];
+    let text = normalizeNewlines(raw);
 
     strippedFrontmatter = "";
     codeblockMap = new Map();
     hiddenBlockMap = new Map();
 
-    allBlocks.forEach((block, originalIndex) => {
-      if (
-        appSettings.reader_hide_frontmatter &&
-        isFrontmatterBlock(block, originalIndex)
-      ) {
-        strippedFrontmatter = block;
-        return;
-      }
+    if (appSettings.reader_hide_frontmatter) {
+      text = text.replace(
+        /^---\n[\s\S]*?\n---[ \t]*(?:\n+)?/,
+        (match) => {
+          strippedFrontmatter = match.trimEnd();
+          return "";
+        },
+      );
+    }
 
-      if (appSettings.reader_hide_dataview && isCodeBlock(block)) {
-        const codeblockId = `__CB_${codeblockMap.size}__`;
-        const firstLine = block.split("\n")[0]?.trim() ?? "```";
-        const lang = firstLine.slice(3).trim();
-        codeblockMap.set(codeblockId, block);
-        visibleBlocks.push(`\u200B${codeblockId}:${lang}`);
-        return;
-      }
-
-      if (appSettings.reader_hide_obsidian_comments && isObsidianComment(block)) {
+    if (appSettings.reader_hide_obsidian_comments) {
+      text = text.replace(/%%[\s\S]*?%%[ \t]*/g, (match) => {
         const hiddenId = `__HD_${hiddenBlockMap.size}__`;
-        hiddenBlockMap.set(hiddenId, block);
-        visibleBlocks.push(`\u200B${hiddenId}`);
-        return;
-      }
+        hiddenBlockMap.set(hiddenId, match);
+        return `\u200B${hiddenId}`;
+      });
+    }
 
-      visibleBlocks.push(block);
-    });
+    if (appSettings.reader_hide_dataview) {
+      text = replaceCodeblocks(text);
+      console.log(
+        "[CB] After replaceCodeblocks, text excerpt:",
+        text.slice(0, 500),
+      );
+      console.log(
+        "[CB] codeblockMap contents:",
+        [...codeblockMap.entries()].map(
+          ([k, v]) => `${k} => ${v.slice(0, 30)}`,
+        ),
+      );
+    }
 
-    return visibleBlocks.join("\n\n");
+    return text.replace(/^\n+/, "");
+  }
+
+  function replaceCodeblocks(text = "") {
+    const result = [];
+    const regex =
+      /^([ \t]*>[ \t]*)?(```([A-Za-z0-9_-]*)[ \t]*)\n([\s\S]*?)^([ \t]*>[ \t]*)?```[ \t]*$/gm;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+      result.push(text.slice(lastIndex, match.index));
+
+      const codeblockId = `__CB_${codeblockMap.size}__`;
+      const label = (match[3] ?? "").trim() || "code";
+      codeblockMap.set(codeblockId, match[0]);
+      result.push(`\u200B${codeblockId}:${label}\u200B`);
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    result.push(text.slice(lastIndex));
+    return result.join("");
   }
 
   function escHtml(text = "") {
@@ -368,19 +392,37 @@
 
   function markdownLineToHtml(line) {
     if (line === null || line === undefined) return "";
-
-    const codeblockMatch = line.match(/^\u200B(__CB_\d+__):(.*)$/);
-    if (codeblockMatch) {
-      const [, id, langValue] = codeblockMatch;
-      const lang = langValue.trim() || "code";
-      return `<div class="codeblock-pill" data-cbid="${id}" contenteditable="false"><span class="codeblock-icon"></span><span class="codeblock-lang">${escHtml(lang)}</span><span class="codeblock-hint">hidden</span></div>`;
+    if (line.includes("\u200B")) {
+      console.log(
+        "[CB] Sentinel line entering renderer:",
+        JSON.stringify(line),
+      );
     }
 
-    const hiddenMatch = line.match(/^\u200B(__HD_\d+__)$/);
+    const trimmed = line.trim();
+    if (line.includes("\u200B")) {
+      console.log(
+        "[CB] trimmed starts with sentinel?",
+        trimmed.startsWith("\u200B"),
+        "first chars:",
+        JSON.stringify(trimmed.slice(0, 20)),
+      );
+    }
+    const codeblockMatch = trimmed.match(/\u200B(__CB_\d+__):([\w-]*)\u200B/);
+    if (codeblockMatch) {
+      const [, id, langValue] = codeblockMatch;
+      const lang = langValue || "code";
+      return `<div class="codeblock-pill" data-cbid="${id}" data-cblang="${escHtml(lang)}" contenteditable="false"><span class="codeblock-icon"></span><span class="codeblock-lang">${escHtml(lang)}</span></div>`;
+    }
+
+    const hiddenMatch = trimmed.match(/^\u200B(__HD_\d+__)$/);
     if (hiddenMatch) {
       return `<div class="hidden-marker" data-hidden-id="${hiddenMatch[1]}" contenteditable="false"></div>`;
     }
 
+    if (/^###### /.test(line)) return `<h6>${escHtml(line.slice(7))}</h6>`;
+    if (/^##### /.test(line)) return `<h5>${escHtml(line.slice(6))}</h5>`;
+    if (/^#### /.test(line)) return `<h4>${escHtml(line.slice(5))}</h4>`;
     if (/^### /.test(line)) return `<h3>${escHtml(line.slice(4))}</h3>`;
     if (/^## /.test(line)) return `<h2>${escHtml(line.slice(3))}</h2>`;
     if (/^# /.test(line)) return `<h1>${escHtml(line.slice(2))}</h1>`;
@@ -440,6 +482,9 @@
     if (tag === "h1") return `# ${inner}`;
     if (tag === "h2") return `## ${inner}`;
     if (tag === "h3") return `### ${inner}`;
+    if (tag === "h4") return `#### ${inner}`;
+    if (tag === "h5") return `##### ${inner}`;
+    if (tag === "h6") return `###### ${inner}`;
     if (tag === "hr") return "---";
     if (tag === "blockquote") return `> ${inner}`;
 
@@ -633,6 +678,21 @@
         return;
       }
 
+      if (tag === "h4") {
+        lines.push(`#### ${serializeChildren(element).trim()}`);
+        return;
+      }
+
+      if (tag === "h5") {
+        lines.push(`##### ${serializeChildren(element).trim()}`);
+        return;
+      }
+
+      if (tag === "h6") {
+        lines.push(`###### ${serializeChildren(element).trim()}`);
+        return;
+      }
+
       if (tag === "hr") {
         lines.push("---");
         return;
@@ -645,8 +705,9 @@
 
       if (tag === "div" && element.classList.contains("codeblock-pill")) {
         const id = element.dataset.cbid;
+        const lang = element.dataset.cblang ?? "code";
         if (id) {
-          lines.push(id);
+          lines.push(`\u200B${id}:${lang}\u200B`);
         }
         return;
       }
@@ -709,11 +770,10 @@
 
   function restoreCodeblocks(markdown = "") {
     let restored = markdown;
-
-    codeblockMap.forEach((block, id) => {
-      const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      restored = restored.replace(new RegExp(`(?:\\u200B)?${escaped}(?::[^\\n]*)?`, "g"), block);
-    });
+    restored = restored.replace(
+      /\u200B(__CB_\d+__):[^\u200B]*\u200B/g,
+      (_, id) => codeblockMap.get(id) ?? "",
+    );
 
     return restored;
   }
@@ -765,6 +825,11 @@
 
     isRenderingContent = true;
     editorRef.innerHTML = markdownToHtml(processed);
+    console.log(
+      "[CB] Pills in DOM:",
+      editorRef.querySelectorAll(".codeblock-pill").length,
+    );
+    console.log("[CB] innerHTML excerpt:", editorRef.innerHTML.slice(0, 300));
     isRenderingContent = false;
   }
 
@@ -1781,6 +1846,30 @@
     line-height: 1.35;
   }
 
+  .editor-body :global(h4) {
+    margin: 3px 0 2px;
+    font-size: 1em;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .editor-body :global(h5) {
+    margin: 2px 0 1px;
+    font-size: 0.94em;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: 0.01em;
+  }
+
+  .editor-body :global(h6) {
+    margin: 2px 0 1px;
+    font-size: 0.88em;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
+  }
+
   .editor-body :global(blockquote) {
     margin: 2px 0;
     padding-left: 12px;
@@ -1833,11 +1922,12 @@
   }
 
   .editor-body :global(.codeblock-pill) {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 4px 0;
-    padding: 7px 10px;
+    width: fit-content;
+    gap: 6px;
+    margin: 4px 0 4px auto;
+    padding: 4px 8px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.06);
     border: 0.5px solid rgba(255, 255, 255, 0.1);
@@ -1850,22 +1940,17 @@
   }
 
   .editor-body :global(.codeblock-icon) {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 999px;
     background: var(--accent-color);
     opacity: 0.85;
   }
 
   .editor-body :global(.codeblock-lang) {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     text-transform: lowercase;
-  }
-
-  .editor-body :global(.codeblock-hint) {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.5);
   }
 
   .editor-body :global(.hidden-marker) {

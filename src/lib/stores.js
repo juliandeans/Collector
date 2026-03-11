@@ -5,6 +5,8 @@ export const defaultSettings = {
   edge_side: 'right',
   window_width: 300,
   window_height: 100,
+  reader_width: 380,
+  reader_height: 700,
   border_radius: 8,
   background_color: '#FFFFFF',
   font_family: 'SF Pro',

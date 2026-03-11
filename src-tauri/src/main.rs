@@ -100,6 +100,16 @@ async fn save_settings(
         configure_macos_window(&window, new_settings.border_radius as f64);
     }
 
+    if let Some(reader_window) = app.get_webview_window("reader") {
+        if let Err(e) = position_reader_window_logical(&reader_window, &new_settings) {
+            log::warn!("Failed to update reader window position: {}", e);
+        } else {
+            log::info!("Reader window position/size updated");
+        }
+
+        configure_macos_window(&reader_window, new_settings.border_radius as f64);
+    }
+
     // Emit settings_changed before shortcuts so visual changes apply even if shortcuts fail.
     if let Some(capture_window) = app.get_webview_window("capture") {
         if let Err(e) = capture_window.emit("settings_changed", &new_settings) {
@@ -391,21 +401,7 @@ async fn show_reader_internal(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<AppState>();
     if let Some(window) = app.get_webview_window("reader") {
         let settings = state.settings.read().await;
-        let screen = window
-            .current_monitor()
-            .map_err(|e| e.to_string())?
-            .ok_or("No monitor")?;
-        let scale = screen.scale_factor();
-        let screen_size = screen.size();
-        let screen_h = screen_size.height as f64 / scale;
-        let win_h = settings.window_height as f64;
-        let y = ((screen_h - win_h) / 2.0).max(0.0);
-        window
-            .set_size(LogicalSize::new(380.0, settings.window_height as f64))
-            .map_err(|e| e.to_string())?;
-        window
-            .set_position(LogicalPosition::new(0.0, y))
-            .map_err(|e| e.to_string())?;
+        position_reader_window_logical(&window, &settings)?;
         configure_macos_window(&window, settings.border_radius as f64);
         let _ = window.show();
         let _ = window.set_focus();
@@ -434,6 +430,8 @@ async fn get_window_info(state: tauri::State<'_, AppState>) -> Result<serde_json
     Ok(serde_json::json!({
         "width": settings.window_width,
         "height": settings.window_height,
+        "readerWidth": settings.reader_width,
+        "readerHeight": settings.reader_height,
         "borderRadius": settings.border_radius,
         "backgroundColor": settings.background_color,
         "fontFamily": settings.font_family,
@@ -573,6 +571,32 @@ fn position_window_logical(
 
     window
         .set_position(LogicalPosition { x, y })
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+fn position_reader_window_logical(
+    window: &tauri::WebviewWindow,
+    settings: &Settings,
+) -> Result<(), String> {
+    let screen = window
+        .current_monitor()
+        .map_err(|e| e.to_string())?
+        .ok_or("No monitor")?;
+    let scale = screen.scale_factor();
+    let screen_size = screen.size();
+    let screen_h = screen_size.height as f64 / scale;
+    let width = settings.reader_width as f64;
+    let height = settings.reader_height as f64;
+    let y = ((screen_h - height) / 2.0).max(0.0);
+
+    window
+        .set_size(LogicalSize::new(width, height))
+        .map_err(|e| e.to_string())?;
+
+    window
+        .set_position(LogicalPosition::new(0.0, y))
         .map_err(|e| e.to_string())?;
 
     Ok(())

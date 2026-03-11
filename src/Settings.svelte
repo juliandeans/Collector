@@ -429,49 +429,6 @@
             </p>
 
             <div class="field">
-              <fieldset class="radio-group">
-                <legend>Screen Edge</legend>
-                <label class="radio"
-                  ><input
-                    type="radio"
-                    bind:group={settings.edge_side}
-                    value="left"
-                  />
-                  Left</label
-                >
-                <label class="radio"
-                  ><input
-                    type="radio"
-                    bind:group={settings.edge_side}
-                    value="right"
-                  />
-                  Right</label
-                >
-              </fieldset>
-            </div>
-            <div class="field-row">
-              <div class="field">
-                <label for="window_width">Width (px)</label>
-                <input
-                  type="number"
-                  id="window_width"
-                  bind:value={settings.window_width}
-                  min="200"
-                  max="800"
-                />
-              </div>
-              <div class="field">
-                <label for="window_height">Height (px)</label>
-                <input
-                  type="number"
-                  id="window_height"
-                  bind:value={settings.window_height}
-                  min="80"
-                  max="400"
-                />
-              </div>
-            </div>
-            <div class="field">
               <label for="border_radius"
                 >Corner Radius: {settings.border_radius}px</label
               >
@@ -602,6 +559,30 @@
               Defaults used when Collector creates a new note file.
             </p>
 
+            <h3>Window Size</h3>
+            <div class="field-row">
+              <div class="field">
+                <label for="window_width">Width (px)</label>
+                <input
+                  type="number"
+                  id="window_width"
+                  bind:value={settings.window_width}
+                  min="200"
+                  max="800"
+                />
+              </div>
+              <div class="field">
+                <label for="window_height">Height (px)</label>
+                <input
+                  type="number"
+                  id="window_height"
+                  bind:value={settings.window_height}
+                  min="200"
+                  max="1200"
+                />
+              </div>
+            </div>
+
             <div class="field">
               <label for="notes_folder">Notes Folder</label>
               <input
@@ -642,6 +623,30 @@
               Configure the left reader window and the tabs shown there by
               default.
             </p>
+
+            <h3>Window Size</h3>
+            <div class="field-row">
+              <div class="field">
+                <label for="reader_width">Width (px)</label>
+                <input
+                  type="number"
+                  id="reader_width"
+                  bind:value={settings.reader_width}
+                  min="200"
+                  max="800"
+                />
+              </div>
+              <div class="field">
+                <label for="reader_height">Height (px)</label>
+                <input
+                  type="number"
+                  id="reader_height"
+                  bind:value={settings.reader_height}
+                  min="200"
+                  max="1200"
+                />
+              </div>
+            </div>
 
             <div class="field">
               <div class="field-label">Pinned Notes</div>
@@ -1036,6 +1041,15 @@
     letter-spacing: -0.2px;
   }
 
+  section h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 16px 0 8px;
+  }
+
   .field {
     margin-bottom: 12px;
   }
@@ -1129,20 +1143,6 @@
   .color-input input[type="text"] {
     flex: 1;
     font-family: monospace;
-  }
-
-  .radio-group {
-    display: flex;
-    gap: 16px;
-    border: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  .radio-group legend {
-    padding: 0;
-    margin: 0 0 6px 0;
-    font-weight: 500;
   }
 
   .section-description {

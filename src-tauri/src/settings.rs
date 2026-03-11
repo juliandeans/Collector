@@ -69,6 +69,10 @@ pub struct Settings {
     pub edge_side: String,
     pub window_width: u32,
     pub window_height: u32,
+    #[serde(default = "default_reader_width")]
+    pub reader_width: u32,
+    #[serde(default = "default_reader_height")]
+    pub reader_height: u32,
     pub border_radius: u32,
     pub background_color: String,
     pub font_family: String,
@@ -197,6 +201,14 @@ fn default_window_brightness() -> i32 {
     0
 }
 
+fn default_reader_width() -> u32 {
+    380
+}
+
+fn default_reader_height() -> u32 {
+    700
+}
+
 fn default_text_color() -> String {
     "#ffffff".to_string()
 }
@@ -222,6 +234,8 @@ impl Default for Settings {
             edge_side: "right".to_string(),
             window_width: 330,
             window_height: 600,
+            reader_width: default_reader_width(),
+            reader_height: default_reader_height(),
             border_radius: 12,
             background_color: "#1e1e2e".to_string(),
             font_family: "-apple-system, BlinkMacSystemFont, SF Pro Display".to_string(),
@@ -362,8 +376,15 @@ impl Settings {
         if self.window_width < 200 || self.window_width > 800 {
             return Err("window_width must be between 200 and 800".to_string());
         }
-        if self.window_height < 80 || self.window_height > 1200 {
-            return Err("window_height must be between 80 and 1200".to_string());
+        if self.window_height < 200 || self.window_height > 1200 {
+            return Err("window_height must be between 200 and 1200".to_string());
+        }
+
+        if self.reader_width < 200 || self.reader_width > 800 {
+            return Err("reader_width must be between 200 and 800".to_string());
+        }
+        if self.reader_height < 200 || self.reader_height > 1200 {
+            return Err("reader_height must be between 200 and 1200".to_string());
         }
 
         if self.border_radius > 30 {
