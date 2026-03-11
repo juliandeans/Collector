@@ -5,8 +5,8 @@
 
   let tabs = [];
   let activeTabIndex = 0;
-  let lines = [""];
-  let focusedLine = null;
+  let blocks = [""];
+  let focusedBlock = null;
   let showPalette = false;
   let paletteQuery = "";
   let vaultNotes = [];
@@ -30,7 +30,7 @@
   let showSavedIndicator = false;
 
   let paletteInputRef;
-  let lineInputRefs = [];
+  let blockInputRefs = [];
   let saveTimeout;
   let pendingSave = null;
   let statusTimeout;
@@ -63,13 +63,36 @@
     return ` brightness(${brightnessValue}) contrast(${contrastValue})`;
   })();
 
-  function splitContent(content = "") {
+  function splitIntoBlocks(content = "") {
     const normalized = content.replace(/\r\n/g, "\n");
-    return normalized.length > 0 ? normalized.split("\n") : [""];
+    return normalized.length > 0 ? normalized.split(/\n\n+/) : [""];
   }
 
-  function joinLines(nextLines) {
-    return nextLines.join("\n");
+  function getFileContent(nextBlocks = blocks) {
+    return nextBlocks.join("\n\n");
+  }
+
+  function loadContent(raw = "") {
+    blocks = splitIntoBlocks(raw);
+    focusedBlock = null;
+    blockInputRefs = [];
+  }
+
+  function autosize(node) {
+    const resize = () => {
+      node.style.height = "auto";
+      node.style.height = `${node.scrollHeight}px`;
+    };
+
+    node.addEventListener("input", resize);
+    setTimeout(resize, 0);
+
+    return {
+      update: resize,
+      destroy() {
+        node.removeEventListener("input", resize);
+      },
+    };
   }
 
   function fileLabel(path) {
@@ -132,9 +155,9 @@
     });
   }
 
-  function updateLines(nextLines, shouldScheduleSave = true) {
-    lines = nextLines.length > 0 ? nextLines : [""];
-    updateActiveTabContent(joinLines(lines));
+  function updateBlocks(nextBlocks, shouldScheduleSave = true) {
+    blocks = nextBlocks.length > 0 ? nextBlocks : [""];
+    updateActiveTabContent(getFileContent(blocks));
     if (shouldScheduleSave) {
       scheduleSave();
     }
@@ -144,11 +167,11 @@
     const tab = tabs[index];
     if (!tab) return;
 
-    focusedLine = null;
-    lineInputRefs = [];
+    focusedBlock = null;
+    blockInputRefs = [];
 
     if (!forceReload && tab.loaded) {
-      lines = splitContent(tab.content);
+      loadContent(tab.content);
       missingFileMessage = tab.missing ? tab.missingMessage || "" : "";
       return;
     }
@@ -162,7 +185,7 @@
         missingMessage: "",
       });
       if (index === activeTabIndex) {
-        lines = splitContent(content);
+        loadContent(content);
         missingFileMessage = "";
       }
     } catch (error) {
@@ -179,7 +202,7 @@
       });
 
       if (index === activeTabIndex) {
-        lines = [""];
+        loadContent("");
         missingFileMessage = missingMessage;
       }
 
@@ -246,7 +269,7 @@
     saveTimeout = null;
     pendingSave = null;
 
-    const content = joinLines(lines);
+    const content = getFileContent();
     updateActiveTabContent(content);
     await saveTabByIndex(activeTabIndex, content, showConfirmation);
   }
@@ -255,7 +278,7 @@
     clearTimeout(saveTimeout);
     pendingSave = {
       index: activeTabIndex,
-      content: joinLines(lines),
+      content: getFileContent(),
     };
     saveTimeout = setTimeout(() => {
       const job = pendingSave;
@@ -276,10 +299,10 @@
     await saveTabByIndex(job.index, job.content, showConfirmation);
   }
 
-  function focusLine(index) {
-    focusedLine = index;
+  function focusBlock(index) {
+    focusedBlock = index;
     setTimeout(() => {
-      const input = lineInputRefs[index];
+      const input = blockInputRefs[index];
       if (input) {
         input.focus();
         input.setSelectionRange(input.value.length, input.value.length);
@@ -287,58 +310,27 @@
     }, 0);
   }
 
-  function blurLine() {
-    focusedLine = null;
+  function blurBlock() {
+    focusedBlock = null;
   }
 
-  function handleLineInput(index, value) {
-    const nextLines = [...lines];
-    nextLines[index] = value;
-    updateLines(nextLines);
+  function handleBlockInput(index) {
+    blocks = [...blocks];
+    updateActiveTabContent(getFileContent(blocks));
+    scheduleSave();
   }
 
-  function insertLineAfter(index) {
-    const nextLines = [...lines];
-    nextLines.splice(index + 1, 0, "");
-    updateLines(nextLines);
-    focusLine(index + 1);
-  }
-
-  function removeLine(index) {
-    if (lines.length === 1) {
-      updateLines([""]);
-      focusLine(0);
+  function handleBlockKeydown(event, index) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      focusedBlock = null;
       return;
     }
 
-    const nextLines = [...lines];
-    nextLines.splice(index, 1);
-    updateLines(nextLines);
-    focusLine(Math.max(index - 1, 0));
-  }
-
-  function handleLineKeydown(event, index) {
-    if (event.key === "Enter") {
+    if (event.metaKey && event.key.toLowerCase() === "s") {
       event.preventDefault();
-      insertLineAfter(index);
-      return;
-    }
-
-    if (event.key === "ArrowUp" && index > 0) {
-      event.preventDefault();
-      focusLine(index - 1);
-      return;
-    }
-
-    if (event.key === "ArrowDown" && index < lines.length - 1) {
-      event.preventDefault();
-      focusLine(index + 1);
-      return;
-    }
-
-    if (event.key === "Backspace" && lines[index] === "") {
-      event.preventDefault();
-      removeLine(index);
+      event.stopPropagation();
+      saveCurrentTab();
     }
   }
 
@@ -381,14 +373,52 @@
     };
   }
 
-  async function toggleCheckbox(index) {
-    const checkbox = parseCheckbox(lines[index]);
+  function isSpacerBlock(block) {
+    return block.trim() === "";
+  }
+
+  function getBlockLines(block) {
+    return block.split("\n").map((line) => {
+      const heading = parseHeading(line);
+      const checkbox = parseCheckbox(line);
+
+      if (line.trim() === "") {
+        return { type: "spacer" };
+      }
+
+      if (checkbox) {
+        return {
+          type: "checkbox",
+          checked: checkbox.checked,
+          html: renderInlineMarkdown(checkbox.text || "Task"),
+        };
+      }
+
+      if (heading) {
+        return {
+          type: "heading",
+          level: heading.level,
+          html: renderInlineMarkdown(heading.text),
+        };
+      }
+
+      return {
+        type: "text",
+        html: renderInlineMarkdown(line),
+      };
+    });
+  }
+
+  async function toggleCheckbox(blockIndex, lineIndex) {
+    const nextBlocks = [...blocks];
+    const blockLines = nextBlocks[blockIndex].split("\n");
+    const checkbox = parseCheckbox(blockLines[lineIndex]);
     if (!checkbox) return;
 
     const marker = checkbox.checked ? " " : "x";
-    const nextLines = [...lines];
-    nextLines[index] = `- [${marker}] ${checkbox.text}`;
-    updateLines(nextLines, false);
+    blockLines[lineIndex] = `- [${marker}] ${checkbox.text}`;
+    nextBlocks[blockIndex] = blockLines.join("\n");
+    updateBlocks(nextBlocks, false);
     await saveCurrentTab();
   }
 
@@ -671,7 +701,7 @@
     tabindex="0"
     on:click={(event) => {
       if (event.target === event.currentTarget) {
-        focusLine(lines.length - 1);
+        focusBlock(blocks.length - 1);
       }
     }}
     on:keydown={(event) => {
@@ -680,7 +710,7 @@
         (event.key === "Enter" || event.key === " ")
       ) {
         event.preventDefault();
-        focusLine(lines.length - 1);
+        focusBlock(blocks.length - 1);
       }
     }}
   >
@@ -688,68 +718,60 @@
       <div class="missing-file-banner">{missingFileMessage}</div>
     {/if}
 
-    {#each lines as line, index}
-      <div class="line-row">
-        {#if focusedLine === index}
-          <input
-            bind:this={lineInputRefs[index]}
-            class="line-input"
-            type="text"
-            value={line}
+    {#each blocks as block, index}
+      <div class="block-row">
+        {#if focusedBlock === index}
+          <textarea
+            bind:this={blockInputRefs[index]}
+            bind:value={blocks[index]}
+            class="block-input"
             spellcheck="false"
-            on:blur={blurLine}
-            on:input={(event) => handleLineInput(index, event.currentTarget.value)}
-            on:keydown={(event) => handleLineKeydown(event, index)}
-          />
+            rows={blocks[index].split("\n").length || 1}
+            style="resize: none; overflow: hidden;"
+            use:autosize
+            on:blur={blurBlock}
+            on:input={() => handleBlockInput(index)}
+            on:keydown={(event) => handleBlockKeydown(event, index)}
+          ></textarea>
         {:else}
-          {@const heading = parseHeading(line)}
-          {@const checkbox = parseCheckbox(line)}
-
-          {#if line.trim() === ""}
-            <button
-              class="line-display blank"
-              type="button"
-              on:click={() => focusLine(index)}
-            >
-              <span class="line-spacer"></span>
-            </button>
-          {:else if checkbox}
-            <div class="line-display checkbox-line">
-              <button
-                class="checkbox-toggle"
-                class:checked={checkbox.checked}
-                type="button"
-                on:click={() => toggleCheckbox(index)}
-              ></button>
-              <button
-                class="checkbox-text"
-                type="button"
-                on:click={() => focusLine(index)}
-              >
-                <span
-                  class:checked={checkbox.checked}
-                  >{@html renderInlineMarkdown(checkbox.text || "Task")}</span
-                >
-              </button>
-            </div>
-          {:else if heading}
-            <button
-              class="line-display heading"
-              class:level-1={heading.level === 1}
-              class:level-2={heading.level === 2}
-              class:level-3={heading.level === 3}
-              type="button"
-              on:click={() => focusLine(index)}
-            >
-              <span>{@html renderInlineMarkdown(heading.text)}</span>
-            </button>
+          {#if isSpacerBlock(block)}
+            <div class="editor-spacer" aria-hidden="true"></div>
           {:else}
             <button
-              class="line-display"
+              class="block-display"
               type="button"
-              on:click={() => focusLine(index)}
+              on:click={() => focusBlock(index)}
             >
-              <span>{@html renderInlineMarkdown(line)}</span>
+              {#each getBlockLines(block) as blockLine, lineIndex}
+                {#if blockLine.type === "spacer"}
+                  <span class="block-line-spacer"></span>
+                {:else if blockLine.type === "checkbox"}
+                  <span class="block-line checkbox-line">
+                    <button
+                      class="checkbox-toggle"
+                      class:checked={blockLine.checked}
+                      type="button"
+                      on:click|stopPropagation={() =>
+                        toggleCheckbox(index, lineIndex)}
+                    ></button>
+                    <span
+                      class:checked={blockLine.checked}
+                      >{@html blockLine.html}</span
+                    >
+                  </span>
+                {:else if blockLine.type === "heading"}
+                  <span
+                    class="block-line heading"
+                    class:level-1={blockLine.level === 1}
+                    class:level-2={blockLine.level === 2}
+                    class:level-3={blockLine.level === 3}
+                  >
+                    {@html blockLine.html}
+                  </span>
+                {:else}
+                  <span class="block-line">{@html blockLine.html}</span>
+                {/if}
+              {/each}
             </button>
           {/if}
         {/if}
@@ -830,7 +852,10 @@
 
   .reader-container {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
     background: color-mix(
@@ -849,20 +874,38 @@
     border: 0.5px solid rgba(0, 0, 0, 0.08);
     box-shadow:
       0 8px 32px rgba(0, 0, 0, 0.08),
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
-    overflow: hidden;
+      0 2px 8px rgba(0, 0, 0, 0.04);
+    overflow: clip;
+    font-family: var(
+      --app-font-family,
+      -apple-system,
+      BlinkMacSystemFont,
+      "SF Pro Display",
+      sans-serif
+    );
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
   }
 
   .accent-line {
     height: 2px;
-    width: 100%;
     background: linear-gradient(
       90deg,
-      transparent,
-      var(--accent-color),
-      transparent
+      rgba(139, 92, 246, 0.6),
+      rgba(139, 92, 246, 0.3),
+      rgba(139, 92, 246, 0.6)
     );
-    opacity: 0.85;
+    background-size: 200% 100%;
+    animation: shimmer 3s linear infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 
   .reader-topbar {
@@ -870,14 +913,9 @@
     align-items: center;
     justify-content: space-between;
     min-height: 40px;
-    padding: 6px 10px;
+    padding: 8px 12px 6px;
     gap: 10px;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.08),
-      rgba(255, 255, 255, 0.02)
-    );
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: transparent;
   }
 
   .tab-strip {
@@ -910,8 +948,7 @@
 
   .tab-button,
   .tab-action,
-  .line-display,
-  .checkbox-text,
+  .block-display,
   .palette-item {
     border: 0;
     background: transparent;
@@ -925,7 +962,7 @@
     max-width: 120px;
     padding: 8px 10px 10px;
     border-radius: 10px 10px 0 0;
-    color: rgba(255, 255, 255, 0.72);
+    color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
     white-space: nowrap;
     overflow: hidden;
@@ -934,7 +971,7 @@
 
   .tab-button.active {
     color: var(--app-text-color, #ffffff);
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .tab-button.active::after {
@@ -952,7 +989,7 @@
     width: 26px;
     height: 26px;
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
     cursor: pointer;
     transition:
       background var(--transition-fast),
@@ -961,11 +998,10 @@
 
   .tab-action:hover,
   .tab-button:hover,
-  .line-display:hover,
-  .checkbox-text:hover,
+  .block-display:hover,
   .palette-item:hover,
   .checkbox-toggle:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.08);
   }
 
   .tab-action:active {
@@ -992,69 +1028,86 @@
     position: relative;
     flex: 1;
     overflow-y: auto;
-    padding: 16px 14px 18px;
+    padding: 12px 16px 16px;
+    background: transparent;
   }
 
   .missing-file-banner {
     margin-bottom: 12px;
     padding: 10px 12px;
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.05);
     color: rgba(255, 255, 255, 0.72);
     font-size: 12px;
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
   }
 
-  .line-row + .line-row {
-    margin-top: 2px;
+  .block-row + .block-row {
+    margin-top: 8px;
   }
 
-  .line-display,
-  .line-input {
+  .block-display,
+  .block-input {
     width: 100%;
-    min-height: 32px;
     padding: 7px 10px;
     border-radius: 10px;
     text-align: left;
   }
 
-  .line-display {
+  .block-display {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     cursor: text;
     color: var(--app-text-color, #ffffff);
   }
 
-  .line-display.blank {
-    padding: 6px 10px;
+  .editor-spacer {
+    height: 0.8em;
   }
 
-  .line-spacer {
+  .block-line-spacer {
     display: block;
-    height: 18px;
-    border-radius: 999px;
-    background: transparent;
+    height: 0.8em;
   }
 
-  .line-input {
+  .block-input {
+    width: 100%;
+    min-height: 32px;
     border: 1px solid rgba(255, 255, 255, 0.16);
-    background: rgba(10, 10, 18, 0.42);
+    background: rgba(255, 255, 255, 0.04);
     color: var(--app-text-color, #ffffff);
     outline: none;
+    resize: none;
+    font: inherit;
+    line-height: 1.6;
+    overflow: hidden;
+    field-sizing: content;
   }
 
-  .line-display.heading {
+  .block-line {
+    display: block;
+    min-height: 1.5em;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .block-line.heading {
     font-weight: 600;
   }
 
-  .line-display.level-1 {
+  .block-line.level-1 {
     font-size: 1.55rem;
     line-height: 1.2;
   }
 
-  .line-display.level-2 {
+  .block-line.level-2 {
     font-size: 1.25rem;
     line-height: 1.25;
   }
 
-  .line-display.level-3 {
+  .block-line.level-3 {
     font-size: 1.05rem;
     line-height: 1.3;
     letter-spacing: 0.01em;
@@ -1093,29 +1146,20 @@
     font-weight: 700;
   }
 
-  .checkbox-text {
-    flex: 1;
-    min-height: 32px;
-    padding: 7px 10px;
-    border-radius: 10px;
-    text-align: left;
-    cursor: text;
-  }
-
-  .checkbox-text .checked {
+  .checkbox-line .checked {
     color: rgba(255, 255, 255, 0.52);
     text-decoration: line-through;
   }
 
   :global(.reader-container a) {
-    color: #9bd0ff;
+    color: var(--accent-color);
     text-decoration: none;
   }
 
   :global(.reader-container code) {
     padding: 2px 6px;
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.12);
     font-family: "SF Mono", Monaco, monospace;
     font-size: 0.92em;
   }
@@ -1127,37 +1171,84 @@
     align-items: flex-start;
     justify-content: center;
     padding: 52px 14px 14px;
-    background: rgba(10, 12, 18, 0.22);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(14px) saturate(120%);
+    -webkit-backdrop-filter: blur(14px) saturate(120%);
   }
 
   .palette {
+    position: relative;
     width: 100%;
     max-width: 520px;
     max-height: min(70vh, 520px);
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
-    border-radius: 18px;
-    background: rgba(20, 20, 30, 0.82);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+    border-radius: 12px;
+    background: color-mix(
+      in srgb,
+      var(--app-background, #1e1e2e) var(--app-transparency, 55%),
+      transparent
+    );
+    backdrop-filter: blur(var(--app-blur, 80px))
+      saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
+    -webkit-backdrop-filter: blur(var(--app-blur, 80px))
+      saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
+    color: var(--app-text-color, #ffffff);
+    font-family: var(
+      --app-font-family,
+      -apple-system,
+      BlinkMacSystemFont,
+      "SF Pro Display",
+      sans-serif
+    );
+    border: 0.5px solid rgba(0, 0, 0, 0.08);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.08),
+      0 2px 8px rgba(0, 0, 0, 0.04);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+
+  .palette::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      rgba(139, 92, 246, 0.6),
+      rgba(139, 92, 246, 0.3),
+      rgba(139, 92, 246, 0.6)
+    );
+    background-size: 200% 100%;
+    animation: shimmer 3s linear infinite;
+    z-index: 1;
   }
 
   .palette-input {
     width: 100%;
-    padding: 14px 16px;
+    padding: 14px 16px 12px;
     border: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     background: transparent;
-    color: #fff;
+    color: var(--app-text-color, #ffffff);
     font: inherit;
     outline: none;
+    position: relative;
+    z-index: 1;
+  }
+
+  .palette-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
   }
 
   .palette-results {
     max-height: 420px;
     overflow-y: auto;
-    padding: 8px;
+    padding: 10px 8px 8px;
   }
 
   .palette-item {
@@ -1171,11 +1262,11 @@
   }
 
   .palette-item.selected {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.08);
   }
 
   .palette-name {
-    color: #fff;
+    color: var(--app-text-color, #ffffff);
     font-weight: 600;
   }
 
@@ -1193,19 +1284,61 @@
 
   .status-toast {
     position: absolute;
-    right: 12px;
-    bottom: 12px;
-    padding: 9px 12px;
-    border-radius: 999px;
-    background: rgba(24, 26, 34, 0.82);
-    color: #fff;
-    font-size: 12px;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    background: rgba(52, 199, 89, 0.12);
     backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+    border: 0.5px solid rgba(52, 199, 89, 0.3);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #34c759;
+    animation: fadeInUp 0.2s ease-out;
+    white-space: nowrap;
+    z-index: 100;
   }
 
   .status-toast.error {
-    background: rgba(143, 35, 35, 0.88);
+    background: rgba(255, 59, 48, 0.12);
+    border-color: rgba(255, 59, 48, 0.3);
+    color: #ff3b30;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  .save-indicator {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .save-indicator.busy {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .editor-scroll::-webkit-scrollbar,
+  .palette-results::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .editor-scroll::-webkit-scrollbar-track,
+  .palette-results::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .editor-scroll::-webkit-scrollbar-thumb,
+  .palette-results::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 3px;
   }
 </style>
