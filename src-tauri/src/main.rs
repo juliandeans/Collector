@@ -37,6 +37,7 @@ struct AppState {
     settings: Arc<RwLock<Settings>>,
     edge_detector: Arc<EdgeDetector>,
     shortcut_manager: Arc<ShortcutManager>,
+    reader_shortcut_manager: Arc<ShortcutManager>,
     capture_text_shortcut_manager: Arc<ShortcutManager>,
     save_as_note_shortcut_manager: Arc<ShortcutManager>,
 }
@@ -130,6 +131,15 @@ async fn save_settings(
     }
 
     match state
+        .reader_shortcut_manager
+        .register_reader(&app, &new_settings)
+        .await
+    {
+        Ok(_) => log::info!("Reader shortcut updated"),
+        Err(e) => log::warn!("Failed to update reader shortcut (non-fatal): {}", e),
+    }
+
+    match state
         .capture_text_shortcut_manager
         .register_capture_text(&app, &new_settings)
         .await
@@ -159,7 +169,7 @@ async fn save_as_note(
 ) -> Result<String, String> {
     let settings = state.settings.read().await.clone();
 
-    state.edge_detector.set_window_open(false).await;
+    state.edge_detector.set_capture_open(false).await;
 
     if let Some(window) = app.get_webview_window("capture") {
         let _ = window.hide();
@@ -342,7 +352,7 @@ async fn is_autostart_enabled(app: AppHandle) -> Result<bool, String> {
 
 #[tauri::command]
 async fn hide_capture(app: AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
-    state.edge_detector.set_window_open(false).await;
+    state.edge_detector.set_capture_open(false).await;
 
     if let Some(window) = app.get_webview_window("capture") {
         let _ = window.hide();
@@ -360,7 +370,7 @@ async fn show_capture(app: AppHandle, state: tauri::State<'_, AppState>) -> Resu
         let _ = window.show();
         let _ = window.set_focus();
     }
-    state.edge_detector.set_window_open(true).await;
+    state.edge_detector.set_capture_open(true).await;
     log::info!("Window shown");
     Ok(())
 }
@@ -373,7 +383,7 @@ async fn show_capture_internal(app: &AppHandle) -> Result<(), String> {
         let _ = window.show();
         let _ = window.set_focus();
     }
-    state.edge_detector.set_window_open(true).await;
+    state.edge_detector.set_capture_open(true).await;
     Ok(())
 }
 
@@ -394,13 +404,13 @@ async fn show_reader_internal(app: &AppHandle) -> Result<(), String> {
             .set_size(LogicalSize::new(380.0, settings.window_height as f64))
             .map_err(|e| e.to_string())?;
         window
-            .set_position(LogicalPosition::new(8.0, y))
+            .set_position(LogicalPosition::new(0.0, y))
             .map_err(|e| e.to_string())?;
         configure_macos_window(&window, settings.border_radius as f64);
         let _ = window.show();
         let _ = window.set_focus();
     }
-    state.edge_detector.set_window_open(true).await;
+    state.edge_detector.set_reader_open(true).await;
     Ok(())
 }
 
@@ -414,7 +424,7 @@ async fn hide_reader(app: AppHandle, state: tauri::State<'_, AppState>) -> Resul
     if let Some(window) = app.get_webview_window("reader") {
         let _ = window.hide();
     }
-    state.edge_detector.set_window_open(false).await;
+    state.edge_detector.set_reader_open(false).await;
     Ok(())
 }
 
@@ -638,6 +648,7 @@ fn main() {
 
     let edge_detector = Arc::new(EdgeDetector::new(settings.clone()));
     let shortcut_manager = Arc::new(ShortcutManager::new());
+    let reader_shortcut_manager = Arc::new(ShortcutManager::new());
     let capture_text_shortcut_manager = Arc::new(ShortcutManager::new());
     let save_as_note_shortcut_manager = Arc::new(ShortcutManager::new());
 
@@ -645,6 +656,7 @@ fn main() {
         settings: Arc::new(RwLock::new(settings.clone())),
         edge_detector: edge_detector.clone(),
         shortcut_manager: shortcut_manager.clone(),
+        reader_shortcut_manager: reader_shortcut_manager.clone(),
         capture_text_shortcut_manager: capture_text_shortcut_manager.clone(),
         save_as_note_shortcut_manager: save_as_note_shortcut_manager.clone(),
     };
@@ -718,6 +730,15 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = capture_text_mgr.register_capture_text(&app_handle_capture_text, &settings_for_capture_text).await {
                     log::error!("Failed to register capture_text shortcut: {}", e);
+                }
+            });
+
+            let reader_shortcut_mgr = reader_shortcut_manager.clone();
+            let app_handle_reader_shortcut = app_handle.clone();
+            let settings_for_reader_shortcut = settings.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = reader_shortcut_mgr.register_reader(&app_handle_reader_shortcut, &settings_for_reader_shortcut).await {
+                    log::error!("Failed to register reader shortcut: {}", e);
                 }
             });
 

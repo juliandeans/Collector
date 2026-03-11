@@ -10,11 +10,15 @@ pub struct EdgeDetector {
     /// Whether edge detection is enabled
     enabled: Arc<RwLock<bool>>,
     /// Whether the capture window is currently open
-    is_window_open: Arc<RwLock<bool>>,
+    is_capture_open: Arc<RwLock<bool>>,
+    /// Whether the reader window is currently open
+    is_reader_open: Arc<RwLock<bool>>,
     /// Current settings
     settings: Arc<RwLock<Settings>>,
-    /// Cooldown timestamp
-    last_close_time: Arc<RwLock<Option<Instant>>>,
+    /// Cooldown timestamp for capture window
+    last_capture_close_time: Arc<RwLock<Option<Instant>>>,
+    /// Cooldown timestamp for reader window
+    last_reader_close_time: Arc<RwLock<Option<Instant>>>,
 }
 
 /// Screen bounds
@@ -29,9 +33,11 @@ impl EdgeDetector {
     pub fn new(settings: Settings) -> Self {
         Self {
             enabled: Arc::new(RwLock::new(settings.edge_detection_enabled)),
-            is_window_open: Arc::new(RwLock::new(false)),
+            is_capture_open: Arc::new(RwLock::new(false)),
+            is_reader_open: Arc::new(RwLock::new(false)),
             settings: Arc::new(RwLock::new(settings)),
-            last_close_time: Arc::new(RwLock::new(None)),
+            last_capture_close_time: Arc::new(RwLock::new(None)),
+            last_reader_close_time: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -74,28 +80,52 @@ impl EdgeDetector {
         *self.enabled.read().await
     }
 
-    /// Set window open state (called from main when window visibility changes)
-    pub async fn set_window_open(&self, open: bool) {
-        let mut w = self.is_window_open.write().await;
+    /// Set capture open state (called from main when capture visibility changes)
+    pub async fn set_capture_open(&self, open: bool) {
+        let mut w = self.is_capture_open.write().await;
         let was_open = *w;
         *w = open;
 
-        // If window was just closed, set cooldown
         if was_open && !open {
-            *self.last_close_time.write().await = Some(Instant::now());
+            *self.last_capture_close_time.write().await = Some(Instant::now());
         }
     }
 
-    /// Check if window is open
-    #[allow(dead_code)]
-    pub async fn is_window_open(&self) -> bool {
-        *self.is_window_open.read().await
+    /// Set reader open state (called from main when reader visibility changes)
+    pub async fn set_reader_open(&self, open: bool) {
+        let mut w = self.is_reader_open.write().await;
+        let was_open = *w;
+        *w = open;
+
+        if was_open && !open {
+            *self.last_reader_close_time.write().await = Some(Instant::now());
+        }
     }
 
-    /// Check if we're in cooldown period after closing
-    async fn is_in_cooldown(&self) -> bool {
-        if let Some(close_time) = *self.last_close_time.read().await {
-            // 500ms cooldown after window close
+    /// Check if capture window is open
+    #[allow(dead_code)]
+    pub async fn is_capture_open(&self) -> bool {
+        *self.is_capture_open.read().await
+    }
+
+    /// Check if reader window is open
+    #[allow(dead_code)]
+    pub async fn is_reader_open(&self) -> bool {
+        *self.is_reader_open.read().await
+    }
+
+    /// Check if capture is in cooldown period after closing
+    async fn is_capture_in_cooldown(&self) -> bool {
+        if let Some(close_time) = *self.last_capture_close_time.read().await {
+            close_time.elapsed() < Duration::from_millis(500)
+        } else {
+            false
+        }
+    }
+
+    /// Check if reader is in cooldown period after closing
+    async fn is_reader_in_cooldown(&self) -> bool {
+        if let Some(close_time) = *self.last_reader_close_time.read().await {
             close_time.elapsed() < Duration::from_millis(500)
         } else {
             false
@@ -114,20 +144,6 @@ impl EdgeDetector {
         loop {
             tokio::time::sleep(poll_interval).await;
 
-            // Check if in cooldown
-            if self.is_in_cooldown().await {
-                trigger_start = None;
-                trigger_target = None;
-                continue;
-            }
-
-            // Check if window is already open
-            if *self.is_window_open.read().await {
-                trigger_start = None;
-                trigger_target = None;
-                continue;
-            }
-
             // Get current mouse position and screen bounds
             let mouse_pos = get_mouse_position();
             let screen = get_primary_screen_bounds();
@@ -142,9 +158,18 @@ impl EdgeDetector {
             let at_left_edge = mouse_pos.0 <= edge_zone;
             let at_right_edge = mouse_pos.0 >= screen.width - edge_zone;
 
-            let edge_target = if at_left_edge && settings.reader_edge_enabled {
+            let can_show_reader = settings.reader_edge_enabled
+                && at_left_edge
+                && !*self.is_reader_open.read().await
+                && !self.is_reader_in_cooldown().await;
+            let can_show_capture = settings.edge_detection_enabled
+                && at_right_edge
+                && !*self.is_capture_open.read().await
+                && !self.is_capture_in_cooldown().await;
+
+            let edge_target = if can_show_reader {
                 Some("show_reader")
-            } else if at_right_edge && settings.edge_detection_enabled {
+            } else if can_show_capture {
                 Some("show_capture")
             } else {
                 None
@@ -158,7 +183,11 @@ impl EdgeDetector {
                     trigger_target = Some(target);
                 } else if trigger_start.unwrap().elapsed() >= trigger_delay {
                     log::info!("Edge triggered! Emitting {}", target);
-                    *self.is_window_open.write().await = true;
+                    if target == "show_reader" {
+                        *self.is_reader_open.write().await = true;
+                    } else {
+                        *self.is_capture_open.write().await = true;
+                    }
                     let _ = app.emit(target, ());
                     trigger_start = None;
                     trigger_target = None;

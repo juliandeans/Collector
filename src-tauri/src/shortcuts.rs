@@ -256,6 +256,73 @@ impl ShortcutManager {
         );
         Ok(())
     }
+
+    pub async fn register_reader(
+        &self,
+        app: &AppHandle,
+        settings: &Settings,
+    ) -> Result<(), String> {
+        let shortcut_str = normalize_shortcut(&settings.reader_shortcut);
+        log::info!(
+            "Attempting to register reader shortcut: '{}'",
+            shortcut_str
+        );
+
+        if shortcut_str.trim().is_empty() {
+            log::info!("Reader shortcut is empty, skipping registration");
+            *self.current_shortcut.lock().await = None;
+            return Ok(());
+        }
+
+        let old_shortcut = self.current_shortcut.lock().await.clone();
+        if let Some(old) = old_shortcut {
+            if old != shortcut_str {
+                log::info!("Unregistering old reader shortcut: {}", old);
+                if let Ok(shortcut) = old.parse::<Shortcut>() {
+                    let _ = app.global_shortcut().unregister(shortcut);
+                }
+            } else {
+                log::info!("Reader shortcut unchanged, skipping re-registration");
+                return Ok(());
+            }
+        }
+
+        log::info!("Parsing reader shortcut: '{}'", shortcut_str);
+        let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
+            let err_msg = format!("Invalid reader shortcut '{}': {:?}", shortcut_str, e);
+            log::error!("{}", err_msg);
+            err_msg
+        })?;
+
+        log::info!("Registering reader shortcut handler...");
+        let app_handle = app.clone();
+        app.global_shortcut()
+            .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
+                if event.state == ShortcutState::Pressed {
+                    log::info!("Reader shortcut triggered");
+                    let app_handle2 = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let _ = app_handle2.emit("show_reader", ());
+                        if let Some(window) = app_handle2.get_webview_window("reader") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    });
+                }
+            })
+            .map_err(|e| {
+                let err_msg = format!(
+                    "Failed to register reader shortcut '{}': {:?}",
+                    shortcut_str, e
+                );
+                log::error!("{}", err_msg);
+                err_msg
+            })?;
+
+        *self.current_shortcut.lock().await = Some(shortcut_str.clone());
+        log::info!("Reader shortcut successfully registered: {}", shortcut_str);
+        Ok(())
+    }
 }
 
 fn normalize_shortcut(shortcut: &str) -> String {
