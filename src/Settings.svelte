@@ -48,11 +48,35 @@
     },
   ];
 
+  function normalizePinnedNotes(pinnedNotes = []) {
+    return pinnedNotes
+      .map((entry) => {
+        if (typeof entry === "string") {
+          return {
+            path: entry,
+            label: "",
+            icon: "",
+          };
+        }
+
+        return {
+          path: entry?.path ?? "",
+          label: entry?.label ?? "",
+          icon: entry?.icon ?? "",
+        };
+      })
+      .filter((entry) => entry.path.trim() !== "");
+  }
+
   async function loadSettings() {
     try {
       const loaded = await invoke("load_settings");
-      settings = { ...loaded };
-      originalSettings = { ...loaded };
+      const normalized = {
+        ...loaded,
+        pinned_notes: normalizePinnedNotes(loaded.pinned_notes),
+      };
+      settings = normalized;
+      originalSettings = { ...normalized };
     } catch (e) {
       console.error("Failed to load settings:", e);
       showStatus("Failed to load settings", "error");
@@ -103,15 +127,37 @@
 
     if (selected) {
       const paths = Array.isArray(selected) ? selected : [selected];
-      const existing = settings.pinned_notes ?? [];
-      settings.pinned_notes = [...new Set([...existing, ...paths])];
+      const existing = normalizePinnedNotes(settings.pinned_notes);
+      const existingByPath = new Set(existing.map((note) => note.path));
+      const additions = paths
+        .filter((path) => !existingByPath.has(path))
+        .map((path) => ({
+          path,
+          label: "",
+          icon: "",
+        }));
+
+      settings.pinned_notes = [...existing, ...additions];
       settings = { ...settings };
     }
   }
 
   function removePinnedNote(pathToRemove) {
-    settings.pinned_notes = (settings.pinned_notes ?? []).filter(
-      (path) => path !== pathToRemove,
+    settings.pinned_notes = normalizePinnedNotes(settings.pinned_notes).filter(
+      (note) => note.path !== pathToRemove,
+    );
+    settings = { ...settings };
+  }
+
+  function updatePinnedNote(pathToUpdate, field, value) {
+    settings.pinned_notes = normalizePinnedNotes(settings.pinned_notes).map(
+      (note) =>
+        note.path === pathToUpdate
+          ? {
+              ...note,
+              [field]: value,
+            }
+          : note,
     );
     settings = { ...settings };
   }
@@ -124,9 +170,15 @@
     isSaving = true;
 
     try {
-      await invoke("save_settings", { newSettings: settings });
+      const payload = {
+        ...settings,
+        pinned_notes: normalizePinnedNotes(settings.pinned_notes),
+      };
 
-      originalSettings = { ...settings };
+      await invoke("save_settings", { newSettings: payload });
+
+      settings = { ...payload };
+      originalSettings = { ...payload };
 
       showStatus("Settings saved!", "success");
     } catch (e) {
@@ -597,18 +649,44 @@
                 Note is always included automatically.</small
               >
 
-              {#if (settings.pinned_notes ?? []).length > 0}
+              {#if normalizePinnedNotes(settings.pinned_notes).length > 0}
                 <div class="note-list">
-                  {#each settings.pinned_notes ?? [] as notePath}
+                  {#each normalizePinnedNotes(settings.pinned_notes) as note}
                     <div class="note-list-item">
                       <div class="note-list-copy">
-                        <strong>{getFilename(notePath)}</strong>
-                        <small>{notePath}</small>
+                        <div class="note-list-editors">
+                          <input
+                            class="pinned-note-icon"
+                            type="text"
+                            value={note.icon}
+                            placeholder="📝"
+                            maxlength="8"
+                            on:input={(event) =>
+                              updatePinnedNote(
+                                note.path,
+                                "icon",
+                                event.currentTarget.value,
+                              )}
+                          />
+                          <input
+                            class="pinned-note-label"
+                            type="text"
+                            value={note.label}
+                            placeholder={getFilename(note.path)}
+                            on:input={(event) =>
+                              updatePinnedNote(
+                                note.path,
+                                "label",
+                                event.currentTarget.value,
+                              )}
+                          />
+                        </div>
+                        <small>{note.path}</small>
                       </div>
                       <button
                         class="remove-note"
                         type="button"
-                        on:click={() => removePinnedNote(notePath)}
+                        on:click={() => removePinnedNote(note.path)}
                       >
                         ✕
                       </button>
@@ -619,6 +697,10 @@
                 <div class="empty-note-list">No pinned notes selected.</div>
               {/if}
 
+              <small>
+                Optional icon and label only affect the reader tab display, not
+                the actual Markdown file.
+              </small>
               <button class="secondary" type="button" on:click={addPinnedNotes}
                 >+ Add Note</button
               >
@@ -1158,11 +1240,27 @@
     min-width: 0;
   }
 
-  .note-list-copy strong {
-    display: block;
-    font-size: 13px;
+  .note-list-editors {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+  }
+
+  .pinned-note-icon,
+  .pinned-note-label {
+    width: 100%;
+  }
+
+  .pinned-note-icon {
+    text-align: center;
+    font-size: 15px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .pinned-note-label {
     font-weight: 600;
-    color: #1a1a1a;
   }
 
   .note-list-copy small {

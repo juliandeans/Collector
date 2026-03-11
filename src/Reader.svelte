@@ -24,6 +24,7 @@
     window_saturation: 200,
     window_brightness: 0,
     text_color: "#ffffff",
+    pinned_notes: [],
     reader_hide_frontmatter: true,
     reader_hide_dataview: true,
     reader_hide_obsidian_comments: true,
@@ -190,7 +191,8 @@
 
   function loadContent(raw = "") {
     rawContent = normalizeNewlines(raw);
-    const { allBlocks, nextVisibleBlocks } = getVisibleBlocksFromRaw(rawContent);
+    const { allBlocks, nextVisibleBlocks } =
+      getVisibleBlocksFromRaw(rawContent);
 
     visibleBlocks =
       nextVisibleBlocks.length > 0
@@ -224,6 +226,62 @@
     return filename.replace(/\.md$/i, "");
   }
 
+  function normalizePinnedNotes(pinnedNotes = []) {
+    return pinnedNotes
+      .map((entry) => {
+        if (typeof entry === "string") {
+          return {
+            path: entry,
+            label: "",
+            icon: "",
+          };
+        }
+
+        return {
+          path: entry?.path ?? "",
+          label: entry?.label ?? "",
+          icon: entry?.icon ?? "",
+        };
+      })
+      .filter((entry) => entry.path.trim() !== "")
+      .map((entry) => ({
+        path: entry.path,
+        label: entry.label.trim(),
+        icon: entry.icon.trim(),
+      }));
+  }
+
+  function getPinnedNotesSignature(pinnedNotes = []) {
+    return JSON.stringify(
+      normalizePinnedNotes(pinnedNotes).map((note) => ({
+        path: note.path,
+        label: note.label,
+        icon: note.icon,
+      })),
+    );
+  }
+
+  function createTab({
+    kind = "opened",
+    path,
+    label = "",
+    icon = "",
+    existingTab = null,
+  }) {
+    const fallbackLabel = kind === "daily" ? "Daily" : fileLabel(path);
+
+    return {
+      kind,
+      path,
+      label: label.trim() || fallbackLabel,
+      icon: icon.trim(),
+      content: existingTab?.content ?? "",
+      loaded: existingTab?.loaded ?? false,
+      missing: existingTab?.missing ?? false,
+      missingMessage: existingTab?.missingMessage ?? "",
+    };
+  }
+
   function normalizeError(error) {
     return typeof error === "string"
       ? error
@@ -252,16 +310,22 @@
   function applySettings(settings) {
     appSettings = {
       ...appSettings,
-      background_color: settings.background_color ?? appSettings.background_color,
+      background_color:
+        settings.background_color ?? appSettings.background_color,
       font_family: settings.font_family ?? appSettings.font_family,
       font_size: settings.font_size ?? appSettings.font_size,
       border_radius: settings.border_radius ?? appSettings.border_radius,
       window_transparency:
         settings.window_transparency ?? appSettings.window_transparency,
       window_blur: settings.window_blur ?? appSettings.window_blur,
-      window_saturation: settings.window_saturation ?? appSettings.window_saturation,
-      window_brightness: settings.window_brightness ?? appSettings.window_brightness,
+      window_saturation:
+        settings.window_saturation ?? appSettings.window_saturation,
+      window_brightness:
+        settings.window_brightness ?? appSettings.window_brightness,
       text_color: settings.text_color ?? appSettings.text_color,
+      pinned_notes: normalizePinnedNotes(
+        settings.pinned_notes ?? appSettings.pinned_notes,
+      ),
       reader_hide_frontmatter:
         settings.reader_hide_frontmatter ?? appSettings.reader_hide_frontmatter,
       reader_hide_dataview:
@@ -623,14 +687,11 @@
 
     tabs = [
       ...tabs,
-      {
-        label: fileLabel(note.path),
+      createTab({
+        kind: "opened",
         path: note.path,
-        content: "",
-        loaded: false,
-        missing: false,
-        missingMessage: "",
-      },
+        label: note.name,
+      }),
     ];
 
     await activateTab(tabs.length - 1, true);
@@ -716,33 +777,72 @@
     }
   }
 
+  async function rebuildTabsFromSettings(
+    settings,
+    { preserveOpened = true, forceReloadActive = false } = {},
+  ) {
+    const dailyPath = await invoke("get_daily_note_path");
+    const pinnedNotes = normalizePinnedNotes(settings.pinned_notes);
+    const previousTabs = tabs;
+    const previousActivePath = activeTab?.path ?? null;
+    const existingByPath = new Map(previousTabs.map((tab) => [tab.path, tab]));
+
+    const nextTabs = [
+      createTab({
+        kind: "daily",
+        path: dailyPath,
+        label: "Daily",
+        existingTab:
+          previousTabs.find((tab) => tab.kind === "daily") ??
+          existingByPath.get(dailyPath),
+      }),
+      ...pinnedNotes.map((note) =>
+        createTab({
+          kind: "pinned",
+          path: note.path,
+          label: note.label,
+          icon: note.icon,
+          existingTab: existingByPath.get(note.path),
+        }),
+      ),
+    ];
+
+    if (preserveOpened) {
+      const reservedPaths = new Set(nextTabs.map((tab) => tab.path));
+      previousTabs
+        .filter((tab) => tab.kind === "opened" && !reservedPaths.has(tab.path))
+        .forEach((tab) => {
+          nextTabs.push({ ...tab });
+        });
+    }
+
+    tabs = nextTabs;
+
+    const nextActiveIndex = previousActivePath
+      ? nextTabs.findIndex((tab) => tab.path === previousActivePath)
+      : 0;
+
+    activeTabIndex = nextActiveIndex >= 0 ? nextActiveIndex : 0;
+
+    const currentTab = tabs[activeTabIndex];
+    if (!currentTab) return;
+
+    if (forceReloadActive || !currentTab.loaded) {
+      await loadTab(activeTabIndex, true);
+      return;
+    }
+
+    loadContent(currentTab.content);
+    missingFileMessage = currentTab.missing ? currentTab.missingMessage || "" : "";
+  }
+
   async function buildInitialTabs() {
     const settings = await invoke("load_settings");
     applySettings(settings);
-
-    const dailyPath = await invoke("get_daily_note_path");
-    const pinnedTabs = (settings.pinned_notes || []).map((path) => ({
-      label: fileLabel(path),
-      path,
-      content: "",
-      loaded: false,
-      missing: false,
-      missingMessage: "",
-    }));
-
-    tabs = [
-      {
-        label: "Daily",
-        path: dailyPath,
-        content: "",
-        loaded: false,
-        missing: false,
-        missingMessage: "",
-      },
-      ...pinnedTabs,
-    ];
-
-    await activateTab(0, true);
+    await rebuildTabsFromSettings(settings, {
+      preserveOpened: false,
+      forceReloadActive: true,
+    });
   }
 
   onMount(async () => {
@@ -754,19 +854,33 @@
         await reloadCurrentTab();
       });
 
-      unlistenSettingsChanged = await listen("settings_changed", (event) => {
+      unlistenSettingsChanged = await listen("settings_changed", async (event) => {
         const previousFilters = getReaderFilterSettings();
+        const previousPinnedNotes = getPinnedNotesSignature(
+          appSettings.pinned_notes,
+        );
         applySettings(event.payload);
         const nextFilters = getReaderFilterSettings();
-
-        if (
+        const nextPinnedNotes = getPinnedNotesSignature(appSettings.pinned_notes);
+        const filtersChanged =
           previousFilters.reader_hide_frontmatter !==
             nextFilters.reader_hide_frontmatter ||
           previousFilters.reader_hide_dataview !==
             nextFilters.reader_hide_dataview ||
           previousFilters.reader_hide_obsidian_comments !==
-            nextFilters.reader_hide_obsidian_comments
-        ) {
+            nextFilters.reader_hide_obsidian_comments;
+        const pinnedNotesChanged = previousPinnedNotes !== nextPinnedNotes;
+
+        if (pinnedNotesChanged) {
+          await flushPendingSave(false);
+          await rebuildTabsFromSettings(event.payload, {
+            preserveOpened: true,
+            forceReloadActive: false,
+          });
+          return;
+        }
+
+        if (filtersChanged) {
           loadContent(rawContent);
         }
       });
@@ -806,7 +920,7 @@
 
   <div class="reader-topbar" data-tauri-drag-region>
     <div class="tab-strip">
-      <div class="drag-handle" aria-hidden="true">≡</div>
+      <!-- <div class="drag-handle" aria-hidden="true">≡</div> -->
       <button
         class="tab-action"
         type="button"
@@ -827,7 +941,10 @@
             on:mousedown|stopPropagation
             on:click|stopPropagation={() => activateTab(index)}
           >
-            <span>{tab.label}</span>
+            {#if tab.icon}
+              <span class="tab-icon">{tab.icon}</span>
+            {/if}
+            <span class="tab-label">{tab.label}</span>
           </button>
         {/each}
       </div>
@@ -890,47 +1007,44 @@
             on:input={() => handleBlockInput(index)}
             on:keydown={(event) => handleBlockKeydown(event, index)}
           ></textarea>
+        {:else if isSpacerBlock(block)}
+          <div class="editor-spacer" aria-hidden="true"></div>
         {:else}
-          {#if isSpacerBlock(block)}
-            <div class="editor-spacer" aria-hidden="true"></div>
-          {:else}
-            <button
-              class="block-display"
-              type="button"
-              on:click={() => focusBlock(index)}
-            >
-              {#each getBlockLines(block) as blockLine, lineIndex}
-                {#if blockLine.type === "spacer"}
-                  <span class="block-line-spacer"></span>
-                {:else if blockLine.type === "checkbox"}
-                  <span class="block-line checkbox-line">
-                    <button
-                      class="checkbox-toggle"
-                      class:checked={blockLine.checked}
-                      type="button"
-                      on:click|stopPropagation={() =>
-                        toggleCheckbox(index, lineIndex)}
-                    ></button>
-                    <span
-                      class:checked={blockLine.checked}
-                      >{@html blockLine.html}</span
-                    >
-                  </span>
-                {:else if blockLine.type === "heading"}
-                  <span
-                    class="block-line heading"
-                    class:level-1={blockLine.level === 1}
-                    class:level-2={blockLine.level === 2}
-                    class:level-3={blockLine.level === 3}
+          <button
+            class="block-display"
+            type="button"
+            on:click={() => focusBlock(index)}
+          >
+            {#each getBlockLines(block) as blockLine, lineIndex}
+              {#if blockLine.type === "spacer"}
+                <span class="block-line-spacer"></span>
+              {:else if blockLine.type === "checkbox"}
+                <span class="block-line checkbox-line">
+                  <button
+                    class="checkbox-toggle"
+                    class:checked={blockLine.checked}
+                    type="button"
+                    on:click|stopPropagation={() =>
+                      toggleCheckbox(index, lineIndex)}
+                  ></button>
+                  <span class:checked={blockLine.checked}
+                    >{@html blockLine.html}</span
                   >
-                    {@html blockLine.html}
-                  </span>
-                {:else}
-                  <span class="block-line">{@html blockLine.html}</span>
-                {/if}
-              {/each}
-            </button>
-          {/if}
+                </span>
+              {:else if blockLine.type === "heading"}
+                <span
+                  class="block-line heading"
+                  class:level-1={blockLine.level === 1}
+                  class:level-2={blockLine.level === 2}
+                  class:level-3={blockLine.level === 3}
+                >
+                  {@html blockLine.html}
+                </span>
+              {:else}
+                <span class="block-line">{@html blockLine.html}</span>
+              {/if}
+            {/each}
+          </button>
         {/if}
       </div>
     {/each}
@@ -949,11 +1063,7 @@
         }
       }}
     >
-      <div
-        class="palette"
-        role="dialog"
-        aria-modal="true"
-      >
+      <div class="palette" role="dialog" aria-modal="true">
         <input
           bind:this={paletteInputRef}
           bind:value={paletteQuery}
@@ -1083,13 +1193,6 @@
     flex: 1;
   }
 
-  .drag-handle {
-    flex: 0 0 auto;
-    color: rgba(255, 255, 255, 0.45);
-    letter-spacing: 0.08em;
-    user-select: none;
-  }
-
   .tab-list {
     display: flex;
     align-items: center;
@@ -1115,6 +1218,9 @@
 
   .tab-button {
     position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     flex: 0 0 auto;
     max-width: 120px;
     padding: 8px 10px 10px;
@@ -1122,6 +1228,17 @@
     color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tab-icon {
+    flex: 0 0 auto;
+    line-height: 1;
+  }
+
+  .tab-label {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
   }
