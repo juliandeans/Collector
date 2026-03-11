@@ -47,6 +47,7 @@
   let paletteInputRef;
   let isComposing = false;
   let isRenderingContent = false;
+  let activeParagraphEl = null;
   let saveTimeout;
   let pendingSave = null;
   let statusTimeout;
@@ -365,51 +366,182 @@
     return html;
   }
 
+  function markdownLineToHtml(line) {
+    if (line === null || line === undefined) return "";
+
+    const codeblockMatch = line.match(/^\u200B(__CB_\d+__):(.*)$/);
+    if (codeblockMatch) {
+      const [, id, langValue] = codeblockMatch;
+      const lang = langValue.trim() || "code";
+      return `<div class="codeblock-pill" data-cbid="${id}" contenteditable="false"><span class="codeblock-icon"></span><span class="codeblock-lang">${escHtml(lang)}</span><span class="codeblock-hint">hidden</span></div>`;
+    }
+
+    const hiddenMatch = line.match(/^\u200B(__HD_\d+__)$/);
+    if (hiddenMatch) {
+      return `<div class="hidden-marker" data-hidden-id="${hiddenMatch[1]}" contenteditable="false"></div>`;
+    }
+
+    if (/^### /.test(line)) return `<h3>${escHtml(line.slice(4))}</h3>`;
+    if (/^## /.test(line)) return `<h2>${escHtml(line.slice(3))}</h2>`;
+    if (/^# /.test(line)) return `<h1>${escHtml(line.slice(2))}</h1>`;
+    if (line.trim() === "") return "<p><br></p>";
+    if (/^---+$/.test(line.trim())) return "<hr>";
+
+    if (/^- \[ \] /.test(line)) {
+      const label = line.slice(6);
+      return `<p><input type="checkbox" class="md-checkbox" contenteditable="false"> ${inlineMarkdown(label)}</p>`;
+    }
+
+    if (/^- \[x\] /i.test(line)) {
+      const label = line.slice(6);
+      return `<p><input type="checkbox" class="md-checkbox" contenteditable="false" checked> ${inlineMarkdown(label)}</p>`;
+    }
+
+    if (/^> /.test(line)) {
+      return `<blockquote>${inlineMarkdown(line.slice(2))}</blockquote>`;
+    }
+
+    if (/^- /.test(line)) {
+      return `<p class="list-item">${inlineMarkdown(line.slice(2))}</p>`;
+    }
+
+    return `<p>${inlineMarkdown(line)}</p>`;
+  }
+
   function markdownToHtml(text = "") {
     if (!text.trim()) return "";
 
     const lines = normalizeNewlines(text).split("\n");
-    const htmlLines = lines.map((line) => {
-      const codeblockMatch = line.match(/^\u200B(__CB_\d+__):(.*)$/);
-      if (codeblockMatch) {
-        const [, id, langValue] = codeblockMatch;
-        const lang = langValue.trim() || "code";
-        return `<div class="codeblock-pill" data-cbid="${id}" contenteditable="false"><span class="codeblock-icon"></span><span class="codeblock-lang">${escHtml(lang)}</span><span class="codeblock-hint">hidden</span></div>`;
+    return lines.map((line) => markdownLineToHtml(line)).join("");
+  }
+
+  function elementInnerToMarkdown(el) {
+    return serializeChildren(el);
+  }
+
+  function elementToMarkdownLine(el) {
+    if (!el) return "";
+
+    if (el.classList?.contains("raw-mode")) {
+      return el.textContent ?? "";
+    }
+
+    if (el.classList?.contains("codeblock-pill")) {
+      return null;
+    }
+
+    if (el.classList?.contains("hidden-marker")) {
+      return el.dataset.hiddenId ?? "";
+    }
+
+    const tag = el.tagName?.toLowerCase();
+    const inner = el.innerText ?? el.textContent ?? "";
+
+    if (tag === "h1") return `# ${inner}`;
+    if (tag === "h2") return `## ${inner}`;
+    if (tag === "h3") return `### ${inner}`;
+    if (tag === "hr") return "---";
+    if (tag === "blockquote") return `> ${inner}`;
+
+    if (tag === "p") {
+      const checkbox = el.querySelector('input[type="checkbox"]');
+      if (checkbox) {
+        const text = inner.replace(/^\s*/, "");
+        return `${checkbox.checked ? "- [x] " : "- [ ] "}${text}`;
       }
 
-      const hiddenMatch = line.match(/^\u200B(__HD_\d+__)$/);
-      if (hiddenMatch) {
-        return `<div class="hidden-marker" data-hidden-id="${hiddenMatch[1]}" contenteditable="false"></div>`;
+      if (el.classList.contains("list-item")) {
+        return `- ${inner}`;
       }
 
-      if (/^### /.test(line)) return `<h3>${escHtml(line.slice(4))}</h3>`;
-      if (/^## /.test(line)) return `<h2>${escHtml(line.slice(3))}</h2>`;
-      if (/^# /.test(line)) return `<h1>${escHtml(line.slice(2))}</h1>`;
-      if (line.trim() === "") return "<p><br></p>";
-      if (/^---+$/.test(line.trim())) return "<hr>";
+      if (!inner.trim()) return "";
+      return elementInnerToMarkdown(el);
+    }
 
-      if (/^- \[ \] /.test(line)) {
-        const label = line.slice(6);
-        return `<p><input type="checkbox" class="md-checkbox" contenteditable="false"> ${inlineMarkdown(label)}</p>`;
-      }
+    return inner;
+  }
 
-      if (/^- \[x\] /i.test(line)) {
-        const label = line.slice(6);
-        return `<p><input type="checkbox" class="md-checkbox" contenteditable="false" checked> ${inlineMarkdown(label)}</p>`;
-      }
+  function placeCursorAtEnd(el) {
+    if (!el) return;
 
-      if (/^> /.test(line)) {
-        return `<blockquote>${inlineMarkdown(line.slice(2))}</blockquote>`;
-      }
+    const range = document.createRange();
+    const selection = window.getSelection();
+    if (!selection) return;
 
-      if (/^- /.test(line)) {
-        return `<p class="list-item">${inlineMarkdown(line.slice(2))}</p>`;
-      }
+    range.selectNodeContents(el);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
 
-      return `<p>${inlineMarkdown(line)}</p>`;
-    });
+  function rerenderBlock(el) {
+    if (!el || !editorRef?.contains(el)) return null;
 
-    return htmlLines.join("");
+    const raw = elementToMarkdownLine(el);
+    if (raw === null) return el;
+
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = markdownLineToHtml(raw);
+    const newEl = tempDiv.firstElementChild;
+    if (!newEl) return el;
+
+    el.replaceWith(newEl);
+    return newEl;
+  }
+
+  function finalizeActiveBlock() {
+    if (activeParagraphEl && editorRef?.contains(activeParagraphEl)) {
+      rerenderBlock(activeParagraphEl);
+    }
+    activeParagraphEl = null;
+  }
+
+  function switchActiveBlock(newEl) {
+    if (activeParagraphEl && editorRef?.contains(activeParagraphEl)) {
+      rerenderBlock(activeParagraphEl);
+      activeParagraphEl = null;
+    }
+
+    if (!newEl || !editorRef?.contains(newEl)) {
+      activeParagraphEl = null;
+      return;
+    }
+
+    const raw = elementToMarkdownLine(newEl);
+    if (raw === null) {
+      activeParagraphEl = null;
+      return;
+    }
+
+    activeParagraphEl = newEl;
+    activeParagraphEl.classList.add("raw-mode");
+    activeParagraphEl.textContent = raw;
+    placeCursorAtEnd(activeParagraphEl);
+  }
+
+  function handleSelectionChange() {
+    if (isRenderingContent || !editorRef) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const node = selection.getRangeAt(0).startContainer;
+    if (!editorRef.contains(node)) return;
+
+    let el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    while (el && el !== editorRef && el.parentElement !== editorRef) {
+      el = el.parentElement;
+    }
+
+    if (!el || el === editorRef || el === activeParagraphEl) return;
+    if (el.classList?.contains("codeblock-pill")) return;
+
+    switchActiveBlock(el);
+  }
+
+  function handleEditorBlur(event) {
+    if (editorRef?.contains(event.relatedTarget)) return;
+    finalizeActiveBlock();
   }
 
   function serializeInline(node) {
@@ -527,6 +659,11 @@
         return;
       }
 
+      if (element.classList.contains("raw-mode")) {
+        lines.push(element.textContent ?? "");
+        return;
+      }
+
       if (tag === "p" || tag === "div") {
         const checkbox = element.querySelector('input[type="checkbox"]');
         if (checkbox) {
@@ -622,6 +759,7 @@
   function renderContentToEditor(raw = "") {
     const processed = preprocessContent(raw);
     blocks = parseRawBlocks(processed);
+    activeParagraphEl = null;
 
     if (!editorRef) return;
 
@@ -631,6 +769,7 @@
   }
 
   function loadEditorContent(raw = "") {
+    finalizeActiveBlock();
     rawContent = normalizeNewlines(raw);
     renderContentToEditor(rawContent);
   }
@@ -684,6 +823,7 @@
 
   async function activateTab(index, forceReload = false) {
     if (index !== activeTabIndex) {
+      finalizeActiveBlock();
       await flushPendingSave(false);
     }
 
@@ -884,6 +1024,7 @@
   }
 
   async function hideReader() {
+    finalizeActiveBlock();
     await flushPendingSave(false);
 
     try {
@@ -1099,6 +1240,7 @@
       await buildInitialTabs();
 
       unlistenShowReader = await listen("show_reader", async () => {
+        finalizeActiveBlock();
         await flushPendingSave(false);
         await reloadCurrentTab();
       });
@@ -1130,10 +1272,12 @@
         }
 
         if (filtersChanged) {
+          finalizeActiveBlock();
           renderContentToEditor(rawContent);
         }
       });
 
+      document.addEventListener("selectionchange", handleSelectionChange);
       window.addEventListener("keydown", handleGlobalKeydown);
     } catch (error) {
       showStatus(normalizeError(error), "error", 2400);
@@ -1144,6 +1288,7 @@
     clearTimeout(saveTimeout);
     clearTimeout(statusTimeout);
     clearTimeout(savedIndicatorTimeout);
+    document.removeEventListener("selectionchange", handleSelectionChange);
     window.removeEventListener("keydown", handleGlobalKeydown);
     unlistenShowReader?.();
     unlistenSettingsChanged?.();
@@ -1265,6 +1410,7 @@
       data-placeholder="Start writing..."
       on:input={handleInput}
       on:keydown={handleKeydown}
+      on:blur={handleEditorBlur}
       on:compositionstart={handleCompositionStart}
       on:compositionend={handleCompositionEnd}
     ></div>
@@ -1724,6 +1870,13 @@
 
   .editor-body :global(.hidden-marker) {
     display: none;
+  }
+
+  .editor-body :global(.raw-mode) {
+    margin-left: -4px;
+    padding-left: 4px;
+    border-radius: 3px;
+    background: rgba(139, 92, 246, 0.04);
   }
 
   .palette-backdrop {
