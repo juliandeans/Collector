@@ -670,16 +670,10 @@ fn position_reader_window_logical(
     window: &tauri::WebviewWindow,
     settings: &Settings,
 ) -> Result<(), String> {
-    let screen = window
-        .current_monitor()
-        .map_err(|e| e.to_string())?
-        .ok_or("No monitor")?;
-    let scale = screen.scale_factor();
-    let screen_size = screen.size();
-    let screen_h = screen_size.height as f64 / scale;
+    let (_, screen_height) = edge_detect::get_screen_bounds();
     let width = settings.reader_width as f64;
     let height = settings.reader_height as f64;
-    let y = ((screen_h - height) / 2.0).max(0.0);
+    let y = ((screen_height as f64 - height) / 2.0).max(0.0);
 
     window
         .set_size(LogicalSize::new(width, height))
@@ -879,6 +873,8 @@ fn main() {
             }
 
             if let Some(window) = app.get_webview_window("reader") {
+                let _ = position_reader_window_logical(&window, &settings);
+
                 let window_clone = window.clone();
                 let border_radius = settings.border_radius;
                 tauri::async_runtime::spawn(async move {

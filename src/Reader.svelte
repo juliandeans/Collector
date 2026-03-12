@@ -1450,12 +1450,20 @@
     scrollPositions.set(currentTab.path, scrollRef.scrollTop);
   }
 
+  function handleEditorScroll() {
+    saveScrollPosition();
+  }
+
   async function restoreScrollPosition(path) {
     await tick();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    if (!scrollRef) return;
-    scrollRef.scrollTop = scrollPositions.get(path) ?? 0;
-    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        if (scrollRef) {
+          scrollRef.scrollTop = scrollPositions.get(path) ?? 0;
+        }
+        resolve();
+      });
+    });
   }
 
   async function loadTab(index, forceReload = false) {
@@ -1505,6 +1513,78 @@
       }
 
       if (!isFileMissingError(error)) {
+        showStatus(message, "error", 2200);
+      }
+    }
+  }
+
+  async function syncTabWithDisk(index) {
+    const tab = tabs[index];
+    if (!tab) return;
+
+    if (!tab.loaded) {
+      await loadTab(index, true);
+      return;
+    }
+
+    try {
+      const content = normalizeNewlines(
+        await invoke("read_note_file", { path: tab.path }),
+      );
+      const currentContent = normalizeNewlines(tab.content ?? "");
+
+      if (!tab.missing && content === currentContent) {
+        if (index === activeTabIndex) {
+          missingFileMessage = "";
+        }
+        return;
+      }
+
+      replaceTab(index, {
+        content,
+        loaded: true,
+        missing: false,
+        missingMessage: "",
+      });
+
+      if (index === activeTabIndex) {
+        await loadEditorContent(content);
+        missingFileMessage = "";
+        await restoreScrollPosition(tab.path);
+      }
+    } catch (error) {
+      const message = normalizeError(error);
+      const missing = isFileMissingError(error);
+      const missingMessage = missing
+        ? "File not found - will be created on first save"
+        : message;
+      const isUnchangedMissingState =
+        missing &&
+        tab.missing &&
+        normalizeNewlines(tab.content ?? "") === "" &&
+        (tab.missingMessage || "") === missingMessage;
+
+      if (isUnchangedMissingState) {
+        if (index === activeTabIndex) {
+          missingFileMessage = missingMessage;
+        }
+        return;
+      }
+
+      replaceTab(index, {
+        content: "",
+        loaded: true,
+        missing,
+        missingMessage,
+      });
+
+      if (index === activeTabIndex) {
+        await loadEditorContent("");
+        missingFileMessage = missingMessage;
+        await restoreScrollPosition(tab.path);
+      }
+
+      if (!missing) {
         showStatus(message, "error", 2200);
       }
     }
@@ -1748,6 +1828,7 @@
   }
 
   async function hideReader() {
+    saveScrollPosition();
     finalizeActiveBlock();
     closeAutocomplete();
     closeSearch();
@@ -2156,10 +2237,11 @@
       await ensureVaultNotes();
 
       unlistenShowReader = await listen("show_reader", async () => {
+        saveScrollPosition();
         finalizeActiveBlock();
         await flushPendingSave(false);
         if (tabs[activeTabIndex]) {
-          await loadTab(activeTabIndex, true);
+          await syncTabWithDisk(activeTabIndex);
         }
       });
 
@@ -2381,7 +2463,7 @@
     </div>
   {/if}
 
-  <div class="editor-scroll" bind:this={scrollRef}>
+  <div class="editor-scroll" bind:this={scrollRef} on:scroll={handleEditorScroll}>
     {#if fileMissing}
       <div class="missing-file-banner">{missingFileMessage}</div>
     {/if}
