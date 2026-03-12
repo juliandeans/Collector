@@ -42,6 +42,11 @@
   let missingFileMessage = "";
   let selectedPaletteIndex = 0;
   let showSavedIndicator = false;
+  let showAutocomplete = false;
+  let autocompleteQuery = "";
+  let autocompleteIndex = 0;
+  let autocompleteResults = [];
+  let autocompleteRange = null;
   let tabContextMenu = {
     open: false,
     x: 0,
@@ -284,6 +289,133 @@
       statusMessage = "";
       statusType = "";
     }, duration);
+  }
+
+  function filterVaultNotes(query) {
+    if (!query) return vaultNotes.slice(0, 10);
+
+    const lower = query.toLowerCase();
+    return vaultNotes
+      .filter(
+        (note) =>
+          note.name.toLowerCase().includes(lower) ||
+          note.relative_path.toLowerCase().includes(lower),
+      )
+      .slice(0, 8);
+  }
+
+  function closeAutocomplete() {
+    showAutocomplete = false;
+    autocompleteQuery = "";
+    autocompleteIndex = 0;
+    autocompleteRange = null;
+    autocompleteResults = [];
+  }
+
+  function checkAutocomplete() {
+    if (!editorRef) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      closeAutocomplete();
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) {
+      closeAutocomplete();
+      return;
+    }
+
+    const text = node.textContent ?? "";
+    const cursor = range.startOffset;
+    const before = text.slice(0, cursor);
+    const triggerIndex = before.lastIndexOf("[[");
+
+    if (triggerIndex === -1) {
+      closeAutocomplete();
+      return;
+    }
+
+    const between = before.slice(triggerIndex + 2);
+    if (between.includes("]]") || between.includes("\n")) {
+      closeAutocomplete();
+      return;
+    }
+
+    autocompleteQuery = between;
+    autocompleteResults = filterVaultNotes(autocompleteQuery);
+    autocompleteIndex = 0;
+
+    const triggerRange = document.createRange();
+    triggerRange.setStart(node, triggerIndex);
+    triggerRange.collapse(true);
+    autocompleteRange = triggerRange;
+    showAutocomplete = autocompleteResults.length > 0;
+  }
+
+  function insertAutocompleteResult(note) {
+    if (!autocompleteRange) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const currentRange = selection.getRangeAt(0);
+    const insertRange = document.createRange();
+    insertRange.setStart(
+      autocompleteRange.startContainer,
+      autocompleteRange.startOffset,
+    );
+    insertRange.setEnd(currentRange.startContainer, currentRange.startOffset);
+    insertRange.deleteContents();
+
+    const linkText = document.createTextNode(`[[${note.name}]]`);
+    insertRange.insertNode(linkText);
+
+    const afterRange = document.createRange();
+    afterRange.setStartAfter(linkText);
+    afterRange.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(afterRange);
+
+    closeAutocomplete();
+    handleInput();
+  }
+
+  function handleAutocompleteKeydown(event) {
+    if (!showAutocomplete) return false;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      autocompleteIndex = Math.min(
+        autocompleteIndex + 1,
+        autocompleteResults.length - 1,
+      );
+      return true;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      autocompleteIndex = Math.max(autocompleteIndex - 1, 0);
+      return true;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (autocompleteResults[autocompleteIndex]) {
+        insertAutocompleteResult(autocompleteResults[autocompleteIndex]);
+      }
+      return true;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeAutocomplete();
+      return true;
+    }
+
+    return false;
   }
 
   function applySettings(settings) {
@@ -1029,6 +1161,7 @@
 
   async function loadEditorContent(raw = "") {
     finalizeActiveBlock();
+    closeAutocomplete();
     rawContent = normalizeNewlines(raw);
     imagePathCache.clear();
     await renderContentToEditor(rawContent);
@@ -1205,6 +1338,7 @@
     rawContent = content;
     updateActiveTabContent(content);
     scheduleSave(content);
+    checkAutocomplete();
   }
 
   function handleCompositionStart() {
@@ -1218,6 +1352,11 @@
 
   async function handleKeydown(event) {
     const key = event.key.toLowerCase();
+
+    if (handleAutocompleteKeydown(event)) {
+      event.stopPropagation();
+      return;
+    }
 
     if (event.key === "Escape") {
       event.preventDefault();
@@ -1313,6 +1452,7 @@
 
   async function hideReader() {
     finalizeActiveBlock();
+    closeAutocomplete();
     await flushPendingSave(false);
 
     try {
@@ -1563,6 +1703,10 @@
 
   async function handleGlobalKeydown(event) {
     const key = event.key.toLowerCase();
+
+    if (handleAutocompleteKeydown(event)) {
+      return;
+    }
 
     if (tabContextMenu.open && event.key === "Escape") {
       event.preventDefault();
@@ -1963,6 +2107,27 @@
     </div>
   {/if}
 </div>
+
+{#if showAutocomplete && autocompleteResults.length > 0}
+  {@const rect = autocompleteRange?.getBoundingClientRect()}
+  <div
+    class="autocomplete-dropdown"
+    style={`left: ${rect?.left ?? 0}px; top: ${(rect?.bottom ?? 0) + 4}px;`}
+  >
+    {#each autocompleteResults as note, index (note.path)}
+      <button
+        class="autocomplete-item"
+        class:selected={index === autocompleteIndex}
+        type="button"
+        on:mousedown|preventDefault={() => insertAutocompleteResult(note)}
+        on:mouseenter={() => (autocompleteIndex = index)}
+      >
+        <span class="autocomplete-name">{note.name}</span>
+        <span class="autocomplete-path">{note.relative_path}</span>
+      </button>
+    {/each}
+  </div>
+{/if}
 
 <style>
   :global(*) {
@@ -2663,6 +2828,64 @@
     background: rgba(255, 59, 48, 0.12);
     border-color: rgba(255, 59, 48, 0.3);
     color: #ff3b30;
+  }
+
+  .autocomplete-dropdown {
+    position: fixed;
+    z-index: 200;
+    min-width: 220px;
+    max-width: 320px;
+    overflow: hidden;
+    border-radius: 8px;
+    background: color-mix(
+      in srgb,
+      var(--app-background, #1e1e2e) var(--app-transparency, 55%),
+      transparent
+    );
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 18px 40px rgba(0, 0, 0, 0.22),
+      0 6px 16px rgba(0, 0, 0, 0.14);
+    backdrop-filter: blur(20px) saturate(130%);
+    -webkit-backdrop-filter: blur(20px) saturate(130%);
+  }
+
+  .autocomplete-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    padding: 7px 12px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+
+  .autocomplete-item:hover,
+  .autocomplete-item.selected {
+    background: color-mix(
+      in srgb,
+      var(--accent-color, #8b5cf6) 14%,
+      transparent
+    );
+  }
+
+  .autocomplete-name {
+    color: var(--app-text-color, #ffffff);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .autocomplete-path {
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: 10px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   @keyframes fadeInUp {
