@@ -17,6 +17,23 @@ impl ShortcutManager {
         }
     }
 
+    async fn unregister_current_shortcut(
+        &self,
+        app: &AppHandle,
+        context: &str,
+    ) -> Option<String> {
+        let current_shortcut = self.current_shortcut.lock().await.take();
+
+        if let Some(shortcut_str) = &current_shortcut {
+            log::info!("Unregistering {} shortcut: {}", context, shortcut_str);
+            if let Ok(shortcut) = shortcut_str.parse::<Shortcut>() {
+                let _ = app.global_shortcut().unregister(shortcut);
+            }
+        }
+
+        current_shortcut
+    }
+
     pub async fn register(&self, app: &AppHandle, settings: &Settings) -> Result<(), String> {
         let shortcut_str = normalize_shortcut(&settings.global_shortcut);
         log::info!("Attempting to register global shortcut: '{}'", shortcut_str);
@@ -24,24 +41,11 @@ impl ShortcutManager {
         // Skip if shortcut is empty
         if shortcut_str.trim().is_empty() {
             log::info!("Global shortcut is empty, skipping registration");
-            // Clear any stored shortcut
-            *self.current_shortcut.lock().await = None;
+            self.unregister_current_shortcut(app, "global").await;
             return Ok(());
         }
 
-        // Check if we need to unregister the old one
-        let old_shortcut = self.current_shortcut.lock().await.clone();
-        if let Some(old) = old_shortcut {
-            if old != shortcut_str {
-                log::info!("Unregistering old shortcut: {}", old);
-                if let Ok(shortcut) = old.parse::<Shortcut>() {
-                    let _ = app.global_shortcut().unregister(shortcut);
-                }
-            } else {
-                log::info!("Shortcut unchanged, skipping re-registration");
-                return Ok(());
-            }
-        }
+        self.unregister_current_shortcut(app, "global").await;
 
         log::info!("Parsing shortcut: '{}'", shortcut_str);
         let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
@@ -118,23 +122,11 @@ impl ShortcutManager {
         // Skip if shortcut is empty
         if shortcut_str.trim().is_empty() {
             log::info!("Capture text shortcut is empty, skipping registration");
-            *self.current_shortcut.lock().await = None;
+            self.unregister_current_shortcut(app, "capture_text").await;
             return Ok(());
         }
 
-        // Check if we need to unregister the old one
-        let old_shortcut = self.current_shortcut.lock().await.clone();
-        if let Some(old) = old_shortcut {
-            if old != shortcut_str {
-                log::info!("Unregistering old capture_text shortcut: {}", old);
-                if let Ok(shortcut) = old.parse::<Shortcut>() {
-                    let _ = app.global_shortcut().unregister(shortcut);
-                }
-            } else {
-                log::info!("Capture text shortcut unchanged, skipping re-registration");
-                return Ok(());
-            }
-        }
+        self.unregister_current_shortcut(app, "capture_text").await;
 
         log::info!("Parsing capture_text shortcut: '{}'", shortcut_str);
         let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
@@ -216,23 +208,11 @@ impl ShortcutManager {
         // Skip if shortcut is empty
         if shortcut_str.trim().is_empty() {
             log::info!("Save as note shortcut is empty, skipping registration");
-            *self.current_shortcut.lock().await = None;
+            self.unregister_current_shortcut(app, "save_as_note").await;
             return Ok(());
         }
 
-        // Check if we need to unregister the old one
-        let old_shortcut = self.current_shortcut.lock().await.clone();
-        if let Some(old) = old_shortcut {
-            if old != shortcut_str {
-                log::info!("Unregistering old save_as_note shortcut: {}", old);
-                if let Ok(shortcut) = old.parse::<Shortcut>() {
-                    let _ = app.global_shortcut().unregister(shortcut);
-                }
-            } else {
-                log::info!("Save as note shortcut unchanged, skipping re-registration");
-                return Ok(());
-            }
-        }
+        self.unregister_current_shortcut(app, "save_as_note").await;
 
         log::info!("Parsing save_as_note shortcut: '{}'", shortcut_str);
         let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
@@ -277,22 +257,11 @@ impl ShortcutManager {
 
         if shortcut_str.trim().is_empty() {
             log::info!("Reader shortcut is empty, skipping registration");
-            *self.current_shortcut.lock().await = None;
+            self.unregister_current_shortcut(app, "reader").await;
             return Ok(());
         }
 
-        let old_shortcut = self.current_shortcut.lock().await.clone();
-        if let Some(old) = old_shortcut {
-            if old != shortcut_str {
-                log::info!("Unregistering old reader shortcut: {}", old);
-                if let Ok(shortcut) = old.parse::<Shortcut>() {
-                    let _ = app.global_shortcut().unregister(shortcut);
-                }
-            } else {
-                log::info!("Reader shortcut unchanged, skipping re-registration");
-                return Ok(());
-            }
-        }
+        self.unregister_current_shortcut(app, "reader").await;
 
         log::info!("Parsing reader shortcut: '{}'", shortcut_str);
         let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
