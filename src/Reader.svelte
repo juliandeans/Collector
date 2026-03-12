@@ -47,6 +47,11 @@
   let autocompleteIndex = 0;
   let autocompleteResults = [];
   let autocompleteRange = null;
+  let showSearch = false;
+  let searchQuery = "";
+  let searchMatches = [];
+  let searchIndex = 0;
+  let searchInputRef;
   let tabContextMenu = {
     open: false,
     x: 0,
@@ -310,6 +315,139 @@
     autocompleteIndex = 0;
     autocompleteRange = null;
     autocompleteResults = [];
+  }
+
+  function clearHighlights() {
+    if (typeof CSS !== "undefined" && CSS.highlights) {
+      CSS.highlights.clear();
+    }
+  }
+
+  function highlightMatches() {
+    clearHighlights();
+
+    if (
+      typeof CSS === "undefined" ||
+      !CSS.highlights ||
+      typeof Highlight === "undefined" ||
+      searchMatches.length === 0
+    ) {
+      return;
+    }
+
+    const allHighlight = new Highlight(...searchMatches);
+    CSS.highlights.set("search-result", allHighlight);
+
+    if (searchMatches[searchIndex]) {
+      const activeHighlight = new Highlight(searchMatches[searchIndex]);
+      CSS.highlights.set("search-active", activeHighlight);
+    }
+  }
+
+  function scrollToMatch(index) {
+    const range = searchMatches[index];
+    if (!range || !scrollRef) return;
+
+    const rect = range.getClientRects()[0] ?? range.getBoundingClientRect();
+    const scrollRect = scrollRef.getBoundingClientRect();
+    if (!rect) return;
+
+    if (rect.top < scrollRect.top || rect.bottom > scrollRect.bottom) {
+      const targetTop =
+        scrollRef.scrollTop +
+        (rect.top - scrollRect.top) -
+        scrollRef.clientHeight / 2 +
+        rect.height / 2;
+
+      scrollRef.scrollTo({
+        top: Math.max(targetTop, 0),
+        behavior: "smooth",
+      });
+    }
+  }
+
+  function runSearch(event) {
+    if (event?.currentTarget?.value !== undefined) {
+      searchQuery = event.currentTarget.value;
+    }
+
+    clearHighlights();
+    searchMatches = [];
+    searchIndex = 0;
+
+    if (!searchQuery.trim() || !editorRef) return;
+
+    const walker = document.createTreeWalker(
+      editorRef,
+      NodeFilter.SHOW_TEXT,
+      null,
+    );
+
+    const query = searchQuery.toLowerCase();
+    const ranges = [];
+    let node;
+
+    while ((node = walker.nextNode())) {
+      const text = node.textContent ?? "";
+      const lower = text.toLowerCase();
+      let position = 0;
+
+      while (true) {
+        const matchIndex = lower.indexOf(query, position);
+        if (matchIndex === -1) break;
+
+        const range = document.createRange();
+        range.setStart(node, matchIndex);
+        range.setEnd(node, matchIndex + query.length);
+        ranges.push(range);
+        position = matchIndex + 1;
+      }
+    }
+
+    searchMatches = ranges;
+    highlightMatches();
+
+    if (ranges.length > 0) {
+      scrollToMatch(0);
+    }
+  }
+
+  function stepSearch(direction) {
+    if (searchMatches.length === 0) return;
+
+    searchIndex =
+      (searchIndex + direction + searchMatches.length) % searchMatches.length;
+    highlightMatches();
+    scrollToMatch(searchIndex);
+  }
+
+  function closeSearch() {
+    showSearch = false;
+    searchQuery = "";
+    clearHighlights();
+    searchMatches = [];
+    searchIndex = 0;
+  }
+
+  function openSearch() {
+    showSearch = true;
+    tick().then(() => {
+      searchInputRef?.focus();
+      searchInputRef?.select();
+    });
+  }
+
+  function handleSearchKeydown(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      stepSearch(event.shiftKey ? -1 : 1);
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSearch();
+    }
   }
 
   function checkAutocomplete() {
@@ -637,6 +775,101 @@
     return html;
   }
 
+  function capitalize(text = "") {
+    return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : "";
+  }
+
+  function calloutIcon(type) {
+    const icons = {
+      note: "ℹ",
+      info: "ℹ",
+      tip: "💡",
+      hint: "💡",
+      warning: "⚠",
+      caution: "⚠",
+      attention: "⚠",
+      danger: "🔥",
+      error: "✗",
+      bug: "🐛",
+      success: "✓",
+      check: "✓",
+      done: "✓",
+      question: "?",
+      help: "?",
+      faq: "?",
+      quote: '"',
+      cite: '"',
+      abstract: "◻",
+      summary: "◻",
+      tldr: "◻",
+      example: "◈",
+      important: "★",
+    };
+
+    return icons[type] ?? "ℹ";
+  }
+
+  function calloutColorClass(type) {
+    const map = {
+      note: "blue",
+      info: "blue",
+      abstract: "blue",
+      summary: "blue",
+      tip: "green",
+      hint: "green",
+      success: "green",
+      check: "green",
+      done: "green",
+      warning: "yellow",
+      caution: "yellow",
+      attention: "yellow",
+      danger: "red",
+      error: "red",
+      bug: "red",
+      question: "purple",
+      help: "purple",
+      faq: "purple",
+      quote: "gray",
+      cite: "gray",
+      example: "purple",
+      important: "orange",
+    };
+
+    return map[type] ?? "blue";
+  }
+
+  function processCallout(lines = []) {
+    const firstLine = lines[0] ?? "";
+    const calloutMatch = firstLine.match(/^>\s*\[!([\w]+)\]\s*(.*)/i);
+    if (!calloutMatch) return null;
+
+    const type = calloutMatch[1].toLowerCase();
+    const title = calloutMatch[2].trim() || capitalize(type);
+    const contentLines = lines
+      .slice(1)
+      .map((line) => line.replace(/^>\s?/, ""));
+
+    while (contentLines.length > 0 && !contentLines[0].trim()) {
+      contentLines.shift();
+    }
+
+    while (
+      contentLines.length > 0 &&
+      !contentLines[contentLines.length - 1].trim()
+    ) {
+      contentLines.pop();
+    }
+
+    const content = contentLines.length
+      ? contentLines.map((line) => inlineMarkdown(line)).join("<br>")
+      : "";
+    const icon = calloutIcon(type);
+    const colorClass = calloutColorClass(type);
+    const raw = lines.join("\n");
+
+    return `<div class="callout callout-${colorClass}" data-raw="${escAttr(raw)}"><div class="callout-title"><span class="callout-icon">${icon}</span><span class="callout-label">${escHtml(title)}</span></div>${content ? `<div class="callout-content">${content}</div>` : ""}</div>`;
+  }
+
   function markdownLineToHtml(line) {
     if (line === null || line === undefined) return "";
     if (line.includes("\u200B")) {
@@ -701,7 +934,36 @@
     if (!text.trim()) return "";
 
     const lines = normalizeNewlines(text).split("\n");
-    return lines.map((line) => markdownLineToHtml(line)).join("");
+    const htmlParts = [];
+    let index = 0;
+
+    while (index < lines.length) {
+      const line = lines[index];
+
+      if (/^>\s?/.test(line)) {
+        const group = [];
+        while (index < lines.length && /^>\s?/.test(lines[index])) {
+          group.push(lines[index]);
+          index += 1;
+        }
+
+        const callout = processCallout(group);
+        if (callout) {
+          htmlParts.push(callout);
+        } else {
+          const content = group
+            .map((groupLine) => inlineMarkdown(groupLine.replace(/^>\s?/, "")))
+            .join("<br>");
+          htmlParts.push(`<blockquote>${content}</blockquote>`);
+        }
+        continue;
+      }
+
+      htmlParts.push(markdownLineToHtml(line));
+      index += 1;
+    }
+
+    return htmlParts.join("");
   }
 
   function imageNodeToMarkdown(node) {
@@ -782,6 +1044,10 @@
 
     if (el.classList?.contains("hidden-marker")) {
       return el.dataset.hiddenId ?? "";
+    }
+
+    if (el.classList?.contains("callout")) {
+      return el.dataset.raw ?? "";
     }
 
     const tag = el.tagName?.toLowerCase();
@@ -936,6 +1202,10 @@
       return `[${serializeChildren(element)}](${href})`;
     }
 
+    if (element.classList.contains("callout")) {
+      return element.dataset.raw ?? "";
+    }
+
     if (tag === "span" && element.classList.contains("wikilink")) {
       return `[[${element.dataset.target ?? element.textContent ?? ""}]]`;
     }
@@ -1015,6 +1285,11 @@
 
       if (tag === "blockquote") {
         lines.push(`> ${serializeChildren(element).trim()}`);
+        return;
+      }
+
+      if (element.classList.contains("callout")) {
+        lines.push(element.dataset.raw ?? "");
         return;
       }
 
@@ -1162,6 +1437,7 @@
   async function loadEditorContent(raw = "") {
     finalizeActiveBlock();
     closeAutocomplete();
+    closeSearch();
     rawContent = normalizeNewlines(raw);
     imagePathCache.clear();
     await renderContentToEditor(rawContent);
@@ -1235,6 +1511,7 @@
 
   async function activateTab(index, forceReload = false) {
     saveScrollPosition();
+    closeSearch();
     if (index !== activeTabIndex) {
       finalizeActiveBlock();
       await flushPendingSave(false);
@@ -1358,9 +1635,28 @@
       return;
     }
 
+    if ((event.metaKey || event.ctrlKey) && key === "f") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (showSearch) {
+        searchInputRef?.focus();
+      } else {
+        openSearch();
+      }
+      return;
+    }
+
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
+      if (showAutocomplete) {
+        closeAutocomplete();
+        return;
+      }
+      if (showSearch) {
+        closeSearch();
+        return;
+      }
       await hideReader();
       return;
     }
@@ -1453,6 +1749,7 @@
   async function hideReader() {
     finalizeActiveBlock();
     closeAutocomplete();
+    closeSearch();
     await flushPendingSave(false);
 
     try {
@@ -1733,6 +2030,16 @@
       return;
     }
 
+    if ((event.metaKey || event.ctrlKey) && key === "f") {
+      event.preventDefault();
+      if (showSearch) {
+        searchInputRef?.focus();
+      } else {
+        openSearch();
+      }
+      return;
+    }
+
     if ((event.metaKey || event.ctrlKey) && key === "p") {
       event.preventDefault();
       await openPalette();
@@ -1756,6 +2063,14 @@
 
     if (event.key === "Escape") {
       event.preventDefault();
+      if (showAutocomplete) {
+        closeAutocomplete();
+        return;
+      }
+      if (showSearch) {
+        closeSearch();
+        return;
+      }
       if (showPalette) {
         closePalette();
       } else {
@@ -1889,6 +2204,7 @@
     clearTimeout(saveTimeout);
     clearTimeout(statusTimeout);
     clearTimeout(savedIndicatorTimeout);
+    clearHighlights();
     document.removeEventListener("selectionchange", handleSelectionChange);
     window.removeEventListener("keydown", handleGlobalKeydown);
     unlistenShowReader?.();
@@ -1915,96 +2231,127 @@
   <div class="accent-line" role="presentation"></div>
 
   <div class="reader-topbar" data-tauri-drag-region>
-    <div class="tab-strip">
-      <button
-        class="tab-action"
-        type="button"
-        title="Open Command Palette"
-        on:mousedown|stopPropagation
-        on:click|stopPropagation={openPalette}
-      >
-        +
-      </button>
+    <div class="topbar-row">
+      <div class="tab-strip">
+        <button
+          class="tab-action"
+          type="button"
+          title="Open Command Palette"
+          on:mousedown|stopPropagation
+          on:click|stopPropagation={openPalette}
+        >
+          +
+        </button>
 
-      <div class="tab-list">
-        {#each tabs as tab, index (tab.path)}
+        <div class="tab-list">
+          {#each tabs as tab, index (tab.path)}
+            <button
+              class="tab-button"
+              class:active={index === activeTabIndex}
+              type="button"
+              title={tab.path}
+              on:mousedown|stopPropagation
+              on:click|stopPropagation={() => activateTab(index)}
+              on:contextmenu|stopPropagation={(event) =>
+                openTabContextMenu(event, index)}
+            >
+              {#if getTabIcon(tab)}
+                <span class="tab-icon" aria-hidden="true">
+                  <svelte:component
+                    this={getTabIcon(tab)}
+                    size={14}
+                    strokeWidth={1.9}
+                  />
+                </span>
+              {/if}
+              <span class="tab-label">{tab.label}</span>
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        {#if isSaving}
+          <span class="save-indicator busy">Saving...</span>
+        {:else if showSavedIndicator}
+          <span class="save-indicator">Saved ✓</span>
+        {/if}
+
+        {#if tabs[activeTabIndex]?.history?.length > 0}
           <button
-            class="tab-button"
-            class:active={index === activeTabIndex}
+            class="topbar-btn back-button"
             type="button"
-            title={tab.path}
+            title="Back (⌘[)"
             on:mousedown|stopPropagation
-            on:click|stopPropagation={() => activateTab(index)}
-            on:contextmenu|stopPropagation={(event) =>
-              openTabContextMenu(event, index)}
+            on:click|stopPropagation={navigateBack}
           >
-            {#if getTabIcon(tab)}
-              <span class="tab-icon" aria-hidden="true">
-                <svelte:component
-                  this={getTabIcon(tab)}
-                  size={14}
-                  strokeWidth={1.9}
-                />
-              </span>
-            {/if}
-            <span class="tab-label">{tab.label}</span>
+            ←
           </button>
-        {/each}
+        {/if}
+
+        {#if tabs[activeTabIndex]?.path}
+          <button
+            class="topbar-btn obsidian-btn"
+            type="button"
+            title="Open in Obsidian"
+            on:mousedown|stopPropagation
+            on:click|stopPropagation={openInObsidian}
+          >
+            <svg width="14" height="14" viewBox="0 0 100 100" fill="none">
+              <path
+                d="M73.8 13.8C67.4 7 58.4 3 49 3c-9.4 0-18.4 4-24.8 10.8L10 30.5c-6.4 6.8-9.5 16-8.6 25.2l2.8 28.7C5 93.5 11.5 99 19.2 99h61.6c7.7 0 14.2-5.5 15-13.1l2.8-28.7c.9-9.2-2.2-18.4-8.6-25.2L73.8 13.8z"
+                fill="currentColor"
+                opacity="0.9"
+              />
+              <path
+                d="M50 25c-8.3 0-15 6.7-15 15s6.7 15 15 15 15-6.7 15-15-6.7-15-15-15zm0 22c-3.9 0-7-3.1-7-7s3.1-7 7-7 7 3.1 7 7-3.1 7-7 7z"
+                fill="white"
+                opacity="0.6"
+              />
+            </svg>
+          </button>
+        {/if}
+
+        <button
+          class="topbar-btn close-btn"
+          type="button"
+          title="Close Reader"
+          on:mousedown|stopPropagation
+          on:click|stopPropagation={hideReader}
+        >
+          ✕
+        </button>
       </div>
     </div>
 
-    <div class="topbar-actions">
-      {#if isSaving}
-        <span class="save-indicator busy">Saving...</span>
-      {:else if showSavedIndicator}
-        <span class="save-indicator">Saved ✓</span>
-      {/if}
-
-      {#if tabs[activeTabIndex]?.history?.length > 0}
-        <button
-          class="topbar-btn back-button"
-          type="button"
-          title="Back (⌘[)"
-          on:mousedown|stopPropagation
-          on:click|stopPropagation={navigateBack}
+    {#if showSearch}
+      <div class="search-bar">
+        <input
+          bind:this={searchInputRef}
+          bind:value={searchQuery}
+          class="search-input"
+          placeholder="Search…"
+          on:input={runSearch}
+          on:keydown={handleSearchKeydown}
+        />
+        <span class="search-count">
+          {searchMatches.length > 0
+            ? `${searchIndex + 1} of ${searchMatches.length}`
+            : searchQuery
+              ? "0 results"
+              : ""}
+        </span>
+        <button class="search-nav" type="button" on:click={() => stepSearch(-1)}
+          >↑</button
         >
-          ←
-        </button>
-      {/if}
-
-      {#if tabs[activeTabIndex]?.path}
-        <button
-          class="topbar-btn obsidian-btn"
-          type="button"
-          title="Open in Obsidian"
-          on:mousedown|stopPropagation
-          on:click|stopPropagation={openInObsidian}
+        <button class="search-nav" type="button" on:click={() => stepSearch(1)}
+          >↓</button
         >
-          <svg width="14" height="14" viewBox="0 0 100 100" fill="none">
-            <path
-              d="M73.8 13.8C67.4 7 58.4 3 49 3c-9.4 0-18.4 4-24.8 10.8L10 30.5c-6.4 6.8-9.5 16-8.6 25.2l2.8 28.7C5 93.5 11.5 99 19.2 99h61.6c7.7 0 14.2-5.5 15-13.1l2.8-28.7c.9-9.2-2.2-18.4-8.6-25.2L73.8 13.8z"
-              fill="currentColor"
-              opacity="0.9"
-            />
-            <path
-              d="M50 25c-8.3 0-15 6.7-15 15s6.7 15 15 15 15-6.7 15-15-6.7-15-15-15zm0 22c-3.9 0-7-3.1-7-7s3.1-7 7-7 7 3.1 7 7-3.1 7-7 7z"
-              fill="white"
-              opacity="0.6"
-            />
-          </svg>
-        </button>
-      {/if}
-
-      <button
-        class="topbar-btn close-btn"
-        type="button"
-        title="Close Reader"
-        on:mousedown|stopPropagation
-        on:click|stopPropagation={hideReader}
-      >
-        ✕
-      </button>
-    </div>
+        <button class="search-close" type="button" on:click={closeSearch}
+          >✕</button
+        >
+      </div>
+    {/if}
   </div>
 
   {#if tabContextMenu.open}
@@ -2214,12 +2561,22 @@
 
   .reader-topbar {
     display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    min-height: 40px;
+    padding: 8px 12px 8px;
+    gap: 6px;
+    background: transparent;
+  }
+
+  .topbar-row {
+    display: flex;
     align-items: center;
     justify-content: space-between;
-    min-height: 40px;
-    padding: 8px 12px 6px;
     gap: 10px;
-    background: transparent;
+    width: 100%;
+    min-width: 0;
   }
 
   .tab-strip {
@@ -2458,6 +2815,62 @@
     background: transparent;
   }
 
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    flex-shrink: 0;
+    width: 100%;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    -webkit-app-region: no-drag;
+  }
+
+  .search-input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--app-text-color, #ffffff);
+    font: inherit;
+    font-size: 13px;
+    outline: none;
+    -webkit-app-region: no-drag;
+  }
+
+  .search-count {
+    min-width: 56px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .search-nav,
+  .search-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    transition: background var(--transition-fast);
+    -webkit-app-region: no-drag;
+  }
+
+  .search-nav:hover,
+  .search-close:hover {
+    background: rgba(0, 0, 0, 0.08);
+    color: var(--app-text-color, #ffffff);
+  }
+
   .missing-file-banner {
     margin: 12px 16px 0;
     padding: 10px 12px;
@@ -2543,6 +2956,86 @@
     padding-left: 12px;
     border-left: 3px solid var(--accent-color, #8b5cf6);
     color: var(--text-secondary);
+  }
+
+  .editor-body :global(.callout) {
+    margin: 6px 0;
+    padding: 10px 14px;
+    border-left: 3px solid;
+    border-radius: 6px;
+    white-space: normal;
+  }
+
+  .editor-body :global(.callout-title) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .editor-body :global(.callout-icon) {
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .editor-body :global(.callout-content) {
+    font-size: 13px;
+    line-height: 1.6;
+    opacity: 0.9;
+  }
+
+  :global(.callout-blue) {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.6);
+    color: #3b82f6;
+  }
+
+  :global(.callout-green) {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.6);
+    color: #22c55e;
+  }
+
+  :global(.callout-yellow) {
+    background: rgba(234, 179, 8, 0.1);
+    border-color: rgba(234, 179, 8, 0.6);
+    color: #eab308;
+  }
+
+  :global(.callout-red) {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.6);
+    color: #ef4444;
+  }
+
+  :global(.callout-purple) {
+    background: rgba(139, 92, 246, 0.1);
+    border-color: rgba(139, 92, 246, 0.6);
+    color: #8b5cf6;
+  }
+
+  :global(.callout-orange) {
+    background: rgba(249, 115, 22, 0.1);
+    border-color: rgba(249, 115, 22, 0.6);
+    color: #f97316;
+  }
+
+  :global(.callout-gray) {
+    background: rgba(107, 114, 128, 0.1);
+    border-color: rgba(107, 114, 128, 0.6);
+    color: #6b7280;
+  }
+
+  :global(.callout-blue .callout-content),
+  :global(.callout-green .callout-content),
+  :global(.callout-yellow .callout-content),
+  :global(.callout-red .callout-content),
+  :global(.callout-purple .callout-content),
+  :global(.callout-orange .callout-content),
+  :global(.callout-gray .callout-content) {
+    color: var(--app-text-color, #ffffff);
   }
 
   .editor-body :global(code) {
@@ -2886,6 +3379,16 @@
     font-size: 10px;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+
+  :global(::highlight(search-result)) {
+    background-color: rgba(234, 179, 8, 0.35);
+    color: inherit;
+  }
+
+  :global(::highlight(search-active)) {
+    background-color: rgba(234, 179, 8, 0.8);
+    color: #1a1a1a;
   }
 
   @keyframes fadeInUp {
