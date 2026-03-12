@@ -1,5 +1,5 @@
 <script>
-  import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+  import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -92,6 +92,17 @@
       saved_path: result?.saved_path ?? null,
       filename: result?.filename ?? null,
     };
+  }
+
+  async function loadPreview(path) {
+    if (!path) return null;
+
+    try {
+      return await invoke("load_image_data_url", { path });
+    } catch (error) {
+      console.warn("Could not load image preview:", path, error);
+      return null;
+    }
   }
 
   function handleDragDropEvent(event) {
@@ -744,7 +755,7 @@
         const normalizedPath = normalizeFilePath(
           normalizedResult.saved_path || filePath,
         );
-        const previewUrl = convertFileSrc(normalizedPath);
+        const previewUrl = await loadPreview(normalizedPath);
 
         return {
           id: Date.now() + Math.random() + index,

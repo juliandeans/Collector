@@ -1,5 +1,5 @@
 <script>
-  import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+  import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy, tick } from "svelte";
   import { getReaderIconComponent } from "./lib/reader-icons.js";
@@ -690,6 +690,29 @@
     return escHtml(text).replace(/"/g, "&quot;");
   }
 
+  function normalizeImageWidth(rawWidth = "") {
+    const trimmed = rawWidth.trim();
+    if (!trimmed) return null;
+
+    const width = Number.parseInt(trimmed, 10);
+    if (!Number.isFinite(width) || width <= 0 || width > 4000) {
+      return null;
+    }
+
+    return `${width}px`;
+  }
+
+  function sanitizeExternalHref(rawHref = "") {
+    const trimmed = rawHref.trim();
+    if (!trimmed) return null;
+
+    if (/^https?:\/\//i.test(trimmed) || /^obsidian:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+
+    return null;
+  }
+
   async function resolveImagePath(rawPath = "") {
     const cleanPath = rawPath.split("|")[0]?.trim() ?? "";
     if (!cleanPath) return "";
@@ -699,10 +722,9 @@
     }
 
     try {
-      const absolutePath = await invoke("resolve_image_path", {
-        filename: cleanPath,
+      const src = await invoke("load_image_data_url", {
+        path: cleanPath,
       });
-      const src = convertFileSrc(absolutePath);
       imagePathCache.set(cleanPath, src);
       return src;
     } catch (error) {
@@ -741,10 +763,10 @@
     html = html.replace(/!\[\[([^\]]+)\]\]/g, (_, inner) => {
       const [rawPath = "", rawWidth = ""] = inner.split("|");
       const cleanPath = rawPath.trim();
-      const widthValue = rawWidth.trim();
+      const widthValue = normalizeImageWidth(rawWidth);
       const src = imagePathCache.get(cleanPath) ?? "";
       const style = widthValue
-        ? `width:${Number.isNaN(Number(widthValue)) ? widthValue : `${widthValue}px`};max-width:100%;`
+        ? `width:${widthValue};max-width:100%;`
         : "max-width:100%;";
       const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(cleanPath)}" style="${escAttr(style)}" class="md-image" loading="lazy">`;
       imageTokens.push(imageTag);
@@ -768,7 +790,14 @@
       const display = (rawDisplay || rawTarget).trim();
       return `<span class="wikilink" data-target="${escAttr(target)}">[[${escHtml(display)}]]</span>`;
     });
-    html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>');
+    html = html.replace(/\[(.+?)\]\((.+?)\)/g, (_, label, href) => {
+      const safeHref = sanitizeExternalHref(href);
+      if (!safeHref) {
+        return `${escHtml(label)} (${escHtml(href)})`;
+      }
+
+      return `<a href="${escAttr(safeHref)}" target="_blank" rel="noopener noreferrer">${escHtml(label)}</a>`;
+    });
     html = html.replace(/\u0000IMG(\d+)\u0000/g, (_, index) => {
       return imageTokens[Number(index)] ?? "";
     });

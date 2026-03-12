@@ -11,13 +11,11 @@
   },
   "app": {
     "macOSPrivateApi": true,
-    "withGlobalTauri": true,
+    "withGlobalTauri": false,
     "security": {
-      "csp": null,
-      "assetProtocol": {
-        "enable": true,
-        "scope": ["$HOME/**"]
-      },
+      "csp": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+      "devCsp": "default-src 'self'; img-src 'self' data: blob: http://localhost:1420; style-src 'self' 'unsafe-inline' http://localhost:1420; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' http://localhost:1420; connect-src 'self' ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420; font-src 'self' http://localhost:1420; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+      "freezePrototype": true,
       "capabilities": [
         {
           "identifier": "main-capability",
@@ -38,7 +36,6 @@
             "core:window:allow-start-dragging",
             "core:window:allow-unminimize",
             "core:webview:default",
-            "core:webview:allow-internal-toggle-devtools",
             "dialog:allow-open"
           ]
         }

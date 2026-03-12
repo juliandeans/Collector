@@ -1,6 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 
 use crate::log_safety::{redact_path, redact_path_str, summarize_bytes};
 
@@ -261,6 +261,24 @@ fn default_daily_note_format() -> String {
     "YYYY-MM-DD".to_string()
 }
 
+fn is_safe_relative_path(path: &str) -> bool {
+    let candidate = Path::new(path);
+    !candidate.is_absolute()
+        && candidate.components().all(|component| {
+            matches!(
+                component,
+                Component::Normal(_) | Component::CurDir
+            )
+        })
+}
+
+fn is_safe_filename_template(template: &str) -> bool {
+    !template.trim().is_empty()
+        && !template.contains('/')
+        && !template.contains('\\')
+        && !template.contains("..")
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -471,12 +489,48 @@ impl Settings {
             }
         }
 
+        if !is_safe_relative_path(&self.notes_folder) {
+            return Err("notes_folder must stay inside the vault".to_string());
+        }
+
+        if !is_safe_relative_path(&self.daily_note_folder) {
+            return Err("daily_note_folder must stay inside the vault".to_string());
+        }
+
+        if !is_safe_filename_template(&self.note_filename_template) {
+            return Err("note_filename_template must be a filename without path separators".to_string());
+        }
+
+        if !is_safe_filename_template(&self.image_filename) {
+            return Err("image_filename must be a filename without path separators".to_string());
+        }
+
         if !self.screenshot_path.is_empty() {
             let screenshot_path = PathBuf::from(&self.screenshot_path);
-            if let Some(parent) = screenshot_path.parent() {
-                if !parent.exists() {
-                    log::warn!("Screenshot path parent directory does not exist");
-                }
+            let vault_path = PathBuf::from(&self.vault_path);
+            let absolute_screenshot_path = if screenshot_path.is_absolute() {
+                screenshot_path
+            } else {
+                vault_path.join(screenshot_path)
+            };
+
+            let normalized = absolute_screenshot_path
+                .components()
+                .fold(PathBuf::new(), |mut acc, component| {
+                    match component {
+                        Component::Prefix(prefix) => acc.push(prefix.as_os_str()),
+                        Component::RootDir => acc.push(component.as_os_str()),
+                        Component::CurDir => {}
+                        Component::Normal(part) => acc.push(part),
+                        Component::ParentDir => {
+                            let _ = acc.pop();
+                        }
+                    }
+                    acc
+                });
+
+            if !normalized.starts_with(&vault_path) {
+                return Err("screenshot_path must stay inside the vault".to_string());
             }
         }
 
@@ -519,5 +573,32 @@ impl Settings {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_notes_folder_escape() {
+        let settings = Settings {
+            vault_path: "/tmp/vault".to_string(),
+            notes_folder: "../outside".to_string(),
+            ..Default::default()
+        };
+
+        assert!(settings.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_image_filename_with_separator() {
+        let settings = Settings {
+            vault_path: "/tmp/vault".to_string(),
+            image_filename: "nested/file".to_string(),
+            ..Default::default()
+        };
+
+        assert!(settings.validate().is_err());
     }
 }

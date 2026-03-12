@@ -32,6 +32,9 @@ use crate::image_handler::ProcessedImage;
 use crate::log_safety::{redact_path_str, summarize_bytes};
 use crate::settings::Settings;
 use crate::shortcuts::ShortcutManager;
+use std::collections::HashSet;
+use std::fs;
+use std::path::Component;
 
 struct AppState {
     settings: Arc<RwLock<Settings>>,
@@ -40,6 +43,252 @@ struct AppState {
     reader_shortcut_manager: Arc<ShortcutManager>,
     capture_text_shortcut_manager: Arc<ShortcutManager>,
     save_as_note_shortcut_manager: Arc<ShortcutManager>,
+}
+
+fn normalize_path(path: &Path) -> Result<PathBuf, String> {
+    let mut normalized = PathBuf::new();
+
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            Component::RootDir => normalized.push(component.as_os_str()),
+            Component::CurDir => {}
+            Component::Normal(part) => normalized.push(part),
+            Component::ParentDir => {
+                if !normalized.pop() {
+                    return Err("Path traversal is not allowed".to_string());
+                }
+            }
+        }
+    }
+
+    Ok(normalized)
+}
+
+fn canonical_vault_root(settings: &Settings) -> Result<PathBuf, String> {
+    let vault_path = PathBuf::from(&settings.vault_path);
+    fs::canonicalize(&vault_path).map_err(|e| format!("Failed to resolve vault path: {}", e))
+}
+
+fn ensure_markdown_path(path: &Path) -> Result<(), String> {
+    if path.extension().map(|ext| ext == "md").unwrap_or(false) {
+        Ok(())
+    } else {
+        Err("Only Markdown files inside the vault are allowed".to_string())
+    }
+}
+
+fn resolve_vault_read_path(settings: &Settings, requested_path: &str) -> Result<PathBuf, String> {
+    let vault_root = canonical_vault_root(settings)?;
+    let normalized = normalize_path(Path::new(requested_path))?;
+    let candidate = if normalized.is_absolute() {
+        normalized
+    } else {
+        vault_root.join(normalized)
+    };
+    let canonical = fs::canonicalize(&candidate)
+        .map_err(|e| format!("Failed to resolve requested file path: {}", e))?;
+
+    ensure_markdown_path(&canonical)?;
+
+    if canonical.starts_with(&vault_root) {
+        Ok(canonical)
+    } else {
+        Err("Requested file is outside the vault".to_string())
+    }
+}
+
+fn resolve_vault_write_path(settings: &Settings, requested_path: &str) -> Result<PathBuf, String> {
+    let vault_root = canonical_vault_root(settings)?;
+    let normalized = normalize_path(Path::new(requested_path))?;
+    let candidate = if normalized.is_absolute() {
+        normalized
+    } else {
+        vault_root.join(normalized)
+    };
+
+    ensure_markdown_path(&candidate)?;
+
+    if !candidate.starts_with(&vault_root) {
+        return Err("Requested file is outside the vault".to_string());
+    }
+
+    let parent = candidate
+        .parent()
+        .ok_or_else(|| "Invalid note path".to_string())?;
+    fs::create_dir_all(parent).map_err(|e| format!("Failed to create note directory: {}", e))?;
+
+    let canonical_parent =
+        fs::canonicalize(parent).map_err(|e| format!("Failed to resolve note directory: {}", e))?;
+    if !canonical_parent.starts_with(&vault_root) {
+        return Err("Requested file is outside the vault".to_string());
+    }
+
+    let filename = candidate
+        .file_name()
+        .ok_or_else(|| "Invalid note filename".to_string())?;
+
+    Ok(canonical_parent.join(filename))
+}
+
+fn collect_md_files(
+    base: &Path,
+    dir: &Path,
+    out: &mut Vec<serde_json::Value>,
+    visited: &mut HashSet<PathBuf>,
+) {
+    let canonical_dir = match fs::canonicalize(dir) {
+        Ok(path) => path,
+        Err(_) => return,
+    };
+
+    if !visited.insert(canonical_dir.clone()) {
+        return;
+    }
+
+    if let Ok(entries) = fs::read_dir(&canonical_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+
+            if path
+                .file_name()
+                .map(|n| n.to_string_lossy().starts_with('.'))
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
+            if file_type.is_symlink() {
+                continue;
+            }
+
+            if file_type.is_dir() {
+                collect_md_files(base, &path, out, visited);
+            } else if path.extension().map(|e| e == "md").unwrap_or(false) {
+                let name = path
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                let relative = path
+                    .strip_prefix(base)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .to_string();
+                out.push(serde_json::json!({
+                    "path": path.to_string_lossy(),
+                    "name": name,
+                    "relative_path": relative,
+                }));
+            }
+        }
+    }
+}
+
+fn find_file_in_vault(
+    dir: &Path,
+    filename: &str,
+    visited: &mut HashSet<PathBuf>,
+) -> Option<PathBuf> {
+    let canonical_dir = fs::canonicalize(dir).ok()?;
+    if !visited.insert(canonical_dir.clone()) {
+        return None;
+    }
+
+    let entries = fs::read_dir(&canonical_dir).ok()?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let file_type = entry.file_type().ok()?;
+
+        if path
+            .file_name()
+            .map(|name| name.to_string_lossy().starts_with('.'))
+            .unwrap_or(false)
+        {
+            continue;
+        }
+
+        if file_type.is_symlink() {
+            continue;
+        }
+
+        if file_type.is_dir() {
+            if let Some(found) = find_file_in_vault(&path, filename, visited) {
+                return Some(found);
+            }
+        } else if path
+            .file_name()
+            .map(|name| name.to_string_lossy().eq_ignore_ascii_case(filename))
+            .unwrap_or(false)
+        {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+fn resolve_image_file_path(settings: &Settings, requested_path: &str) -> Result<PathBuf, String> {
+    let vault_root = canonical_vault_root(settings)?;
+    let normalized = normalize_path(Path::new(requested_path))?;
+
+    if normalized.is_absolute() {
+        let canonical = fs::canonicalize(&normalized)
+            .map_err(|e| format!("Failed to resolve image path: {}", e))?;
+        if canonical.starts_with(&vault_root) && image_handler::is_supported_image(&canonical) {
+            return Ok(canonical);
+        }
+        return Err("Image path must stay inside the vault".to_string());
+    }
+
+    if requested_path.contains('/') || requested_path.contains('\\') {
+        let candidate = vault_root.join(&normalized);
+        let canonical = fs::canonicalize(&candidate)
+            .map_err(|e| format!("Failed to resolve image path: {}", e))?;
+        if canonical.starts_with(&vault_root) && image_handler::is_supported_image(&canonical) {
+            return Ok(canonical);
+        }
+    }
+
+    let bare_name = normalized
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| requested_path.to_string());
+    let mut visited = HashSet::new();
+    let found = find_file_in_vault(&vault_root, &bare_name, &mut visited)
+        .ok_or_else(|| "Image not found inside the vault".to_string())?;
+
+    if image_handler::is_supported_image(&found) {
+        Ok(found)
+    } else {
+        Err("Unsupported image type".to_string())
+    }
+}
+
+fn build_image_data_url(path: &Path) -> Result<String, String> {
+    let bytes = fs::read(path).map_err(|e| format!("Failed to read image: {}", e))?;
+    let mime = match path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_lowercase())
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        _ => "image/jpeg",
+    };
+
+    use base64::{engine::general_purpose, Engine as _};
+    Ok(format!(
+        "data:{};base64,{}",
+        mime,
+        general_purpose::STANDARD.encode(bytes)
+    ))
 }
 
 #[tauri::command]
@@ -178,6 +427,7 @@ async fn save_as_note(
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
     let settings = state.settings.read().await.clone();
+    settings.validate()?;
 
     state.edge_detector.set_capture_open(false).await;
 
@@ -199,6 +449,7 @@ async fn append_to_daily_note(
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
     let settings = state.settings.read().await.clone();
+    settings.validate()?;
 
     capture::append_to_daily_note(&text, &settings)?;
 
@@ -207,17 +458,33 @@ async fn append_to_daily_note(
 }
 
 #[tauri::command]
-async fn read_note_file(path: String) -> Result<String, String> {
-    std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))
+async fn read_note_file(path: String, state: tauri::State<'_, AppState>) -> Result<String, String> {
+    let settings = state.settings.read().await.clone();
+    let resolved = resolve_vault_read_path(&settings, &path)?;
+    fs::read_to_string(&resolved).map_err(|e| format!("Failed to read file: {}", e))
 }
 
 #[tauri::command]
-async fn write_note_file(path: String, content: String) -> Result<(), String> {
-    std::fs::write(&path, content).map_err(|e| format!("Failed to write file: {}", e))
+async fn write_note_file(
+    path: String,
+    content: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let settings = state.settings.read().await.clone();
+    let resolved = resolve_vault_write_path(&settings, &path)?;
+    fs::write(&resolved, content).map_err(|e| format!("Failed to write file: {}", e))
 }
 
 #[tauri::command]
 async fn open_external_url(url: String) -> Result<(), String> {
+    let allowed = ["http://", "https://", "obsidian://"];
+    if !allowed
+        .iter()
+        .any(|prefix| url.to_ascii_lowercase().starts_with(prefix))
+    {
+        return Err("Only http, https and obsidian links are allowed".to_string());
+    }
+
     open::that(&url).map_err(|e| format!("Failed to open URL: {}", e))?;
     Ok(())
 }
@@ -244,118 +511,34 @@ async fn get_running_apps() -> Result<Vec<String>, String> {
     Ok(apps)
 }
 
-fn find_file_in_vault(dir: &Path, filename: &str) -> Option<PathBuf> {
-    let entries = std::fs::read_dir(dir).ok()?;
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-
-        if path
-            .file_name()
-            .map(|name| name.to_string_lossy().starts_with('.'))
-            .unwrap_or(false)
-        {
-            continue;
-        }
-
-        if path.is_dir() {
-            if let Some(found) = find_file_in_vault(&path, filename) {
-                return Some(found);
-            }
-        } else if path
-            .file_name()
-            .map(|name| name.to_string_lossy().eq_ignore_ascii_case(filename))
-            .unwrap_or(false)
-        {
-            return Some(path);
-        }
-    }
-
-    None
-}
-
 #[tauri::command]
-async fn resolve_image_path(
-    filename: String,
+async fn load_image_data_url(
+    path: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    let settings = state.settings.read().await;
-    let vault_path = PathBuf::from(&settings.vault_path);
-    let candidate_path = PathBuf::from(&filename);
-
-    if candidate_path.is_absolute() {
-        return Ok(filename);
-    }
-
-    if filename.contains('/') || filename.contains('\\') {
-        let resolved = vault_path.join(&filename);
-        if resolved.exists() {
-            return Ok(resolved.to_string_lossy().to_string());
-        }
-    }
-
-    let bare_name = candidate_path
-        .file_name()
-        .map(|name| name.to_string_lossy().to_string())
-        .unwrap_or_else(|| filename.clone());
-
-    if let Some(found) = find_file_in_vault(&vault_path, &bare_name) {
-        return Ok(found.to_string_lossy().to_string());
-    }
-
-    Ok(vault_path.join(&filename).to_string_lossy().to_string())
+    let settings = state.settings.read().await.clone();
+    let resolved = resolve_image_file_path(&settings, &path)?;
+    build_image_data_url(&resolved)
 }
 
 #[tauri::command]
 async fn list_vault_notes(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
-    let settings = state.settings.read().await;
-    let vault_path = PathBuf::from(&settings.vault_path);
+    let settings = state.settings.read().await.clone();
+    let vault_path = canonical_vault_root(&settings)?;
 
     let mut notes = Vec::new();
-    collect_md_files(&vault_path, &vault_path, &mut notes);
+    let mut visited = HashSet::new();
+    collect_md_files(&vault_path, &vault_path, &mut notes, &mut visited);
 
     Ok(serde_json::json!(notes))
-}
-
-fn collect_md_files(base: &PathBuf, dir: &PathBuf, out: &mut Vec<serde_json::Value>) {
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path
-                .file_name()
-                .map(|n| n.to_string_lossy().starts_with('.'))
-                .unwrap_or(false)
-            {
-                continue;
-            }
-            if path.is_dir() {
-                collect_md_files(base, &path, out);
-            } else if path.extension().map(|e| e == "md").unwrap_or(false) {
-                let name = path
-                    .file_stem()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                let relative = path
-                    .strip_prefix(base)
-                    .unwrap_or(&path)
-                    .to_string_lossy()
-                    .to_string();
-                out.push(serde_json::json!({
-                    "path": path.to_string_lossy(),
-                    "name": name,
-                    "relative_path": relative,
-                }));
-            }
-        }
-    }
 }
 
 #[tauri::command]
 async fn get_daily_note_path(state: tauri::State<'_, AppState>) -> Result<String, String> {
     let settings = state.settings.read().await.clone();
+    settings.validate()?;
     let daily_path = capture::build_daily_note_path(&settings);
-    let file_path = PathBuf::from(&settings.vault_path).join(daily_path);
+    let file_path = resolve_vault_write_path(&settings, &daily_path)?;
     Ok(file_path.to_string_lossy().to_string())
 }
 
@@ -365,6 +548,7 @@ async fn save_image(
     state: tauri::State<'_, AppState>,
 ) -> Result<ProcessedImage, String> {
     let settings = state.settings.read().await.clone();
+    settings.validate()?;
 
     let result = image_handler::process_dropped_file(&file_path, &settings)?;
 
@@ -382,12 +566,17 @@ async fn save_image_from_bytes(
     state: tauri::State<'_, AppState>,
 ) -> Result<ProcessedImage, String> {
     let settings = state.settings.read().await.clone();
+    settings.validate()?;
 
     log::info!(
         "Received base64 string (file={}, chars={})",
         redact_path_str(&filename),
         bytes_base64.len()
     );
+
+    if bytes_base64.len() > 20 * 1024 * 1024 {
+        return Err("Image payload too large".to_string());
+    }
 
     use base64::{engine::general_purpose, Engine as _};
     let bytes = general_purpose::STANDARD
@@ -896,7 +1085,7 @@ fn main() {
             write_note_file,
             open_external_url,
             get_running_apps,
-            resolve_image_path,
+            load_image_data_url,
             list_vault_notes,
             get_daily_note_path,
             save_image,
@@ -914,4 +1103,42 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_vault_dir() -> PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("collector-test-{}", suffix));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn normalize_path_rejects_escape() {
+        assert!(normalize_path(Path::new("../../secret.md")).is_err());
+    }
+
+    #[test]
+    fn resolve_vault_read_path_rejects_outside_file() {
+        let vault_dir = temp_vault_dir();
+        let note_path = vault_dir.join("safe.md");
+        fs::write(&note_path, "# Safe").unwrap();
+
+        let settings = Settings {
+            vault_path: vault_dir.to_string_lossy().to_string(),
+            ..Default::default()
+        };
+
+        let result = resolve_vault_read_path(&settings, "../safe.md");
+        assert!(result.is_err());
+
+        let _ = fs::remove_dir_all(vault_dir);
+    }
 }
