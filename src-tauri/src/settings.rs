@@ -94,6 +94,12 @@ pub struct Settings {
     pub compression_max_kb: u32,
     #[serde(default = "default_edge_enabled")]
     pub edge_detection_enabled: bool,
+    #[serde(default = "default_reaction_time_ms")]
+    pub edge_reaction_time_ms: u64,
+    #[serde(default)]
+    pub edge_modifier_keys: Vec<String>,
+    #[serde(default)]
+    pub edge_excluded_apps: Vec<String>,
     #[serde(default = "default_notes_folder")]
     pub notes_folder: String,
     #[serde(default = "default_save_to_daily_shortcut")]
@@ -145,6 +151,10 @@ fn default_edge_enabled() -> bool {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_reaction_time_ms() -> u64 {
+    50
 }
 
 fn default_vault_path() -> String {
@@ -269,6 +279,9 @@ impl Default for Settings {
             capture_text_shortcut: default_capture_text_shortcut(),
             compression_max_kb: 200,
             edge_detection_enabled: true,
+            edge_reaction_time_ms: default_reaction_time_ms(),
+            edge_modifier_keys: Vec::new(),
+            edge_excluded_apps: Vec::new(),
             notes_folder: default_notes_folder(),
             save_to_daily_shortcut: default_save_to_daily_shortcut(),
             save_as_note_shortcut: default_save_as_note_shortcut(),
@@ -406,6 +419,10 @@ impl Settings {
         }
         if self.reader_height < 200 || self.reader_height > 1200 {
             return Err("reader_height must be between 200 and 1200".to_string());
+        }
+
+        if self.edge_reaction_time_ms < 50 || self.edge_reaction_time_ms > 1000 {
+            return Err("edge_reaction_time_ms must be between 50 and 1000".to_string());
         }
 
         if self.border_radius > 30 {

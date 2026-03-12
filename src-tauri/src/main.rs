@@ -222,6 +222,28 @@ async fn open_external_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn get_running_apps() -> Result<Vec<String>, String> {
+    use std::process::Command;
+
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(
+            r#"tell application "System Events" to get name of every process where background only is false"#,
+        )
+        .output()
+        .map_err(|e| format!("Failed to get running apps: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let apps = stdout
+        .split(',')
+        .map(|app| app.trim().to_string())
+        .filter(|app| !app.is_empty())
+        .collect();
+
+    Ok(apps)
+}
+
 fn find_file_in_vault(dir: &Path, filename: &str) -> Option<PathBuf> {
     let entries = std::fs::read_dir(dir).ok()?;
 
@@ -877,6 +899,7 @@ fn main() {
             read_note_file,
             write_note_file,
             open_external_url,
+            get_running_apps,
             resolve_image_path,
             list_vault_notes,
             get_daily_note_path,

@@ -1,3 +1,4 @@
+use std::process::Command;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
@@ -137,7 +138,6 @@ impl EdgeDetector {
         let poll_interval = Duration::from_millis(50);
         let mut trigger_start: Option<Instant> = None;
         let mut trigger_target: Option<&'static str> = None;
-        let trigger_delay = Duration::from_millis(50);
 
         log::info!("Edge detection polling started");
 
@@ -148,12 +148,14 @@ impl EdgeDetector {
             let mouse_pos = get_mouse_position();
             let screen = get_primary_screen_bounds();
 
-            let settings = self.settings.read().await;
+            let settings = self.settings.read().await.clone();
             if !settings.edge_detection_enabled && !settings.reader_edge_enabled {
                 trigger_start = None;
                 trigger_target = None;
                 continue;
             }
+
+            let trigger_delay = Duration::from_millis(settings.edge_reaction_time_ms);
             let edge_zone = 5;
             let at_left_edge = mouse_pos.0 <= edge_zone;
             let at_right_edge = mouse_pos.0 >= screen.width - edge_zone;
@@ -175,19 +177,24 @@ impl EdgeDetector {
                 None
             };
 
-            drop(settings); // Release lock early
-
             if let Some(target) = edge_target {
                 if trigger_start.is_none() || trigger_target != Some(target) {
                     trigger_start = Some(Instant::now());
                     trigger_target = Some(target);
                 } else if trigger_start.unwrap().elapsed() >= trigger_delay {
-                    log::info!("Edge triggered! Emitting {}", target);
-                    if target == "show_reader" {
-                        *self.is_reader_open.write().await = true;
-                    } else {
-                        *self.is_capture_open.write().await = true;
+                    if !modifiers_match(&settings.edge_modifier_keys) {
+                        trigger_start = None;
+                        trigger_target = None;
+                        continue;
                     }
+
+                    if is_frontmost_app_excluded(&settings.edge_excluded_apps) {
+                        trigger_start = None;
+                        trigger_target = None;
+                        continue;
+                    }
+
+                    log::info!("Edge triggered! Emitting {}", target);
                     let _ = app.emit(target, ());
                     trigger_start = None;
                     trigger_target = None;
@@ -197,6 +204,68 @@ impl EdgeDetector {
                 trigger_target = None;
             }
         }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn modifiers_match(required: &[String]) -> bool {
+    use core_graphics::event::CGEventFlags;
+    use core_graphics::event_source::CGEventSourceStateID;
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    unsafe extern "C" {
+        fn CGEventSourceFlagsState(state_id: CGEventSourceStateID) -> CGEventFlags;
+    }
+
+    if required.is_empty() {
+        return true;
+    }
+
+    let flags = unsafe { CGEventSourceFlagsState(CGEventSourceStateID::HIDSystemState) };
+
+    required
+        .iter()
+        .all(|modifier| match modifier.trim().to_lowercase().as_str() {
+            "cmd" | "command" | "meta" => flags.contains(CGEventFlags::CGEventFlagCommand),
+            "option" | "alt" => flags.contains(CGEventFlags::CGEventFlagAlternate),
+            "shift" => flags.contains(CGEventFlags::CGEventFlagShift),
+            "ctrl" | "control" => flags.contains(CGEventFlags::CGEventFlagControl),
+            _ => true,
+        })
+}
+
+#[cfg(not(target_os = "macos"))]
+fn modifiers_match(_required: &[String]) -> bool {
+    true
+}
+
+fn is_frontmost_app_excluded(excluded_apps: &[String]) -> bool {
+    if excluded_apps.is_empty() {
+        return false;
+    }
+
+    let frontmost = match get_frontmost_app() {
+        Some(app) => app,
+        None => return false,
+    };
+
+    excluded_apps
+        .iter()
+        .any(|excluded| excluded.trim().eq_ignore_ascii_case(&frontmost))
+}
+
+fn get_frontmost_app() -> Option<String> {
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(r#"tell application "System Events" to get name of first process where frontmost is true"#)
+        .output()
+        .ok()?;
+
+    let app_name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if app_name.is_empty() {
+        None
+    } else {
+        Some(app_name)
     }
 }
 

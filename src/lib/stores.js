@@ -22,6 +22,9 @@ export const defaultSettings = {
   
   compression_max_kb: 200,
   edge_detection_enabled: true,
+  edge_reaction_time_ms: 50,
+  edge_modifier_keys: [],
+  edge_excluded_apps: [],
   window_transparency: 55,
   window_blur: 80,
   window_saturation: 200,
