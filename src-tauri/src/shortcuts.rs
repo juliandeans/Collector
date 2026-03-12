@@ -300,10 +300,6 @@ impl ShortcutManager {
                     let app_handle2 = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         let _ = app_handle2.emit("show_reader", ());
-                        if let Some(window) = app_handle2.get_webview_window("reader") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
                     });
                 }
             })

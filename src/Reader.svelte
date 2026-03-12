@@ -1417,6 +1417,7 @@
     activeParagraphEl = null;
 
     if (!editorRef) return;
+    if (scrollRef) scrollRef.scrollTop = 0;
 
     const requestId = ++renderRequestId;
     isRenderingContent = true;
@@ -1451,9 +1452,13 @@
 
   async function restoreScrollPosition(path) {
     await tick();
-    requestAnimationFrame(() => {
-      if (!scrollRef) return;
-      scrollRef.scrollTop = scrollPositions.get(path) ?? 0;
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        if (scrollRef) {
+          scrollRef.scrollTop = scrollPositions.get(path) ?? 0;
+        }
+        resolve();
+      });
     });
   }
 
@@ -2157,7 +2162,9 @@
       unlistenShowReader = await listen("show_reader", async () => {
         finalizeActiveBlock();
         await flushPendingSave(false);
-        await reloadCurrentTab();
+        if (tabs[activeTabIndex]) {
+          await loadTab(activeTabIndex, true);
+        }
       });
 
       unlistenSettingsChanged = await listen("settings_changed", async (event) => {
