@@ -128,6 +128,12 @@ pub struct Settings {
     pub autostart_enabled: bool,
     #[serde(default = "default_text_color")]
     pub text_color: String,
+    #[serde(default = "default_accent_color")]
+    pub accent_color: String,
+    #[serde(default = "default_internal_link_color")]
+    pub internal_link_color: String,
+    #[serde(default = "default_external_link_color")]
+    pub external_link_color: String,
 }
 
 fn default_autostart_enabled() -> bool {
@@ -213,6 +219,18 @@ fn default_text_color() -> String {
     "#ffffff".to_string()
 }
 
+fn default_accent_color() -> String {
+    "#8b5cf6".to_string()
+}
+
+fn default_internal_link_color() -> String {
+    "#a78bfa".to_string()
+}
+
+fn default_external_link_color() -> String {
+    "#60a5fa".to_string()
+}
+
 fn default_capture_text_shortcut() -> String {
     "Cmd+Shift+C".to_string()
 }
@@ -268,6 +286,9 @@ impl Default for Settings {
             window_brightness: default_window_brightness(),
             autostart_enabled: default_autostart_enabled(),
             text_color: default_text_color(),
+            accent_color: default_accent_color(),
+            internal_link_color: default_internal_link_color(),
+            external_link_color: default_external_link_color(),
         }
     }
 }

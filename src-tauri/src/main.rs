@@ -216,6 +216,12 @@ async fn write_note_file(path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content).map_err(|e| format!("Failed to write file: {}", e))
 }
 
+#[tauri::command]
+async fn open_external_url(url: String) -> Result<(), String> {
+    open::that(&url).map_err(|e| format!("Failed to open URL: {}", e))?;
+    Ok(())
+}
+
 fn find_file_in_vault(dir: &Path, filename: &str) -> Option<PathBuf> {
     let entries = std::fs::read_dir(dir).ok()?;
 
@@ -870,6 +876,7 @@ fn main() {
             append_to_daily_note,
             read_note_file,
             write_note_file,
+            open_external_url,
             resolve_image_path,
             list_vault_notes,
             get_daily_note_path,

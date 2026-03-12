@@ -17,6 +17,7 @@
   let hiddenBlockMap = new Map();
   const imagePathCache = new Map();
   let appSettings = {
+    vault_name: "Vault",
     vault_path: "",
     background_color: "#1e1e2e",
     font_family: "-apple-system, BlinkMacSystemFont, SF Pro Display",
@@ -27,6 +28,9 @@
     window_saturation: 200,
     window_brightness: 0,
     text_color: "#ffffff",
+    accent_color: "#8b5cf6",
+    internal_link_color: "#a78bfa",
+    external_link_color: "#60a5fa",
     pinned_notes: [],
     reader_hide_frontmatter: true,
     reader_hide_dataview: true,
@@ -86,6 +90,22 @@
 
   function normalizeNewlines(content = "") {
     return content.replace(/\r\n/g, "\n");
+  }
+
+  function applyColorSettings(settings = appSettings) {
+    const root = document.documentElement;
+    root.style.setProperty(
+      "--accent-color",
+      settings.accent_color ?? "#8b5cf6",
+    );
+    root.style.setProperty(
+      "--internal-link-color",
+      settings.internal_link_color ?? "#a78bfa",
+    );
+    root.style.setProperty(
+      "--external-link-color",
+      settings.external_link_color ?? "#60a5fa",
+    );
   }
 
   function parseRawBlocks(content = "") {
@@ -268,6 +288,7 @@
   function applySettings(settings) {
     appSettings = {
       ...appSettings,
+      vault_name: settings.vault_name ?? appSettings.vault_name,
       vault_path: settings.vault_path ?? appSettings.vault_path,
       background_color:
         settings.background_color ?? appSettings.background_color,
@@ -282,6 +303,11 @@
       window_brightness:
         settings.window_brightness ?? appSettings.window_brightness,
       text_color: settings.text_color ?? appSettings.text_color,
+      accent_color: settings.accent_color ?? appSettings.accent_color,
+      internal_link_color:
+        settings.internal_link_color ?? appSettings.internal_link_color,
+      external_link_color:
+        settings.external_link_color ?? appSettings.external_link_color,
       pinned_notes: normalizePinnedNotes(
         settings.pinned_notes ?? appSettings.pinned_notes,
       ),
@@ -293,6 +319,7 @@
         settings.reader_hide_obsidian_comments ??
         appSettings.reader_hide_obsidian_comments,
     };
+    applyColorSettings(appSettings);
   }
 
   function getReaderFilterSettings(settings = appSettings) {
@@ -1097,9 +1124,6 @@
         showSavedIndicator = false;
       }, 1500);
 
-      if (showConfirmation) {
-        showStatus("Saved ✓", "success");
-      }
     } catch (error) {
       showStatus(normalizeError(error), "error", 2200);
     } finally {
@@ -1273,6 +1297,36 @@
     }
   }
 
+  async function openInObsidian() {
+    const tab = tabs[activeTabIndex];
+    if (!tab?.path) return;
+
+    try {
+      const settings = await invoke("load_settings");
+      const vaultName = settings.vault_name ?? "Vault";
+      const vaultPath = (settings.vault_path ?? "").replace(/[\\/]$/, "");
+      let relativePath = tab.path.replace(/\\/g, "/");
+
+      if (vaultPath) {
+        const normalizedVaultPath = vaultPath.replace(/\\/g, "/");
+        if (relativePath.startsWith(normalizedVaultPath)) {
+          relativePath = relativePath
+            .slice(normalizedVaultPath.length)
+            .replace(/^\/+/, "");
+        }
+      }
+
+      const noteRef = relativePath.replace(/\.md$/i, "");
+      const encodedVault = encodeURIComponent(vaultName);
+      const encodedNote = encodeURIComponent(noteRef).replace(/%2F/g, "/");
+      const obsidianUrl = `obsidian://open?vault=${encodedVault}&file=${encodedNote}`;
+      await invoke("open_external_url", { url: obsidianUrl });
+    } catch (error) {
+      console.error("Failed to open in Obsidian:", error);
+      showStatus("Failed to open in Obsidian", "error", 2200);
+    }
+  }
+
   async function ensureVaultNotes() {
     if (vaultNotes.length > 0) return;
 
@@ -1362,15 +1416,29 @@
 
   function handleEditorMouseDown(event) {
     const wikilink = event.target?.closest?.(".wikilink");
-    if (!wikilink) return;
+    if (wikilink) {
+      event.preventDefault();
+      event.stopPropagation();
 
-    event.preventDefault();
-    event.stopPropagation();
+      const target = wikilink.dataset.target;
+      if (!target) return;
 
-    const target = wikilink.dataset.target;
-    if (!target) return;
+      navigateToWikilink(target, event.metaKey || event.ctrlKey);
+      return;
+    }
 
-    navigateToWikilink(target, event.metaKey || event.ctrlKey);
+    const anchor = event.target?.closest?.("a[href]");
+    if (!anchor) return;
+
+    const href = anchor.getAttribute("href");
+    if (href && /^(https?:\/\/|obsidian:\/\/)/i.test(href)) {
+      event.preventDefault();
+      event.stopPropagation();
+      invoke("open_external_url", { url: href }).catch((error) => {
+        console.error("Failed to open external URL:", error);
+        showStatus("Failed to open link", "error", 2200);
+      });
+    }
   }
 
   async function navigateBack() {
@@ -1687,18 +1755,6 @@
         +
       </button>
 
-      {#if tabs[activeTabIndex]?.history?.length > 0}
-        <button
-          class="back-button"
-          type="button"
-          title="Back"
-          on:mousedown|stopPropagation
-          on:click|stopPropagation={navigateBack}
-        >
-          ←
-        </button>
-      {/if}
-
       <div class="tab-list">
         {#each tabs as tab, index (tab.path)}
           <button
@@ -1733,14 +1789,49 @@
         <span class="save-indicator">Saved ✓</span>
       {/if}
 
+      {#if tabs[activeTabIndex]?.history?.length > 0}
+        <button
+          class="topbar-btn back-button"
+          type="button"
+          title="Back (⌘[)"
+          on:mousedown|stopPropagation
+          on:click|stopPropagation={navigateBack}
+        >
+          ←
+        </button>
+      {/if}
+
+      {#if tabs[activeTabIndex]?.path}
+        <button
+          class="topbar-btn obsidian-btn"
+          type="button"
+          title="Open in Obsidian"
+          on:mousedown|stopPropagation
+          on:click|stopPropagation={openInObsidian}
+        >
+          <svg width="14" height="14" viewBox="0 0 100 100" fill="none">
+            <path
+              d="M73.8 13.8C67.4 7 58.4 3 49 3c-9.4 0-18.4 4-24.8 10.8L10 30.5c-6.4 6.8-9.5 16-8.6 25.2l2.8 28.7C5 93.5 11.5 99 19.2 99h61.6c7.7 0 14.2-5.5 15-13.1l2.8-28.7c.9-9.2-2.2-18.4-8.6-25.2L73.8 13.8z"
+              fill="currentColor"
+              opacity="0.9"
+            />
+            <path
+              d="M50 25c-8.3 0-15 6.7-15 15s6.7 15 15 15 15-6.7 15-15-6.7-15-15-15zm0 22c-3.9 0-7-3.1-7-7s3.1-7 7-7 7 3.1 7 7-3.1 7-7 7z"
+              fill="white"
+              opacity="0.6"
+            />
+          </svg>
+        </button>
+      {/if}
+
       <button
-        class="tab-action close"
+        class="topbar-btn close-btn"
         type="button"
         title="Close Reader"
         on:mousedown|stopPropagation
         on:click|stopPropagation={hideReader}
       >
-        x
+        ✕
       </button>
     </div>
   </div>
@@ -1839,7 +1930,7 @@
     </div>
   {/if}
 
-  {#if statusMessage}
+  {#if statusMessage && statusType === "error"}
     <div class="status-toast" class:error={statusType === "error"}>
       {statusMessage}
     </div>
@@ -1912,9 +2003,9 @@
     height: 2px;
     background: linear-gradient(
       90deg,
-      rgba(139, 92, 246, 0.6),
-      rgba(139, 92, 246, 0.3),
-      rgba(139, 92, 246, 0.6)
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
     );
     background-size: 200% 100%;
     animation: shimmer 3s linear infinite;
@@ -2007,37 +2098,75 @@
 
   .tab-context-menu {
     position: absolute;
-    min-width: 140px;
-    padding: 6px;
-    border-radius: 12px;
-    background: color-mix(
-      in srgb,
-      var(--app-background, #1e1e2e) 82%,
-      rgba(0, 0, 0, 0.22)
-    );
+    display: inline-flex;
     color: var(--app-text-color, #ffffff);
-    border: 0.5px solid rgba(255, 255, 255, 0.08);
-    box-shadow:
-      0 18px 40px rgba(0, 0, 0, 0.28),
-      0 6px 16px rgba(0, 0, 0, 0.18);
-    backdrop-filter: blur(20px) saturate(130%);
-    -webkit-backdrop-filter: blur(20px) saturate(130%);
   }
 
   .tab-context-item {
+    position: relative;
     width: 100%;
-    padding: 9px 10px;
-    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 8px 10px;
+    border-radius: 9px;
     text-align: left;
     cursor: pointer;
     color: inherit;
     font: inherit;
     border: 0;
     background: transparent;
+    overflow: hidden;
+    isolation: isolate;
+    transition:
+      background var(--transition-fast),
+      transform var(--transition-fast);
+  }
+
+  .tab-context-item::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
+    );
+    background-size: 200% 100%;
+    animation: shimmer 3s linear infinite;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .tab-context-item::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: color-mix(
+      in srgb,
+      var(--app-background, #1e1e2e) 28%,
+      transparent
+    );
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.08),
+      0 2px 8px rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(28px) saturate(135%) brightness(0.92);
+    -webkit-backdrop-filter: blur(28px) saturate(135%) brightness(0.92);
+    pointer-events: none;
+    z-index: 0;
   }
 
   .tab-context-item:hover {
     background: rgba(255, 255, 255, 0.08);
+  }
+
+  .tab-context-item:active {
+    transform: translateY(1px);
   }
 
   .tab-button.active {
@@ -2053,7 +2182,7 @@
     bottom: 0;
     height: 2px;
     border-radius: 999px;
-    background: var(--accent-color);
+    background: var(--accent-color, #8b5cf6);
   }
 
   .tab-action {
@@ -2067,29 +2196,48 @@
       transform var(--transition-fast);
   }
 
-  .back-button {
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+    flex: 0 0 auto;
+    -webkit-app-region: no-drag;
+  }
+
+  .topbar-btn {
     display: flex;
     align-items: center;
     justify-content: center;
     width: 26px;
     height: 26px;
-    flex: 0 0 auto;
     border: 0;
     border-radius: 5px;
     background: transparent;
     color: var(--text-secondary);
     font: inherit;
-    font-size: 16px;
+    font-size: 14px;
     cursor: pointer;
     transition:
       background var(--transition-fast),
       color var(--transition-fast);
-    -webkit-app-region: no-drag;
   }
 
-  .back-button:hover {
+  .topbar-btn:hover {
     background: rgba(0, 0, 0, 0.08);
     color: var(--app-text-color, #ffffff);
+  }
+
+  .back-button {
+    font-size: 16px;
+  }
+
+  .obsidian-btn {
+    opacity: 0.5;
+  }
+
+  .obsidian-btn:hover {
+    opacity: 1;
   }
 
   .tab-action:hover,
@@ -2100,13 +2248,6 @@
 
   .tab-action:active {
     transform: translateY(1px);
-  }
-
-  .topbar-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 0 0 auto;
   }
 
   .save-indicator {
@@ -2145,7 +2286,7 @@
     line-height: 1.7;
     word-break: break-word;
     white-space: pre-wrap;
-    caret-color: var(--accent-color);
+    caret-color: var(--accent-color, #8b5cf6);
     -webkit-user-modify: read-write;
   }
 
@@ -2208,7 +2349,7 @@
   .editor-body :global(blockquote) {
     margin: 2px 0;
     padding-left: 12px;
-    border-left: 3px solid var(--accent-color);
+    border-left: 3px solid var(--accent-color, #8b5cf6);
     color: var(--text-secondary);
   }
 
@@ -2229,8 +2370,13 @@
   }
 
   .editor-body :global(a) {
-    color: var(--accent-color);
+    color: var(--external-link-color, #60a5fa);
     text-decoration: none;
+    cursor: pointer;
+  }
+
+  .editor-body :global(a:hover) {
+    text-decoration: underline;
   }
 
   .editor-body :global(hr) {
@@ -2247,12 +2393,12 @@
 
   .editor-body :global(.md-checkbox) {
     margin-right: 6px;
-    accent-color: var(--accent-color);
+    accent-color: var(--accent-color, #8b5cf6);
     cursor: pointer;
   }
 
   .editor-body :global(.wikilink) {
-    color: var(--accent-color);
+    color: var(--internal-link-color, #a78bfa);
     opacity: 0.9;
     cursor: pointer;
     border-bottom: 1px solid transparent;
@@ -2263,7 +2409,7 @@
 
   .editor-body :global(.wikilink:hover) {
     opacity: 1;
-    border-bottom-color: var(--accent-color);
+    border-bottom-color: var(--internal-link-color, #a78bfa);
   }
 
   .editor-body :global(.md-image) {
@@ -2305,7 +2451,7 @@
     width: 6px;
     height: 6px;
     border-radius: 999px;
-    background: var(--accent-color);
+    background: var(--accent-color, #8b5cf6);
     opacity: 0.85;
   }
 
@@ -2323,7 +2469,11 @@
     margin-left: -4px;
     padding-left: 4px;
     border-radius: 3px;
-    background: rgba(139, 92, 246, 0.04);
+    background: color-mix(
+      in srgb,
+      var(--accent-color, #8b5cf6) 10%,
+      transparent
+    );
   }
 
   .palette-backdrop {
@@ -2401,9 +2551,9 @@
     height: 2px;
     background: linear-gradient(
       90deg,
-      rgba(139, 92, 246, 0.6),
-      rgba(139, 92, 246, 0.3),
-      rgba(139, 92, 246, 0.6)
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
     );
     background-size: 200% 100%;
     animation: shimmer 3s linear infinite;

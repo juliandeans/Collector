@@ -263,10 +263,7 @@ impl ShortcutManager {
         settings: &Settings,
     ) -> Result<(), String> {
         let shortcut_str = normalize_shortcut(&settings.reader_shortcut);
-        log::info!(
-            "Attempting to register reader shortcut: '{}'",
-            shortcut_str
-        );
+        log::info!("Attempting to register reader shortcut: '{}'", shortcut_str);
 
         if shortcut_str.trim().is_empty() {
             log::info!("Reader shortcut is empty, skipping registration");

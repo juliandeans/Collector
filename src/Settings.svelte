@@ -455,6 +455,55 @@
                 />
               </div>
             </div>
+            <h3>Colors</h3>
+            <div class="field">
+              <label for="accent_color">Accent Color</label>
+              <div class="color-input">
+                <input
+                  type="color"
+                  id="accent_color"
+                  bind:value={settings.accent_color}
+                />
+                <input
+                  type="text"
+                  bind:value={settings.accent_color}
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                />
+              </div>
+              <small
+                >Used for active tabs, checkboxes, caret, and highlights</small
+              >
+            </div>
+            <div class="field">
+              <label for="internal_link_color">Internal Links [[wikilinks]]</label>
+              <div class="color-input">
+                <input
+                  type="color"
+                  id="internal_link_color"
+                  bind:value={settings.internal_link_color}
+                />
+                <input
+                  type="text"
+                  bind:value={settings.internal_link_color}
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                />
+              </div>
+            </div>
+            <div class="field">
+              <label for="external_link_color">External Links [text](url)</label>
+              <div class="color-input">
+                <input
+                  type="color"
+                  id="external_link_color"
+                  bind:value={settings.external_link_color}
+                />
+                <input
+                  type="text"
+                  bind:value={settings.external_link_color}
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                />
+              </div>
+            </div>
             <div class="field">
               <label for="window_transparency"
                 >Transparency: {settings.window_transparency ?? 55}%</label

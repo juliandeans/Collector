@@ -30,6 +30,9 @@
     window_saturation: 200,
     window_brightness: 0,
     text_color: "#ffffff",
+    accent_color: "#8b5cf6",
+    internal_link_color: "#a78bfa",
+    external_link_color: "#60a5fa",
     save_to_daily_shortcut: "Cmd+Enter",
     save_as_note_shortcut: "Cmd+Shift+Enter",
   };
@@ -54,6 +57,22 @@
     if (types && Array.from(types).includes("Files")) return true;
     const items = e.dataTransfer?.items;
     return !!items && items.length > 0;
+  }
+
+  function applyColorSettings(settings = appSettings) {
+    const root = document.documentElement;
+    root.style.setProperty(
+      "--accent-color",
+      settings.accent_color ?? "#8b5cf6",
+    );
+    root.style.setProperty(
+      "--internal-link-color",
+      settings.internal_link_color ?? "#a78bfa",
+    );
+    root.style.setProperty(
+      "--external-link-color",
+      settings.external_link_color ?? "#60a5fa",
+    );
   }
 
   function normalizeFilePath(path) {
@@ -190,6 +209,13 @@
             window_brightness:
               newSettings.window_brightness ?? appSettings.window_brightness,
             text_color: newSettings.text_color ?? appSettings.text_color,
+            accent_color: newSettings.accent_color ?? appSettings.accent_color,
+            internal_link_color:
+              newSettings.internal_link_color ??
+              appSettings.internal_link_color,
+            external_link_color:
+              newSettings.external_link_color ??
+              appSettings.external_link_color,
             save_to_daily_shortcut:
               newSettings.save_to_daily_shortcut ??
               appSettings.save_to_daily_shortcut,
@@ -197,6 +223,7 @@
               newSettings.save_as_note_shortcut ??
               appSettings.save_as_note_shortcut,
           };
+          applyColorSettings(appSettings);
         });
 
         const currentWindow = await getCurrentWindow();
@@ -216,11 +243,15 @@
             window_saturation: settings.window_saturation ?? 200,
             window_brightness: settings.window_brightness ?? 0,
             text_color: settings.text_color ?? "#ffffff",
+            accent_color: settings.accent_color ?? "#8b5cf6",
+            internal_link_color: settings.internal_link_color ?? "#a78bfa",
+            external_link_color: settings.external_link_color ?? "#60a5fa",
             save_to_daily_shortcut:
               settings.save_to_daily_shortcut ?? "Cmd+Enter",
             save_as_note_shortcut:
               settings.save_as_note_shortcut ?? "Cmd+Shift+Enter",
           };
+          applyColorSettings(appSettings);
         } catch (e) {
           console.error("Failed to load initial settings:", e);
         }
@@ -946,9 +977,9 @@
     height: 2px;
     background: linear-gradient(
       90deg,
-      rgba(139, 92, 246, 0.6),
-      rgba(139, 92, 246, 0.3),
-      rgba(139, 92, 246, 0.6)
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
     );
     background-size: 200% 100%;
     animation: shimmer 3s linear infinite;
@@ -1085,7 +1116,7 @@
     font-size: var(--app-font-size, 15px);
     line-height: 1.6;
     color: var(--app-text-color, #ffffff);
-    caret-color: #8b5cf6;
+    caret-color: var(--accent-color, #8b5cf6);
   }
 
   textarea::placeholder {
@@ -1205,7 +1236,7 @@
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(139, 92, 246, 0.8),
+      color-mix(in srgb, var(--accent-color, #8b5cf6) 85%, transparent),
       transparent
     );
     background-size: 200% 100%;
