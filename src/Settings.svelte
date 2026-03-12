@@ -3,7 +3,10 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
-  import { getReaderIconComponent, readerIconOptions } from "./lib/reader-icons.js";
+  import {
+    getReaderIconComponent,
+    readerIconOptions,
+  } from "./lib/reader-icons.js";
   import { getSystemFonts } from "./lib/utils.js";
   import { defaultSettings } from "./lib/stores.js";
 
@@ -537,7 +540,9 @@
               >
             </div>
             <div class="field">
-              <label for="internal_link_color">Internal Links [[wikilinks]]</label>
+              <label for="internal_link_color"
+                >Internal Links [[wikilinks]]</label
+              >
               <div class="color-input">
                 <input
                   type="color"
@@ -552,7 +557,8 @@
               </div>
             </div>
             <div class="field">
-              <label for="external_link_color">External Links [text](url)</label>
+              <label for="external_link_color">External Links [text](url)</label
+              >
               <div class="color-input">
                 <input
                   type="color"
@@ -794,7 +800,11 @@
                               title={iconOption.label}
                               aria-label={iconOption.label}
                               on:click={() =>
-                                updatePinnedNote(note.path, "icon", iconOption.id)}
+                                updatePinnedNote(
+                                  note.path,
+                                  "icon",
+                                  iconOption.id,
+                                )}
                             >
                               {#if iconOption.component}
                                 <svelte:component
@@ -833,29 +843,6 @@
               >
             </div>
 
-            <div class="field">
-              <label for="reader_shortcut">Reader Shortcut</label>
-              <input
-                type="text"
-                id="reader_shortcut"
-                bind:value={settings.reader_shortcut}
-                placeholder="Cmd+Shift+R"
-                on:keydown={(e) => handleShortcutKeyDown(e, "reader_shortcut")}
-              />
-              <small
-                >Click in the field and press the desired key combination</small
-              >
-            </div>
-
-            <div class="field">
-              <label class="checkbox">
-                <input
-                  type="checkbox"
-                  bind:checked={settings.reader_edge_enabled}
-                />
-                Open on left edge
-              </label>
-            </div>
           </section>
 
           <section>
@@ -941,8 +928,8 @@
             <div class="field">
               <div class="field-label">Required Modifier Keys</div>
               <small style="margin-bottom: 8px; display: block;">
-                Hold these keys while touching the edge to open the panel.
-                Leave all unchecked to open without any modifier.
+                Hold these keys while touching the edge to open the panel. Leave
+                all unchecked to open without any modifier.
               </small>
               <div class="modifier-grid">
                 {#each ["cmd", "option", "shift", "ctrl"] as mod}
@@ -1055,6 +1042,19 @@
                 placeholder="Cmd+Shift+C"
                 on:keydown={(e) =>
                   handleShortcutKeyDown(e, "capture_text_shortcut")}
+              />
+              <small
+                >Click in the field and press the desired key combination</small
+              >
+            </div>
+            <div class="field">
+              <label for="reader_shortcut">Open Reader</label>
+              <input
+                type="text"
+                id="reader_shortcut"
+                bind:value={settings.reader_shortcut}
+                placeholder="Cmd+Shift+R"
+                on:keydown={(e) => handleShortcutKeyDown(e, "reader_shortcut")}
               />
               <small
                 >Click in the field and press the desired key combination</small

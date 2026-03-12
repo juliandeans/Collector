@@ -28,6 +28,30 @@ I build a macOS  app for quick text and image capture into Obsidian. Without ope
 
 ## Implemented in 1.1
 
+### 📖 Reader Panel
+A new left-side panel for quickly accessing your Obsidian notes — 
+without opening the app.
+- **Tab-based navigation** — Daily Note is always available, 
+  pin any `.md` file from your vault
+- **Hybrid Markdown Editor** — all content renders as formatted text; 
+  the active line shows raw Markdown for editing
+- **Image preview** — `![[image.jpg]]` and `![alt](url)` render inline
+- **Wikilink navigation** — click any `[[Link]]` to open the note in a 
+  new or the same tab; Cmd+Click always opens a new tab
+- **Open in Obsidian** — one click to open the current note in Obsidian
+- **Command Palette** (Cmd+P / Cmd+K) — search and open any vault note 
+- **`[[` Autocomplete** — inline dropdown when typing wikilinks
+- **Inline Search** (Cmd+F) — highlight and step through matches in the 
+  current note
+- **Content filtering** — optionally hide YAML frontmatter,
+  Dataview/code blocks, and Obsidian comments `%% ... %%`
+
+### ⚙️ Settings
+- Separate size settings for Note Window and Reader Window
+- Custom colors for accent, internal links, and external links
+- **Activation controls** — configure edge detection reaction time, 
+  require modifier keys (⌘ / ⌥ / ⇧ / ⌃), and exclude specific apps 
+  from triggering the panels
 
 ## Planned for 1.2
 - Multi-Vault Support

@@ -2532,10 +2532,14 @@
   .reader-container.palette-open .reader-topbar,
   .reader-container.palette-open .editor-scroll,
   .reader-container.palette-open .status-toast {
-    filter: blur(10px) saturate(0.82) brightness(0.62);
-    opacity: 0.5;
-    transform: scale(0.992);
+    filter: blur(4px) brightness(0.85);
+    opacity: 0.7;
+    transform: scale(0.996);
     pointer-events: none;
+    transition:
+      filter 0.2s,
+      opacity 0.2s,
+      transform 0.2s;
   }
 
   .accent-line {
@@ -3169,27 +3173,8 @@
     justify-content: center;
     padding: 52px 14px 14px;
     z-index: 120;
-    background: color-mix(
-      in srgb,
-      var(--app-background, #1e1e2e) 56%,
-      rgba(0, 0, 0, 0.58)
-    );
-    backdrop-filter: blur(28px) saturate(135%) brightness(0.74);
-    -webkit-backdrop-filter: blur(28px) saturate(135%) brightness(0.74);
-  }
-
-  .palette-backdrop::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.04) 0%,
-        rgba(0, 0, 0, 0.08) 100%
-      ),
-      rgba(0, 0, 0, 0.26);
-    pointer-events: none;
+    background: transparent;
+    pointer-events: auto;
   }
 
   .palette {
@@ -3263,6 +3248,7 @@
   }
 
   .palette-results {
+    flex: 1;
     max-height: 420px;
     overflow-y: auto;
     padding: 10px 8px 8px;
@@ -3271,11 +3257,13 @@
   .palette-item {
     display: flex;
     flex-direction: column;
+    gap: 2px;
     width: 100%;
     padding: 10px 12px;
     border-radius: 12px;
     cursor: pointer;
     text-align: left;
+    transition: background var(--transition-fast);
   }
 
   .palette-item.selected {
