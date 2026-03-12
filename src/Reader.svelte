@@ -1,7 +1,7 @@
 <script>
   import { convertFileSrc, invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import { getReaderIconComponent } from "./lib/reader-icons.js";
 
   let tabs = [];
@@ -16,6 +16,7 @@
   let codeblockMap = new Map();
   let hiddenBlockMap = new Map();
   const imagePathCache = new Map();
+  const scrollPositions = new Map();
   let appSettings = {
     vault_name: "Vault",
     vault_path: "",
@@ -1033,6 +1034,20 @@
     await renderContentToEditor(rawContent);
   }
 
+  function saveScrollPosition() {
+    const currentTab = tabs[activeTabIndex];
+    if (!currentTab || !scrollRef) return;
+    scrollPositions.set(currentTab.path, scrollRef.scrollTop);
+  }
+
+  async function restoreScrollPosition(path) {
+    await tick();
+    requestAnimationFrame(() => {
+      if (!scrollRef) return;
+      scrollRef.scrollTop = scrollPositions.get(path) ?? 0;
+    });
+  }
+
   async function loadTab(index, forceReload = false) {
     const tab = tabs[index];
     if (!tab) return;
@@ -1040,6 +1055,9 @@
     if (!forceReload && tab.loaded) {
       await loadEditorContent(tab.content);
       missingFileMessage = tab.missing ? tab.missingMessage || "" : "";
+      if (index === activeTabIndex) {
+        await restoreScrollPosition(tab.path);
+      }
       return;
     }
 
@@ -1055,6 +1073,7 @@
       if (index === activeTabIndex) {
         await loadEditorContent(content);
         missingFileMessage = "";
+        await restoreScrollPosition(tab.path);
       }
     } catch (error) {
       const message = normalizeError(error);
@@ -1072,6 +1091,7 @@
       if (index === activeTabIndex) {
         await loadEditorContent("");
         missingFileMessage = missingMessage;
+        await restoreScrollPosition(tab.path);
       }
 
       if (!isFileMissingError(error)) {
@@ -1081,6 +1101,7 @@
   }
 
   async function activateTab(index, forceReload = false) {
+    saveScrollPosition();
     if (index !== activeTabIndex) {
       finalizeActiveBlock();
       await flushPendingSave(false);
@@ -1256,7 +1277,9 @@
   async function closeActiveTab() {
     if (activeTabIndex === 0 || !activeTab) return;
 
+    saveScrollPosition();
     await flushPendingSave(false);
+    scrollPositions.delete(activeTab.path);
 
     const nextTabs = tabs.filter((_, index) => index !== activeTabIndex);
     const nextIndex = Math.max(activeTabIndex - 1, 0);
@@ -1270,7 +1293,9 @@
     if (!tab || tab.kind !== "opened") return;
 
     closeTabContextMenu();
+    saveScrollPosition();
     await flushPendingSave(false);
+    scrollPositions.delete(tab.path);
 
     const nextTabs = tabs.filter((_, tabIndex) => tabIndex !== index);
     const nextIndex =
@@ -1377,6 +1402,7 @@
     const currentTab = tabs[activeTabIndex];
     if (!currentTab) return;
 
+    saveScrollPosition();
     const openNewTab = forceNewTab || currentTab.isPinned;
 
     if (openNewTab) {
@@ -1445,6 +1471,7 @@
     const currentTab = tabs[activeTabIndex];
     if (!currentTab?.history?.length) return;
 
+    saveScrollPosition();
     await forceSave(false);
     const previousPath = currentTab.history[currentTab.history.length - 1];
     const note = vaultNotes.find((entry) => entry.path === previousPath);
