@@ -19,6 +19,7 @@ export const defaultSettings = {
   default_image_width: '600',
   entry_header: '#### HH:mm',
   global_shortcut: 'Cmd+Shift+N',
+  global_shortcut_closes_window: false,
   
   compression_max_kb: 200,
   edge_detection_enabled: true,
@@ -38,6 +39,7 @@ export const defaultSettings = {
   save_to_daily_shortcut: 'Cmd+Enter',
   save_as_note_shortcut: 'Cmd+Shift+Enter',
   reader_shortcut: 'Cmd+Shift+R',
+  reader_shortcut_closes_window: false,
   reader_edge_enabled: true,
   reader_hide_frontmatter: true,
   reader_hide_dataview: true,

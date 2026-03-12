@@ -89,6 +89,8 @@ pub struct Settings {
     pub default_image_width: String,
     pub entry_header: String,
     pub global_shortcut: String,
+    #[serde(default = "default_false")]
+    pub global_shortcut_closes_window: bool,
     #[serde(default = "default_capture_text_shortcut")]
     pub capture_text_shortcut: String,
     pub compression_max_kb: u32,
@@ -110,6 +112,8 @@ pub struct Settings {
     pub pinned_notes: Vec<PinnedNote>,
     #[serde(default = "default_reader_shortcut")]
     pub reader_shortcut: String,
+    #[serde(default = "default_false")]
+    pub reader_shortcut_closes_window: bool,
     #[serde(default = "default_true")]
     pub reader_edge_enabled: bool,
     #[serde(default = "default_true")]
@@ -151,6 +155,10 @@ fn default_edge_enabled() -> bool {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_false() -> bool {
+    false
 }
 
 fn default_reaction_time_ms() -> u64 {
@@ -276,6 +284,7 @@ impl Default for Settings {
             default_image_width: default_image_width(),
             entry_header: "#### HH:mm".to_string(),
             global_shortcut: "Cmd+Shift+N".to_string(),
+            global_shortcut_closes_window: default_false(),
             capture_text_shortcut: default_capture_text_shortcut(),
             compression_max_kb: 200,
             edge_detection_enabled: true,
@@ -287,6 +296,7 @@ impl Default for Settings {
             save_as_note_shortcut: default_save_as_note_shortcut(),
             pinned_notes: Vec::new(),
             reader_shortcut: default_reader_shortcut(),
+            reader_shortcut_closes_window: default_false(),
             reader_edge_enabled: default_true(),
             reader_hide_frontmatter: default_true(),
             reader_hide_dataview: default_true(),

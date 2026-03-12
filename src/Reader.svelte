@@ -1452,14 +1452,10 @@
 
   async function restoreScrollPosition(path) {
     await tick();
-    await new Promise((resolve) => {
-      requestAnimationFrame(() => {
-        if (scrollRef) {
-          scrollRef.scrollTop = scrollPositions.get(path) ?? 0;
-        }
-        resolve();
-      });
-    });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    if (!scrollRef) return;
+    scrollRef.scrollTop = scrollPositions.get(path) ?? 0;
+    await new Promise((resolve) => requestAnimationFrame(resolve));
   }
 
   async function loadTab(index, forceReload = false) {

@@ -1032,6 +1032,13 @@
               <small
                 >Click in the field and press the desired key combination</small
               >
+              <label class="checkbox">
+                <input
+                  type="checkbox"
+                  bind:checked={settings.global_shortcut_closes_window}
+                />
+                <span>Close the window when opened</span>
+              </label>
             </div>
             <div class="field">
               <label for="capture_text_shortcut">Copy Text to Collector</label>
@@ -1059,6 +1066,13 @@
               <small
                 >Click in the field and press the desired key combination</small
               >
+              <label class="checkbox">
+                <input
+                  type="checkbox"
+                  bind:checked={settings.reader_shortcut_closes_window}
+                />
+                <span>Close the window when opened</span>
+              </label>
             </div>
             <div class="field">
               <label for="save_to_daily_shortcut">Save to Daily Note</label>

@@ -52,12 +52,22 @@ impl ShortcutManager {
 
         log::info!("Registering shortcut handler...");
         let app_handle = app.clone();
+        let closes_window = settings.global_shortcut_closes_window;
         app.global_shortcut()
             .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
                 if event.state == ShortcutState::Pressed {
                     log::info!("Global shortcut triggered (open window)");
                     let app_handle2 = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
+                        if let Some(window) = app_handle2.get_webview_window("capture") {
+                            if closes_window && window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                                let state = app_handle2.state::<crate::AppState>();
+                                state.edge_detector.set_capture_open(false).await;
+                                return;
+                            }
+                        }
+
                         // Open/focus capture window and reset UI state
                         let _ = app_handle2.emit("show_capture", ());
                         if let Some(window) = app_handle2.get_webview_window("capture") {
@@ -293,12 +303,21 @@ impl ShortcutManager {
 
         log::info!("Registering reader shortcut handler...");
         let app_handle = app.clone();
+        let closes_window = settings.reader_shortcut_closes_window;
         app.global_shortcut()
             .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
                 if event.state == ShortcutState::Pressed {
                     log::info!("Reader shortcut triggered");
                     let app_handle2 = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
+                        if let Some(window) = app_handle2.get_webview_window("reader") {
+                            if closes_window && window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                                let state = app_handle2.state::<crate::AppState>();
+                                state.edge_detector.set_reader_open(false).await;
+                                return;
+                            }
+                        }
                         let _ = app_handle2.emit("show_reader", ());
                     });
                 }
