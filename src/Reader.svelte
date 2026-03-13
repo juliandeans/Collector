@@ -3,24 +3,18 @@
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy, tick } from "svelte";
   import CommandPalette from "./lib/reader/CommandPalette.svelte";
+  import ReaderEditor from "./lib/reader/ReaderEditor.svelte";
   import ReaderTopBar from "./lib/reader/ReaderTopBar.svelte";
   import SearchBar from "./lib/reader/SearchBar.svelte";
   import StatusToast from "./lib/reader/StatusToast.svelte";
   import TabContextMenu from "./lib/reader/TabContextMenu.svelte";
   import {
     imagePathCache,
-    markdownLineToHtml,
-    markdownToHtml,
     normalizeNewlines,
     parseRawBlocks,
     preprocessContent,
-    warmImagesInText,
   } from "./lib/reader/contentProcessing.js";
-  import {
-    composeContentFromMarkdown,
-    elementToMarkdownLine,
-    htmlToMarkdown,
-  } from "./lib/reader/editorSerialization.js";
+  import { composeContentFromMarkdown } from "./lib/reader/editorSerialization.js";
 
   let tabs = [];
   let activeTabIndex = 0;
@@ -81,19 +75,14 @@
     tabIndex: -1,
   };
 
-  let editorRef;
-  let scrollRef;
+  let editorComponent;
   let paletteInputRef;
-  let isComposing = false;
-  let isRenderingContent = false;
-  let activeParagraphEl = null;
   let saveTimeout;
   let pendingSave = null;
   let statusTimeout;
   let savedIndicatorTimeout;
   let unlistenShowReader;
   let unlistenSettingsChanged;
-  let renderRequestId = 0;
 
   $: activeTab = tabs[activeTabIndex] ?? null;
   $: fileMissing = missingFileMessage.trim() !== "";
@@ -269,6 +258,7 @@
     autocompleteIndex = 0;
     autocompleteRange = null;
     autocompleteResults = [];
+    editorComponent?.clearAutocomplete?.();
   }
 
   function clearHighlights() {
@@ -300,20 +290,21 @@
 
   function scrollToMatch(index) {
     const range = searchMatches[index];
-    if (!range || !scrollRef) return;
+    const scrollEl = editorComponent?.getScrollElement?.();
+    if (!range || !scrollEl) return;
 
     const rect = range.getClientRects()[0] ?? range.getBoundingClientRect();
-    const scrollRect = scrollRef.getBoundingClientRect();
+    const scrollRect = scrollEl.getBoundingClientRect();
     if (!rect) return;
 
     if (rect.top < scrollRect.top || rect.bottom > scrollRect.bottom) {
       const targetTop =
-        scrollRef.scrollTop +
+        scrollEl.scrollTop +
         (rect.top - scrollRect.top) -
-        scrollRef.clientHeight / 2 +
+        scrollEl.clientHeight / 2 +
         rect.height / 2;
 
-      scrollRef.scrollTo({
+      scrollEl.scrollTo({
         top: Math.max(targetTop, 0),
         behavior: "smooth",
       });
@@ -329,10 +320,11 @@
     searchMatches = [];
     searchIndex = 0;
 
-    if (!searchQuery.trim() || !editorRef) return;
+    const editorEl = editorComponent?.getEditorElement?.();
+    if (!searchQuery.trim() || !editorEl) return;
 
     const walker = document.createTreeWalker(
-      editorRef,
+      editorEl,
       NodeFilter.SHOW_TEXT,
       null,
     );
@@ -389,90 +381,6 @@
       searchInputRef?.focus();
       searchInputRef?.select();
     });
-  }
-
-  function handleSearchKeydown(event) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      stepSearch(event.shiftKey ? -1 : 1);
-      return;
-    }
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeSearch();
-    }
-  }
-
-  function checkAutocomplete() {
-    if (!editorRef) return;
-
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) {
-      closeAutocomplete();
-      return;
-    }
-
-    const range = selection.getRangeAt(0);
-    const node = range.startContainer;
-    if (node.nodeType !== Node.TEXT_NODE) {
-      closeAutocomplete();
-      return;
-    }
-
-    const text = node.textContent ?? "";
-    const cursor = range.startOffset;
-    const before = text.slice(0, cursor);
-    const triggerIndex = before.lastIndexOf("[[");
-
-    if (triggerIndex === -1) {
-      closeAutocomplete();
-      return;
-    }
-
-    const between = before.slice(triggerIndex + 2);
-    if (between.includes("]]") || between.includes("\n")) {
-      closeAutocomplete();
-      return;
-    }
-
-    autocompleteQuery = between;
-    autocompleteResults = filterVaultNotes(autocompleteQuery);
-    autocompleteIndex = 0;
-
-    const triggerRange = document.createRange();
-    triggerRange.setStart(node, triggerIndex);
-    triggerRange.collapse(true);
-    autocompleteRange = triggerRange;
-    showAutocomplete = autocompleteResults.length > 0;
-  }
-
-  function insertAutocompleteResult(note) {
-    if (!autocompleteRange) return;
-
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-
-    const currentRange = selection.getRangeAt(0);
-    const insertRange = document.createRange();
-    insertRange.setStart(
-      autocompleteRange.startContainer,
-      autocompleteRange.startOffset,
-    );
-    insertRange.setEnd(currentRange.startContainer, currentRange.startOffset);
-    insertRange.deleteContents();
-
-    const linkText = document.createTextNode(`[[${note.name}]]`);
-    insertRange.insertNode(linkText);
-
-    const afterRange = document.createRange();
-    afterRange.setStartAfter(linkText);
-    afterRange.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(afterRange);
-
-    closeAutocomplete();
-    handleInput();
   }
 
   function createImportPlaceholder(filename = "image") {
@@ -540,6 +448,7 @@
     markdownLinks = [],
     { syncEditor = true } = {},
   ) {
+    const editorRef = editorComponent?.getEditorElement?.();
     if (!editorRef || markdownLinks.length === 0) return;
 
     editorRef.focus();
@@ -553,7 +462,7 @@
     if (!selection || selection.rangeCount === 0) {
       editorRef.append(document.createTextNode(content));
       if (syncEditor) {
-        handleInput();
+        handleEditorChange();
       }
       return;
     }
@@ -562,7 +471,7 @@
     if (!editorRef.contains(range.commonAncestorContainer)) {
       editorRef.append(document.createTextNode(content));
       if (syncEditor) {
-        handleInput();
+        handleEditorChange();
       }
       return;
     }
@@ -578,7 +487,7 @@
     selection.addRange(afterRange);
 
     if (syncEditor) {
-      handleInput();
+      handleEditorChange();
     }
   }
 
@@ -602,6 +511,117 @@
     scheduleSave(rawContent);
   }
 
+  async function handleImportedImages(detail) {
+    if (detail?.type === "drop") {
+      isDragging = false;
+      dragCounter = 0;
+      const items = Array.from(detail.items || []);
+      const files = Array.from(detail.files || []);
+      if (files.length === 0) return;
+
+      try {
+        isImportingImages = true;
+
+        const jobs = files.map((file, index) => {
+          const item = items[index];
+          const itemFile =
+            item?.kind === "file" ? (item.getAsFile?.() ?? null) : null;
+          const fallbackPath =
+            file.path ||
+            file.webkitRelativePath ||
+            itemFile?.path ||
+            itemFile?.webkitRelativePath ||
+            null;
+          const placeholder = createImportPlaceholder(file.name || fallbackPath);
+
+          return {
+            file,
+            fallbackPath,
+            placeholder,
+          };
+        });
+
+        insertImportedMarkdown(
+          jobs.map((job) => job.placeholder),
+          { syncEditor: false },
+        );
+
+        const results = await Promise.allSettled(
+          jobs.map((job) => importImageFile(job.file, job.fallbackPath)),
+        );
+
+        const replacements = results.map((result, index) => {
+          if (result.status === "fulfilled") {
+            return {
+              placeholder: jobs[index].placeholder,
+              markdown: result.value,
+            };
+          }
+
+          showStatus(normalizeError(result.reason), "error", 2200);
+          return {
+            placeholder: jobs[index].placeholder,
+            markdown: "",
+          };
+        });
+
+        await finalizeImportedImages(replacements);
+      } catch (error) {
+        showStatus(normalizeError(error), "error", 2200);
+      } finally {
+        isImportingImages = false;
+      }
+      return;
+    }
+
+    if (detail?.type === "paste") {
+      const imageItems = Array.from(detail.items || []);
+      if (imageItems.length === 0) return;
+
+      try {
+        isImportingImages = true;
+
+        const jobs = imageItems
+          .map((item) => item.getAsFile?.())
+          .filter(Boolean)
+          .map((file) => ({
+            file,
+            placeholder: createImportPlaceholder(file.name),
+          }));
+
+        insertImportedMarkdown(
+          jobs.map((job) => job.placeholder),
+          { syncEditor: false },
+        );
+
+        const results = await Promise.allSettled(
+          jobs.map((job) => importImageFile(job.file, null)),
+        );
+
+        const replacements = results.map((result, index) => {
+          if (result.status === "fulfilled") {
+            return {
+              placeholder: jobs[index].placeholder,
+              markdown: result.value,
+            };
+          }
+
+          showStatus(normalizeError(result.reason), "error", 2200);
+          return {
+            placeholder: jobs[index].placeholder,
+            markdown: "",
+          };
+        });
+
+        await finalizeImportedImages(replacements);
+      } catch (error) {
+        showStatus(normalizeError(error), "error", 2200);
+      } finally {
+        isImportingImages = false;
+      }
+    }
+  }
+
   async function handleEditorDrop(event) {
     if (!event.dataTransfer) return;
 
@@ -613,113 +633,11 @@
     event.stopPropagation();
     isDragging = false;
     dragCounter = 0;
-
-    try {
-      isImportingImages = true;
-
-      const jobs = files.map((file, index) => {
-        const item = items[index];
-        const itemFile =
-          item?.kind === "file" ? (item.getAsFile?.() ?? null) : null;
-        const fallbackPath =
-          file.path ||
-          file.webkitRelativePath ||
-          itemFile?.path ||
-          itemFile?.webkitRelativePath ||
-          null;
-        const placeholder = createImportPlaceholder(file.name || fallbackPath);
-
-        return {
-          file,
-          fallbackPath,
-          placeholder,
-        };
-      });
-
-      insertImportedMarkdown(
-        jobs.map((job) => job.placeholder),
-        { syncEditor: false },
-      );
-
-      const results = await Promise.allSettled(
-        jobs.map((job) => importImageFile(job.file, job.fallbackPath)),
-      );
-
-      const replacements = results.map((result, index) => {
-        if (result.status === "fulfilled") {
-          return {
-            placeholder: jobs[index].placeholder,
-            markdown: result.value,
-          };
-        }
-
-        showStatus(normalizeError(result.reason), "error", 2200);
-        return {
-          placeholder: jobs[index].placeholder,
-          markdown: "",
-        };
-      });
-
-      await finalizeImportedImages(replacements);
-    } catch (error) {
-      showStatus(normalizeError(error), "error", 2200);
-    } finally {
-      isImportingImages = false;
-    }
-  }
-
-  async function handleEditorPaste(event) {
-    const items = Array.from(event.clipboardData?.items || []);
-    const imageItems = items.filter(
-      (item) => item.kind === "file" && item.type.startsWith("image/"),
-    );
-
-    if (imageItems.length === 0) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    try {
-      isImportingImages = true;
-
-      const jobs = imageItems
-        .map((item) => item.getAsFile?.())
-        .filter(Boolean)
-        .map((file) => ({
-          file,
-          placeholder: createImportPlaceholder(file.name),
-        }));
-
-      insertImportedMarkdown(
-        jobs.map((job) => job.placeholder),
-        { syncEditor: false },
-      );
-
-      const results = await Promise.allSettled(
-        jobs.map((job) => importImageFile(job.file, null)),
-      );
-
-      const replacements = results.map((result, index) => {
-        if (result.status === "fulfilled") {
-          return {
-            placeholder: jobs[index].placeholder,
-            markdown: result.value,
-          };
-        }
-
-        showStatus(normalizeError(result.reason), "error", 2200);
-        return {
-          placeholder: jobs[index].placeholder,
-          markdown: "",
-        };
-      });
-
-      await finalizeImportedImages(replacements);
-    } catch (error) {
-      showStatus(normalizeError(error), "error", 2200);
-    } finally {
-      isImportingImages = false;
-    }
+    await handleImportedImages({
+      type: "drop",
+      items,
+      files,
+    });
   }
 
   function handleDragEnter(event) {
@@ -756,41 +674,6 @@
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
     isDragging = true;
-  }
-
-  function handleAutocompleteKeydown(event) {
-    if (!showAutocomplete) return false;
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      autocompleteIndex = Math.min(
-        autocompleteIndex + 1,
-        autocompleteResults.length - 1,
-      );
-      return true;
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      autocompleteIndex = Math.max(autocompleteIndex - 1, 0);
-      return true;
-    }
-
-    if (event.key === "Enter") {
-      event.preventDefault();
-      if (autocompleteResults[autocompleteIndex]) {
-        insertAutocompleteResult(autocompleteResults[autocompleteIndex]);
-      }
-      return true;
-    }
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeAutocomplete();
-      return true;
-    }
-
-    return false;
   }
 
   function applySettings(settings) {
@@ -859,95 +742,8 @@
     });
   }
 
-  function placeCursorAtEnd(el) {
-    if (!el) return;
-
-    const range = document.createRange();
-    const selection = window.getSelection();
-    if (!selection) return;
-
-    range.selectNodeContents(el);
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
-  }
-
-  function rerenderBlock(el) {
-    if (!el || !editorRef?.contains(el)) return null;
-
-    const raw = elementToMarkdownLine(el);
-    if (raw === null) return el;
-
-    const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = markdownLineToHtml(raw);
-    const newEl = tempDiv.firstElementChild;
-    if (!newEl) return el;
-
-    el.replaceWith(newEl);
-    return newEl;
-  }
-
-  function finalizeActiveBlock() {
-    if (activeParagraphEl && editorRef?.contains(activeParagraphEl)) {
-      rerenderBlock(activeParagraphEl);
-    }
-    activeParagraphEl = null;
-  }
-
-  function switchActiveBlock(newEl) {
-    if (activeParagraphEl && editorRef?.contains(activeParagraphEl)) {
-      rerenderBlock(activeParagraphEl);
-      activeParagraphEl = null;
-    }
-
-    if (!newEl || !editorRef?.contains(newEl)) {
-      activeParagraphEl = null;
-      return;
-    }
-
-    const raw = elementToMarkdownLine(newEl);
-    if (raw === null) {
-      activeParagraphEl = null;
-      return;
-    }
-
-    activeParagraphEl = newEl;
-    activeParagraphEl.classList.add("raw-mode");
-    activeParagraphEl.textContent = raw;
-    placeCursorAtEnd(activeParagraphEl);
-  }
-
-  function handleSelectionChange() {
-    if (isRenderingContent || !editorRef) return;
-
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    if (!selection.isCollapsed) return;
-
-    const node = selection.getRangeAt(0).startContainer;
-    const anchorEl =
-      node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-    if (anchorEl?.closest?.(".wikilink")) return;
-    if (!editorRef.contains(node)) return;
-
-    let el = anchorEl;
-    while (el && el !== editorRef && el.parentElement !== editorRef) {
-      el = el.parentElement;
-    }
-
-    if (!el || el === editorRef || el === activeParagraphEl) return;
-    if (el.classList?.contains("codeblock-pill")) return;
-
-    switchActiveBlock(el);
-  }
-
-  function handleEditorBlur(event) {
-    if (editorRef?.contains(event.relatedTarget)) return;
-    finalizeActiveBlock();
-  }
-
   function getCurrentMarkdown() {
-    if (!editorRef) {
+    if (!editorComponent) {
       return preprocessContent(rawContent, {
         appSettings,
         codeblockMap,
@@ -958,7 +754,7 @@
       });
     }
 
-    return normalizeNewlines(htmlToMarkdown(editorRef));
+    return editorComponent.getMarkdown();
   }
 
   async function renderContentToEditor(raw = "") {
@@ -971,37 +767,13 @@
       },
     });
     blocks = parseRawBlocks(processed);
-    activeParagraphEl = null;
 
-    if (!editorRef) return;
-    if (scrollRef) scrollRef.scrollTop = 0;
-
-    const requestId = ++renderRequestId;
-    isRenderingContent = true;
-    editorRef.innerHTML = markdownToHtml(processed);
-    console.log(
-      "[CB] Pills in DOM:",
-      editorRef.querySelectorAll(".codeblock-pill").length,
-    );
-    console.log("[CB] innerHTML excerpt:", editorRef.innerHTML.slice(0, 300));
-    isRenderingContent = false;
-
-    const loadedAnyMissingImages = await warmImagesInText(processed);
-    if (!loadedAnyMissingImages) {
-      return;
-    }
-
-    if (requestId !== renderRequestId || !editorRef) {
-      return;
-    }
-
-    isRenderingContent = true;
-    editorRef.innerHTML = markdownToHtml(processed);
-    isRenderingContent = false;
+    if (!editorComponent) return;
+    await editorComponent.renderContent(raw);
   }
 
   async function loadEditorContent(raw = "") {
-    finalizeActiveBlock();
+    editorComponent?.finalizeBlock?.();
     closeAutocomplete();
     closeSearch();
     rawContent = normalizeNewlines(raw);
@@ -1011,24 +783,49 @@
 
   function saveScrollPosition() {
     const currentTab = tabs[activeTabIndex];
-    if (!currentTab || !scrollRef) return;
-    scrollPositions.set(currentTab.path, scrollRef.scrollTop);
-  }
-
-  function handleEditorScroll() {
-    saveScrollPosition();
+    if (!currentTab || !editorComponent) return;
+    scrollPositions.set(
+      currentTab.path,
+      editorComponent.getScrollTop?.() ?? 0,
+    );
   }
 
   async function restoreScrollPosition(path) {
-    await tick();
-    await new Promise((resolve) => {
-      requestAnimationFrame(() => {
-        if (scrollRef) {
-          scrollRef.scrollTop = scrollPositions.get(path) ?? 0;
-        }
-        resolve();
-      });
+    await editorComponent?.restoreScroll?.(path, scrollPositions);
+  }
+
+  function handleEditorChange() {
+    const markdown = getCurrentMarkdown();
+    blocks = parseRawBlocks(normalizeNewlines(markdown));
+    const content = composeContentFromMarkdown(markdown, {
+      strippedFrontmatter,
+      hiddenBlockMap,
+      codeblockMap,
     });
+    rawContent = content;
+    updateActiveTabContent(content);
+    scheduleSave(content);
+  }
+
+  async function handleEditorSaveRequest() {
+    await forceSave();
+  }
+
+  function handleEditorAutocompleteChange(event) {
+    showAutocomplete = event.detail.open;
+    autocompleteQuery = event.detail.query;
+    autocompleteResults = event.detail.results;
+    autocompleteRange = event.detail.range;
+    autocompleteIndex = event.detail.index ?? 0;
+  }
+
+  async function openExternalUrl(url) {
+    try {
+      await invoke("open_external_url", { url });
+    } catch (error) {
+      console.error("Failed to open external URL:", error);
+      showStatus("Failed to open link", "error", 2200);
+    }
   }
 
   async function loadTab(index, forceReload = false) {
@@ -1159,7 +956,7 @@
     saveScrollPosition();
     closeSearch();
     if (index !== activeTabIndex) {
-      finalizeActiveBlock();
+      editorComponent?.finalizeBlock?.();
       await flushPendingSave(false);
     }
 
@@ -1257,86 +1054,6 @@
     await forceSave(showConfirmation);
   }
 
-  function handleInput() {
-    if (isComposing || isRenderingContent || !editorRef) return;
-
-    const markdown = getCurrentMarkdown();
-    blocks = parseRawBlocks(normalizeNewlines(markdown));
-    const content = composeContentFromMarkdown(markdown, {
-      strippedFrontmatter,
-      hiddenBlockMap,
-      codeblockMap,
-    });
-    rawContent = content;
-    updateActiveTabContent(content);
-    scheduleSave(content);
-    checkAutocomplete();
-  }
-
-  function handleCompositionStart() {
-    isComposing = true;
-  }
-
-  function handleCompositionEnd() {
-    isComposing = false;
-    handleInput();
-  }
-
-  async function handleKeydown(event) {
-    const key = event.key.toLowerCase();
-
-    if (handleAutocompleteKeydown(event)) {
-      event.stopPropagation();
-      return;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && key === "f") {
-      event.preventDefault();
-      event.stopPropagation();
-      if (showSearch) {
-        searchInputRef?.focus();
-      } else {
-        openSearch();
-      }
-      return;
-    }
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      if (showAutocomplete) {
-        closeAutocomplete();
-        return;
-      }
-      if (showSearch) {
-        closeSearch();
-        return;
-      }
-      await hideReader();
-      return;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && key === "s") {
-      event.preventDefault();
-      event.stopPropagation();
-      await forceSave();
-      return;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && key === "k") {
-      event.preventDefault();
-      event.stopPropagation();
-      await openPalette();
-      return;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && key === "p") {
-      event.preventDefault();
-      event.stopPropagation();
-      await openPalette();
-    }
-  }
-
   function closeTabContextMenu() {
     tabContextMenu = {
       open: false,
@@ -1369,7 +1086,7 @@
   }
 
   async function closeActiveTab() {
-    if (activeTabIndex === 0 || !activeTab) return;
+    if (!activeTab || activeTab.kind !== "opened" || activeTab.isPinned) return;
 
     saveScrollPosition();
     await flushPendingSave(false);
@@ -1407,9 +1124,11 @@
 
   async function hideReader() {
     saveScrollPosition();
-    finalizeActiveBlock();
+    editorComponent?.finalizeBlock?.();
     closeAutocomplete();
     closeSearch();
+    isDragging = false;
+    dragCounter = 0;
     await flushPendingSave(false);
 
     try {
@@ -1537,33 +1256,6 @@
     await loadTab(activeTabIndex, true);
   }
 
-  function handleEditorMouseDown(event) {
-    const wikilink = event.target?.closest?.(".wikilink");
-    if (wikilink) {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const target = wikilink.dataset.target;
-      if (!target) return;
-
-      navigateToWikilink(target, event.metaKey || event.ctrlKey);
-      return;
-    }
-
-    const anchor = event.target?.closest?.("a[href]");
-    if (!anchor) return;
-
-    const href = anchor.getAttribute("href");
-    if (href && /^(https?:\/\/|obsidian:\/\/)/i.test(href)) {
-      event.preventDefault();
-      event.stopPropagation();
-      invoke("open_external_url", { url: href }).catch((error) => {
-        console.error("Failed to open external URL:", error);
-        showStatus("Failed to open link", "error", 2200);
-      });
-    }
-  }
-
   async function navigateBack() {
     const currentTab = tabs[activeTabIndex];
     if (!currentTab?.history?.length) return;
@@ -1625,10 +1317,6 @@
 
   async function handleGlobalKeydown(event) {
     const key = event.key.toLowerCase();
-
-    if (handleAutocompleteKeydown(event)) {
-      return;
-    }
 
     if (tabContextMenu.open && event.key === "Escape") {
       event.preventDefault();
@@ -1769,6 +1457,8 @@
     });
   }
 
+  // TODO: move to ReaderEditor once window-wide drag/drop can be preserved cleanly.
+
   onMount(async () => {
     try {
       await buildInitialTabs();
@@ -1776,7 +1466,9 @@
 
       unlistenShowReader = await listen("show_reader", async () => {
         saveScrollPosition();
-        finalizeActiveBlock();
+        editorComponent?.finalizeBlock?.();
+        isDragging = false;
+        dragCounter = 0;
         await flushPendingSave(false);
         if (tabs[activeTabIndex]) {
           await syncTabWithDisk(activeTabIndex);
@@ -1817,14 +1509,13 @@
           }
 
           if (filtersChanged) {
-            finalizeActiveBlock();
+            editorComponent?.finalizeBlock?.();
             imagePathCache.clear();
             await renderContentToEditor(rawContent);
           }
         },
       );
 
-      document.addEventListener("selectionchange", handleSelectionChange);
       window.addEventListener("keydown", handleGlobalKeydown);
     } catch (error) {
       showStatus(normalizeError(error), "error", 2400);
@@ -1836,7 +1527,6 @@
     clearTimeout(statusTimeout);
     clearTimeout(savedIndicatorTimeout);
     clearHighlights();
-    document.removeEventListener("selectionchange", handleSelectionChange);
     window.removeEventListener("keydown", handleGlobalKeydown);
     unlistenShowReader?.();
     unlistenSettingsChanged?.();
@@ -1899,36 +1589,37 @@
     on:closeTab={() => closeTabByIndex(tabContextMenu.tabIndex)}
   />
 
-  <div
-    class="editor-scroll"
-    bind:this={scrollRef}
-    on:scroll={handleEditorScroll}
-  >
-    {#if fileMissing}
-      <div class="missing-file-banner">{missingFileMessage}</div>
-    {/if}
-    <div
-      class="editor-body"
-      contenteditable="true"
-      bind:this={editorRef}
-      spellcheck="true"
-      role="textbox"
-      aria-multiline="true"
-      tabindex="0"
-      data-placeholder="Start writing..."
-      on:input={handleInput}
-      on:keydown={handleKeydown}
-      on:dragenter={handleDragEnter}
-      on:dragleave={handleDragLeave}
-      on:dragover={handleDragOver}
-      on:drop={handleEditorDrop}
-      on:paste={handleEditorPaste}
-      on:mousedown={handleEditorMouseDown}
-      on:blur={handleEditorBlur}
-      on:compositionstart={handleCompositionStart}
-      on:compositionend={handleCompositionEnd}
-    ></div>
-  </div>
+  <ReaderEditor
+    bind:this={editorComponent}
+    {rawContent}
+    {appSettings}
+    {vaultNotes}
+    {showSearch}
+    {showAutocomplete}
+    {autocompleteResults}
+    {autocompleteIndex}
+    missingFileMessage={fileMissing ? missingFileMessage : ""}
+    {codeblockMap}
+    {hiddenBlockMap}
+    setStrippedFrontmatter={(value) => {
+      strippedFrontmatter = value;
+    }}
+    on:change={handleEditorChange}
+    on:saveRequest={handleEditorSaveRequest}
+    on:openSearchRequest={openSearch}
+    on:closeSearchRequest={closeSearch}
+    on:openPaletteRequest={openPalette}
+    on:closeRequest={hideReader}
+    on:navigateWikilink={(event) =>
+      navigateToWikilink(event.detail.target, event.detail.newTab)}
+    on:openExternalLink={(event) => openExternalUrl(event.detail)}
+    on:importImages={(event) => handleImportedImages(event.detail)}
+    on:autocompleteChange={handleEditorAutocompleteChange}
+    on:autocompleteIndexChange={(event) => {
+      autocompleteIndex = event.detail;
+    }}
+    on:scroll={saveScrollPosition}
+  />
 
   {#if isDragging}
     <div class="drop-overlay"></div>
@@ -1964,7 +1655,8 @@
         class="autocomplete-item"
         class:selected={index === autocompleteIndex}
         type="button"
-        on:mousedown|preventDefault={() => insertAutocompleteResult(note)}
+        on:mousedown|preventDefault={() =>
+          editorComponent?.insertAutocompleteResult?.(note)}
         on:mouseenter={() => (autocompleteIndex = index)}
       >
         <span class="autocomplete-name">{note.name}</span>
@@ -2028,7 +1720,7 @@
   :global(.accent-line),
   :global(.reader-topbar),
   :global(.search-bar),
-  .editor-scroll,
+  :global(.editor-scroll),
   :global(.status-toast) {
     transition:
       filter 0.18s ease,
@@ -2054,7 +1746,7 @@
   .reader-container.palette-open :global(.accent-line),
   .reader-container.palette-open :global(.reader-topbar),
   .reader-container.palette-open :global(.search-bar),
-  .reader-container.palette-open .editor-scroll,
+  .reader-container.palette-open :global(.editor-scroll),
   .reader-container.palette-open :global(.status-toast) {
     filter: blur(4px) brightness(0.85);
     opacity: 0.7;
@@ -2064,128 +1756,6 @@
       filter 0.2s,
       opacity 0.2s,
       transform 0.2s;
-  }
-
-  .editor-scroll {
-    position: relative;
-    flex: 1;
-    overflow-y: auto;
-    background: transparent;
-  }
-
-  .missing-file-banner {
-    margin: 12px 16px 0;
-    padding: 10px 12px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.72);
-    font-size: 12px;
-    border: 0.5px solid rgba(255, 255, 255, 0.08);
-  }
-
-  .editor-body {
-    min-height: 100%;
-    padding: 16px 20px 40px;
-    outline: none;
-    font-family: inherit;
-    font-size: inherit;
-    color: inherit;
-    line-height: 1.7;
-    word-break: break-word;
-    white-space: pre-wrap;
-    caret-color: var(--accent-color, #8b5cf6);
-    -webkit-user-modify: read-write;
-  }
-
-  .editor-body[data-placeholder]:empty::before {
-    content: attr(data-placeholder);
-    color: var(--placeholder-color);
-    pointer-events: none;
-  }
-
-  .editor-body :global(p) {
-    margin: 0;
-    min-height: 1.7em;
-  }
-
-  .editor-body :global(h1) {
-    margin: 8px 0 4px;
-    font-size: 1.5em;
-    font-weight: 700;
-    line-height: 1.25;
-  }
-
-  .editor-body :global(h2) {
-    margin: 6px 0 3px;
-    font-size: 1.25em;
-    font-weight: 600;
-    line-height: 1.3;
-  }
-
-  .editor-body :global(h3) {
-    margin: 4px 0 2px;
-    font-size: 1.1em;
-    font-weight: 600;
-    line-height: 1.35;
-  }
-
-  .editor-body :global(h4) {
-    margin: 3px 0 2px;
-    font-size: 1em;
-    font-weight: 600;
-    line-height: 1.4;
-  }
-
-  .editor-body :global(h5) {
-    margin: 2px 0 1px;
-    font-size: 0.94em;
-    font-weight: 600;
-    line-height: 1.45;
-    letter-spacing: 0.01em;
-  }
-
-  .editor-body :global(h6) {
-    margin: 2px 0 1px;
-    font-size: 0.88em;
-    font-weight: 600;
-    line-height: 1.45;
-    letter-spacing: 0.02em;
-    color: var(--text-secondary);
-  }
-
-  .editor-body :global(blockquote) {
-    margin: 2px 0;
-    padding-left: 12px;
-    border-left: 3px solid var(--accent-color, #8b5cf6);
-    color: var(--text-secondary);
-  }
-
-  .editor-body :global(.callout) {
-    margin: 6px 0;
-    padding: 10px 14px;
-    border-left: 3px solid;
-    border-radius: 6px;
-    white-space: normal;
-  }
-
-  .editor-body :global(.callout-title) {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-    font-size: 13px;
-    font-weight: 600;
-  }
-
-  .editor-body :global(.callout-icon) {
-    font-size: 14px;
-    line-height: 1;
-  }
-
-  .editor-body :global(.callout-content) {
-    font-size: 13px;
-    line-height: 1.6;
-    opacity: 0.9;
   }
 
   :global(.callout-blue) {
@@ -2238,129 +1808,6 @@
   :global(.callout-orange .callout-content),
   :global(.callout-gray .callout-content) {
     color: var(--app-text-color, #ffffff);
-  }
-
-  .editor-body :global(code) {
-    padding: 1px 5px;
-    border-radius: 3px;
-    background: rgba(0, 0, 0, 0.08);
-    font-family: "SF Mono", Monaco, monospace;
-    font-size: 0.88em;
-  }
-
-  .editor-body :global(strong) {
-    font-weight: 600;
-  }
-
-  .editor-body :global(em) {
-    font-style: italic;
-  }
-
-  .editor-body :global(a) {
-    color: var(--external-link-color, #60a5fa);
-    text-decoration: none;
-    cursor: pointer;
-  }
-
-  .editor-body :global(a:hover) {
-    text-decoration: underline;
-  }
-
-  .editor-body :global(hr) {
-    margin: 8px 0;
-    border: none;
-    border-top: 1px solid var(--border-color);
-  }
-
-  .editor-body :global(p.list-item)::before {
-    content: "•";
-    margin-right: 8px;
-    color: var(--text-secondary);
-  }
-
-  .editor-body :global(.md-checkbox) {
-    margin-right: 6px;
-    accent-color: var(--accent-color, #8b5cf6);
-    cursor: pointer;
-  }
-
-  .editor-body :global(.wikilink) {
-    color: var(--internal-link-color, #a78bfa);
-    opacity: 0.9;
-    cursor: pointer;
-    border-bottom: 1px solid transparent;
-    transition:
-      border-color 0.15s ease,
-      opacity 0.15s ease;
-  }
-
-  .editor-body :global(.wikilink:hover) {
-    opacity: 1;
-    border-bottom-color: var(--internal-link-color, #a78bfa);
-  }
-
-  .editor-body :global(.md-image) {
-    display: block;
-    max-width: 100%;
-    height: auto;
-    margin: 8px 0;
-    border-radius: 6px;
-    cursor: default;
-  }
-
-  .editor-body :global(p:has(.md-image)) {
-    margin: 4px 0;
-  }
-
-  .editor-body :global(.md-image[src=""]) {
-    display: none;
-  }
-
-  .editor-body :global(.codeblock-pill) {
-    display: flex;
-    align-items: center;
-    width: fit-content;
-    gap: 6px;
-    margin: 4px 0 4px auto;
-    padding: 4px 8px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 0.5px solid rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.78);
-    cursor: default;
-  }
-
-  .editor-body :global(.codeblock-pill):hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .editor-body :global(.codeblock-icon) {
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-    background: var(--accent-color, #8b5cf6);
-    opacity: 0.85;
-  }
-
-  .editor-body :global(.codeblock-lang) {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: lowercase;
-  }
-
-  .editor-body :global(.hidden-marker) {
-    display: none;
-  }
-
-  .editor-body :global(.raw-mode) {
-    margin-left: -4px;
-    padding-left: 4px;
-    border-radius: 3px;
-    background: color-mix(
-      in srgb,
-      var(--accent-color, #8b5cf6) 10%,
-      transparent
-    );
   }
 
   .autocomplete-dropdown {
@@ -2429,18 +1876,5 @@
   :global(::highlight(search-active)) {
     background-color: rgba(234, 179, 8, 0.8);
     color: #1a1a1a;
-  }
-
-  .editor-scroll::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .editor-scroll::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .editor-scroll::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.12);
-    border-radius: 3px;
   }
 </style>
