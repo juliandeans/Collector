@@ -36,6 +36,8 @@
     reader_hide_frontmatter: true,
     reader_hide_dataview: true,
     reader_hide_obsidian_comments: true,
+    reader_hide_inline_fields: true,
+    reader_hide_html: true,
   };
   let statusMessage = "";
   let statusType = "";
@@ -106,6 +108,66 @@
     return content.replace(/\r\n/g, "\n");
   }
 
+  const INLINE_FIELD_LINE_PATTERN = /^\s*\w[\w\s-]*::\s*.*$/;
+  const INLINE_FIELD_SEGMENT_PATTERN =
+    /(^|[\s([{;,:-])(\[?\w[\w\s-]*::\s*(?:[^\s[\](){}<>]+(?:\s+(?!\w[\w\s-]*::)[^\s[\](){}<>]+)*)?\]?)(?=$|[\s)\],;:.!?-])/g;
+  const HTML_TAG_NAMES = [
+    "a",
+    "abbr",
+    "article",
+    "aside",
+    "b",
+    "blockquote",
+    "br",
+    "center",
+    "code",
+    "details",
+    "div",
+    "em",
+    "figcaption",
+    "figure",
+    "footer",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "header",
+    "hr",
+    "i",
+    "iframe",
+    "img",
+    "li",
+    "main",
+    "mark",
+    "ol",
+    "p",
+    "pre",
+    "script",
+    "section",
+    "small",
+    "span",
+    "strong",
+    "style",
+    "sub",
+    "summary",
+    "sup",
+    "table",
+    "tbody",
+    "td",
+    "tfoot",
+    "th",
+    "thead",
+    "tr",
+    "u",
+    "ul",
+  ];
+  const HTML_TAG_PATTERN = new RegExp(
+    `<\\/?(?:${HTML_TAG_NAMES.join("|")})(?=[\\s>/])[^>]*>`,
+    "gi",
+  );
+
   function isFileDrag(event) {
     const types = event.dataTransfer?.types;
     if (types && Array.from(types).includes("Files")) return true;
@@ -127,6 +189,15 @@
       "--external-link-color",
       settings.external_link_color ?? "#60a5fa",
     );
+  }
+
+  function getCachedImageSrc(path) {
+    return imagePathCache.get(path) ?? "";
+  }
+
+  function setCachedImageSrc(path, src) {
+    if (!path || !src) return;
+    imagePathCache.set(path, src);
   }
 
   function parseRawBlocks(content = "") {
@@ -870,6 +941,11 @@
       reader_hide_obsidian_comments:
         settings.reader_hide_obsidian_comments ??
         appSettings.reader_hide_obsidian_comments,
+      reader_hide_inline_fields:
+        settings.reader_hide_inline_fields ??
+        appSettings.reader_hide_inline_fields,
+      reader_hide_html:
+        settings.reader_hide_html ?? appSettings.reader_hide_html,
     };
     applyColorSettings(appSettings);
   }
@@ -879,7 +955,59 @@
       reader_hide_frontmatter: settings.reader_hide_frontmatter,
       reader_hide_dataview: settings.reader_hide_dataview,
       reader_hide_obsidian_comments: settings.reader_hide_obsidian_comments,
+      reader_hide_inline_fields: settings.reader_hide_inline_fields,
+      reader_hide_html: settings.reader_hide_html,
     };
+  }
+
+  function stashHiddenBlock(block = "") {
+    const hiddenId = `__HD_${hiddenBlockMap.size}__`;
+    hiddenBlockMap.set(hiddenId, block);
+    return `\u200B${hiddenId}`;
+  }
+
+  function stripInlineFields(text = "") {
+    return text
+      .split("\n")
+      .map((line) => {
+        if (INLINE_FIELD_LINE_PATTERN.test(line)) {
+          return stashHiddenBlock(line);
+        }
+
+        const stripped = line.replace(
+          INLINE_FIELD_SEGMENT_PATTERN,
+          (_, prefix, field) => `${prefix}${stashHiddenBlock(field)}`,
+        );
+
+        return stripped;
+      })
+      .join("\n");
+  }
+
+  function stripHtmlTags(text = "") {
+    return text
+      .split("\n")
+      .map((line) => {
+        HTML_TAG_PATTERN.lastIndex = 0;
+        if (!HTML_TAG_PATTERN.test(line)) {
+          return line;
+        }
+
+        HTML_TAG_PATTERN.lastIndex = 0;
+        const withoutTags = line.replace(HTML_TAG_PATTERN, (match) =>
+          stashHiddenBlock(match),
+        );
+        const visibleContent = withoutTags
+          .replace(/(?:\u200B)?__HD_\d+__/g, "")
+          .trim();
+
+        if (visibleContent) {
+          return withoutTags;
+        }
+
+        return stashHiddenBlock(line);
+      })
+      .join("\n");
   }
 
   function replaceTab(index, updates) {
@@ -915,9 +1043,7 @@
 
     if (appSettings.reader_hide_obsidian_comments) {
       text = text.replace(/%%[\s\S]*?%%[ \t]*/g, (match) => {
-        const hiddenId = `__HD_${hiddenBlockMap.size}__`;
-        hiddenBlockMap.set(hiddenId, match);
-        return `\u200B${hiddenId}`;
+        return stashHiddenBlock(match);
       });
     }
 
@@ -933,6 +1059,14 @@
           ([k, v]) => `${k} => ${v.slice(0, 30)}`,
         ),
       );
+    }
+
+    if (appSettings.reader_hide_inline_fields) {
+      text = stripInlineFields(text);
+    }
+
+    if (appSettings.reader_hide_html) {
+      text = stripHtmlTags(text);
     }
 
     return text.replace(/^\n+/, "");
@@ -1010,15 +1144,16 @@
     const cleanPath = rawPath.split("|")[0]?.trim() ?? "";
     if (!cleanPath) return "";
 
-    if (imagePathCache.has(cleanPath)) {
-      return imagePathCache.get(cleanPath);
+    const cached = getCachedImageSrc(cleanPath);
+    if (cached) {
+      return cached;
     }
 
     try {
       const src = await invoke("load_image_data_url", {
         path: cleanPath,
       });
-      imagePathCache.set(cleanPath, src);
+      setCachedImageSrc(cleanPath, src);
       return src;
     } catch (error) {
       console.warn("Could not resolve image path:", cleanPath, error);
@@ -1026,7 +1161,7 @@
     }
   }
 
-  async function resolveImagesInText(text = "") {
+  function collectImagePaths(text = "") {
     const wikiImageRegex = /!\[\[([^\]]+)\]\]/g;
     const mdImageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
     const imagePaths = new Set();
@@ -1040,25 +1175,34 @@
       imagePaths.add(match[2].trim());
     }
 
-    await Promise.all(
-      [...imagePaths]
-        .filter((path) => path)
-        .map((path) => resolveImagePath(path)),
+    return [...imagePaths].filter((path) => path);
+  }
+
+  async function warmImagesInText(text = "") {
+    const missingPaths = collectImagePaths(text).filter(
+      (path) => !getCachedImageSrc(path),
     );
 
-    return text;
+    if (missingPaths.length === 0) {
+      return false;
+    }
+
+    await Promise.allSettled(missingPaths.map((path) => resolveImagePath(path)));
+
+    return true;
   }
 
   function inlineMarkdown(text = "") {
     const imageTokens = [];
     const linkTokens = [];
+    const hiddenTokens = [];
     let html = text;
 
     html = html.replace(/!\[\[([^\]]+)\]\]/g, (_, inner) => {
       const [rawPath = "", rawWidth = ""] = inner.split("|");
       const cleanPath = rawPath.trim();
       const widthValue = normalizeImageWidth(rawWidth);
-      const src = imagePathCache.get(cleanPath) ?? "";
+      const src = getCachedImageSrc(cleanPath) ?? "";
       const style = widthValue
         ? `width:${widthValue};max-width:100%;`
         : "max-width:100%;";
@@ -1068,7 +1212,7 @@
     });
 
     html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, path) => {
-      const src = imagePathCache.get(path.trim()) ?? "";
+      const src = getCachedImageSrc(path.trim()) ?? "";
       const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(alt)}" style="max-width:100%;" class="md-image" loading="lazy">`;
       imageTokens.push(imageTag);
       return `\u0000IMG${imageTokens.length - 1}\u0000`;
@@ -1097,6 +1241,13 @@
       return `\u0000LNK${linkTokens.length - 1}\u0000${trailing}`;
     });
 
+    html = html.replace(/(?:\u200B)?(__HD_\d+__)/g, (_, hiddenId) => {
+      hiddenTokens.push(
+        `<span class="hidden-inline-marker" data-hidden-id="${hiddenId}" contenteditable="false"></span>`,
+      );
+      return `\u0000HDN${hiddenTokens.length - 1}\u0000`;
+    });
+
     html = escHtml(html);
     html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
@@ -1112,6 +1263,9 @@
     });
     html = html.replace(/\u0000IMG(\d+)\u0000/g, (_, index) => {
       return imageTokens[Number(index)] ?? "";
+    });
+    html = html.replace(/\u0000HDN(\d+)\u0000/g, (_, index) => {
+      return hiddenTokens[Number(index)] ?? "";
     });
     return html;
   }
@@ -1236,7 +1390,7 @@
       return `<div class="codeblock-pill" data-cbid="${id}" data-cblang="${escHtml(lang)}" contenteditable="false"><span class="codeblock-icon"></span><span class="codeblock-lang">${escHtml(lang)}</span></div>`;
     }
 
-    const hiddenMatch = trimmed.match(/^\u200B(__HD_\d+__)$/);
+    const hiddenMatch = trimmed.match(/^(?:\u200B)?(__HD_\d+__)$/);
     if (hiddenMatch) {
       return `<div class="hidden-marker" data-hidden-id="${hiddenMatch[1]}" contenteditable="false"></div>`;
     }
@@ -1547,6 +1701,10 @@
       return element.dataset.raw ?? "";
     }
 
+    if (tag === "span" && element.classList.contains("hidden-inline-marker")) {
+      return element.dataset.hiddenId ?? "";
+    }
+
     if (tag === "span" && element.classList.contains("wikilink")) {
       return `[[${element.dataset.target ?? element.textContent ?? ""}]]`;
     }
@@ -1762,17 +1920,25 @@
 
     const requestId = ++renderRequestId;
     isRenderingContent = true;
-    const resolvedText = await resolveImagesInText(processed);
-    if (requestId !== renderRequestId || !editorRef) {
-      isRenderingContent = false;
-      return;
-    }
-    editorRef.innerHTML = markdownToHtml(resolvedText);
+    editorRef.innerHTML = markdownToHtml(processed);
     console.log(
       "[CB] Pills in DOM:",
       editorRef.querySelectorAll(".codeblock-pill").length,
     );
     console.log("[CB] innerHTML excerpt:", editorRef.innerHTML.slice(0, 300));
+    isRenderingContent = false;
+
+    const loadedAnyMissingImages = await warmImagesInText(processed);
+    if (!loadedAnyMissingImages) {
+      return;
+    }
+
+    if (requestId !== renderRequestId || !editorRef) {
+      return;
+    }
+
+    isRenderingContent = true;
+    editorRef.innerHTML = markdownToHtml(processed);
     isRenderingContent = false;
   }
 
@@ -2600,7 +2766,10 @@
           previousFilters.reader_hide_dataview !==
             nextFilters.reader_hide_dataview ||
           previousFilters.reader_hide_obsidian_comments !==
-            nextFilters.reader_hide_obsidian_comments;
+            nextFilters.reader_hide_obsidian_comments ||
+          previousFilters.reader_hide_inline_fields !==
+            nextFilters.reader_hide_inline_fields ||
+          previousFilters.reader_hide_html !== nextFilters.reader_hide_html;
         const pinnedNotesChanged = previousPinnedNotes !== nextPinnedNotes;
 
         if (pinnedNotesChanged) {

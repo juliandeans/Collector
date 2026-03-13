@@ -884,6 +884,28 @@
               </label>
               <small>Hides %% ... %% comment blocks</small>
             </div>
+
+            <div class="field">
+              <label class="checkbox">
+                <input
+                  type="checkbox"
+                  bind:checked={settings.reader_hide_inline_fields}
+                />
+                Hide Inline Fields (Dataview)
+              </label>
+              <small>Hides key:: value fields from note text</small>
+            </div>
+
+            <div class="field">
+              <label class="checkbox">
+                <input
+                  type="checkbox"
+                  bind:checked={settings.reader_hide_html}
+                />
+                Hide HTML Blocks
+              </label>
+              <small>Hides raw &lt;div&gt;, &lt;span&gt; and other HTML tags</small>
+            </div>
           </section>
         {:else if activePanel === "activation"}
           <section>
