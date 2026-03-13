@@ -2,7 +2,25 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy, tick } from "svelte";
-  import { getReaderIconComponent } from "./lib/reader-icons.js";
+  import CommandPalette from "./lib/reader/CommandPalette.svelte";
+  import ReaderTopBar from "./lib/reader/ReaderTopBar.svelte";
+  import SearchBar from "./lib/reader/SearchBar.svelte";
+  import StatusToast from "./lib/reader/StatusToast.svelte";
+  import TabContextMenu from "./lib/reader/TabContextMenu.svelte";
+  import {
+    imagePathCache,
+    markdownLineToHtml,
+    markdownToHtml,
+    normalizeNewlines,
+    parseRawBlocks,
+    preprocessContent,
+    warmImagesInText,
+  } from "./lib/reader/contentProcessing.js";
+  import {
+    composeContentFromMarkdown,
+    elementToMarkdownLine,
+    htmlToMarkdown,
+  } from "./lib/reader/editorSerialization.js";
 
   let tabs = [];
   let activeTabIndex = 0;
@@ -15,7 +33,6 @@
   let strippedFrontmatter = "";
   let codeblockMap = new Map();
   let hiddenBlockMap = new Map();
-  const imagePathCache = new Map();
   const scrollPositions = new Map();
   let appSettings = {
     vault_name: "Vault",
@@ -104,70 +121,6 @@
     return ` brightness(${brightnessValue}) contrast(${contrastValue})`;
   })();
 
-  function normalizeNewlines(content = "") {
-    return content.replace(/\r\n/g, "\n");
-  }
-
-  const INLINE_FIELD_LINE_PATTERN = /^\s*\w[\w\s-]*::\s*.*$/;
-  const INLINE_FIELD_SEGMENT_PATTERN =
-    /(^|[\s([{;,:-])(\[?\w[\w\s-]*::\s*(?:[^\s[\](){}<>]+(?:\s+(?!\w[\w\s-]*::)[^\s[\](){}<>]+)*)?\]?)(?=$|[\s)\],;:.!?-])/g;
-  const HTML_TAG_NAMES = [
-    "a",
-    "abbr",
-    "article",
-    "aside",
-    "b",
-    "blockquote",
-    "br",
-    "center",
-    "code",
-    "details",
-    "div",
-    "em",
-    "figcaption",
-    "figure",
-    "footer",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "header",
-    "hr",
-    "i",
-    "iframe",
-    "img",
-    "li",
-    "main",
-    "mark",
-    "ol",
-    "p",
-    "pre",
-    "script",
-    "section",
-    "small",
-    "span",
-    "strong",
-    "style",
-    "sub",
-    "summary",
-    "sup",
-    "table",
-    "tbody",
-    "td",
-    "tfoot",
-    "th",
-    "thead",
-    "tr",
-    "u",
-    "ul",
-  ];
-  const HTML_TAG_PATTERN = new RegExp(
-    `<\\/?(?:${HTML_TAG_NAMES.join("|")})(?=[\\s>/])[^>]*>`,
-    "gi",
-  );
-
   function isFileDrag(event) {
     const types = event.dataTransfer?.types;
     if (types && Array.from(types).includes("Files")) return true;
@@ -189,82 +142,6 @@
       "--external-link-color",
       settings.external_link_color ?? "#60a5fa",
     );
-  }
-
-  function getCachedImageSrc(path) {
-    return imagePathCache.get(path) ?? "";
-  }
-
-  function setCachedImageSrc(path, src) {
-    if (!path || !src) return;
-    imagePathCache.set(path, src);
-  }
-
-  function parseRawBlocks(content = "") {
-    const normalized = normalizeNewlines(content);
-    if (!normalized) return [""];
-
-    const lines = normalized.split("\n");
-    const parsedBlocks = [];
-    let current = [];
-    let inFrontmatter = false;
-    let inCodeBlock = false;
-    let inObsidianComment = false;
-
-    const pushCurrent = () => {
-      if (current.length === 0) return;
-      parsedBlocks.push(current.join("\n"));
-      current = [];
-    };
-
-    for (let index = 0; index < lines.length; index += 1) {
-      const line = lines[index];
-      const trimmed = line.trim();
-
-      if (index === 0 && trimmed === "---") {
-        pushCurrent();
-        current.push(line);
-        inFrontmatter = true;
-        continue;
-      }
-
-      if (inFrontmatter) {
-        current.push(line);
-        if (trimmed === "---" && current.length > 1) {
-          pushCurrent();
-          inFrontmatter = false;
-        }
-        continue;
-      }
-
-      if (!inCodeBlock && !inObsidianComment && trimmed === "") {
-        pushCurrent();
-        continue;
-      }
-
-      current.push(line);
-
-      if (!inObsidianComment && trimmed.startsWith("```")) {
-        inCodeBlock = !inCodeBlock;
-        continue;
-      }
-
-      if (!inCodeBlock && trimmed.startsWith("%%")) {
-        if (inObsidianComment) {
-          inObsidianComment = false;
-        } else if (!trimmed.endsWith("%%") || trimmed === "%%") {
-          inObsidianComment = true;
-        }
-        continue;
-      }
-
-      if (inObsidianComment && trimmed.endsWith("%%")) {
-        inObsidianComment = false;
-      }
-    }
-
-    pushCurrent();
-    return parsedBlocks.length > 0 ? parsedBlocks : [""];
   }
 
   function isFrontmatterBlock(block, index) {
@@ -346,10 +223,6 @@
       isPinned: existingTab?.isPinned ?? isPinned,
       history: [...(existingTab?.history ?? history)],
     };
-  }
-
-  function getTabIcon(tab) {
-    return getReaderIconComponent(tab?.icon);
   }
 
   function normalizeError(error) {
@@ -624,7 +497,9 @@
   async function importImageFile(file, fallbackPath = null) {
     const ext = fileExtension(file?.name ?? fallbackPath ?? "");
     if (!["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
-      throw new Error(`Unsupported image: ${file?.name ?? fallbackPath ?? "file"}`);
+      throw new Error(
+        `Unsupported image: ${file?.name ?? fallbackPath ?? "file"}`,
+      );
     }
 
     const candidatePath =
@@ -661,7 +536,10 @@
     return normalizeImportedImageResult(result).markdown;
   }
 
-  function insertImportedMarkdown(markdownLinks = [], { syncEditor = true } = {}) {
+  function insertImportedMarkdown(
+    markdownLinks = [],
+    { syncEditor = true } = {},
+  ) {
     if (!editorRef || markdownLinks.length === 0) return;
 
     editorRef.focus();
@@ -705,7 +583,13 @@
   }
 
   async function finalizeImportedImages(replacements) {
-    let nextContent = composeContentFromMarkdown(getCurrentMarkdown());
+    const markdown = getCurrentMarkdown();
+    blocks = parseRawBlocks(normalizeNewlines(markdown));
+    let nextContent = composeContentFromMarkdown(markdown, {
+      strippedFrontmatter,
+      hiddenBlockMap,
+      codeblockMap,
+    });
 
     replacements.forEach(({ placeholder, markdown }) => {
       nextContent = nextContent.replace(placeholder, markdown);
@@ -735,7 +619,8 @@
 
       const jobs = files.map((file, index) => {
         const item = items[index];
-        const itemFile = item?.kind === "file" ? item.getAsFile?.() ?? null : null;
+        const itemFile =
+          item?.kind === "file" ? (item.getAsFile?.() ?? null) : null;
         const fallbackPath =
           file.path ||
           file.webkitRelativePath ||
@@ -960,56 +845,6 @@
     };
   }
 
-  function stashHiddenBlock(block = "") {
-    const hiddenId = `__HD_${hiddenBlockMap.size}__`;
-    hiddenBlockMap.set(hiddenId, block);
-    return `\u200B${hiddenId}`;
-  }
-
-  function stripInlineFields(text = "") {
-    return text
-      .split("\n")
-      .map((line) => {
-        if (INLINE_FIELD_LINE_PATTERN.test(line)) {
-          return stashHiddenBlock(line);
-        }
-
-        const stripped = line.replace(
-          INLINE_FIELD_SEGMENT_PATTERN,
-          (_, prefix, field) => `${prefix}${stashHiddenBlock(field)}`,
-        );
-
-        return stripped;
-      })
-      .join("\n");
-  }
-
-  function stripHtmlTags(text = "") {
-    return text
-      .split("\n")
-      .map((line) => {
-        HTML_TAG_PATTERN.lastIndex = 0;
-        if (!HTML_TAG_PATTERN.test(line)) {
-          return line;
-        }
-
-        HTML_TAG_PATTERN.lastIndex = 0;
-        const withoutTags = line.replace(HTML_TAG_PATTERN, (match) =>
-          stashHiddenBlock(match),
-        );
-        const visibleContent = withoutTags
-          .replace(/(?:\u200B)?__HD_\d+__/g, "")
-          .trim();
-
-        if (visibleContent) {
-          return withoutTags;
-        }
-
-        return stashHiddenBlock(line);
-      })
-      .join("\n");
-  }
-
   function replaceTab(index, updates) {
     tabs = tabs.map((tab, tabIndex) =>
       tabIndex === index ? { ...tab, ...updates } : tab,
@@ -1022,558 +857,6 @@
       content: nextContent,
       loaded: true,
     });
-  }
-
-  function preprocessContent(raw = "") {
-    let text = normalizeNewlines(raw);
-
-    strippedFrontmatter = "";
-    codeblockMap = new Map();
-    hiddenBlockMap = new Map();
-
-    if (appSettings.reader_hide_frontmatter) {
-      text = text.replace(
-        /^---\n[\s\S]*?\n---[ \t]*(?:\n+)?/,
-        (match) => {
-          strippedFrontmatter = match.trimEnd();
-          return "";
-        },
-      );
-    }
-
-    if (appSettings.reader_hide_obsidian_comments) {
-      text = text.replace(/%%[\s\S]*?%%[ \t]*/g, (match) => {
-        return stashHiddenBlock(match);
-      });
-    }
-
-    if (appSettings.reader_hide_dataview) {
-      text = replaceCodeblocks(text);
-      console.log(
-        "[CB] After replaceCodeblocks, text excerpt:",
-        text.slice(0, 500),
-      );
-      console.log(
-        "[CB] codeblockMap contents:",
-        [...codeblockMap.entries()].map(
-          ([k, v]) => `${k} => ${v.slice(0, 30)}`,
-        ),
-      );
-    }
-
-    if (appSettings.reader_hide_inline_fields) {
-      text = stripInlineFields(text);
-    }
-
-    if (appSettings.reader_hide_html) {
-      text = stripHtmlTags(text);
-    }
-
-    return text.replace(/^\n+/, "");
-  }
-
-  function replaceCodeblocks(text = "") {
-    const result = [];
-    const regex =
-      /^([ \t]*>[ \t]*)?(```([A-Za-z0-9_-]*)[ \t]*)\n([\s\S]*?)^([ \t]*>[ \t]*)?```[ \t]*$/gm;
-    let lastIndex = 0;
-    let match;
-
-    while ((match = regex.exec(text)) !== null) {
-      result.push(text.slice(lastIndex, match.index));
-
-      const codeblockId = `__CB_${codeblockMap.size}__`;
-      const label = (match[3] ?? "").trim() || "code";
-      codeblockMap.set(codeblockId, match[0]);
-      result.push(`\u200B${codeblockId}:${label}\u200B`);
-
-      lastIndex = match.index + match[0].length;
-    }
-
-    result.push(text.slice(lastIndex));
-    return result.join("");
-  }
-
-  function escHtml(text = "") {
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
-  function escAttr(text = "") {
-    return escHtml(text).replace(/"/g, "&quot;");
-  }
-
-  function normalizeImageWidth(rawWidth = "") {
-    const trimmed = rawWidth.trim();
-    if (!trimmed) return null;
-
-    const width = Number.parseInt(trimmed, 10);
-    if (!Number.isFinite(width) || width <= 0 || width > 4000) {
-      return null;
-    }
-
-    return `${width}px`;
-  }
-
-  function sanitizeExternalHref(rawHref = "") {
-    const trimmed = rawHref.trim();
-    if (!trimmed) return null;
-
-    if (/^https?:\/\//i.test(trimmed) || /^obsidian:\/\//i.test(trimmed)) {
-      return trimmed;
-    }
-
-    return null;
-  }
-
-  function splitTrailingUrlPunctuation(rawUrl = "") {
-    let url = rawUrl;
-    let trailing = "";
-
-    while (/[),.!?;:]$/.test(url)) {
-      trailing = `${url.slice(-1)}${trailing}`;
-      url = url.slice(0, -1);
-    }
-
-    return { url, trailing };
-  }
-
-  async function resolveImagePath(rawPath = "") {
-    const cleanPath = rawPath.split("|")[0]?.trim() ?? "";
-    if (!cleanPath) return "";
-
-    const cached = getCachedImageSrc(cleanPath);
-    if (cached) {
-      return cached;
-    }
-
-    try {
-      const src = await invoke("load_image_data_url", {
-        path: cleanPath,
-      });
-      setCachedImageSrc(cleanPath, src);
-      return src;
-    } catch (error) {
-      console.warn("Could not resolve image path:", cleanPath, error);
-      return "";
-    }
-  }
-
-  function collectImagePaths(text = "") {
-    const wikiImageRegex = /!\[\[([^\]]+)\]\]/g;
-    const mdImageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-    const imagePaths = new Set();
-    let match;
-
-    while ((match = wikiImageRegex.exec(text)) !== null) {
-      imagePaths.add(match[1].split("|")[0].trim());
-    }
-
-    while ((match = mdImageRegex.exec(text)) !== null) {
-      imagePaths.add(match[2].trim());
-    }
-
-    return [...imagePaths].filter((path) => path);
-  }
-
-  async function warmImagesInText(text = "") {
-    const missingPaths = collectImagePaths(text).filter(
-      (path) => !getCachedImageSrc(path),
-    );
-
-    if (missingPaths.length === 0) {
-      return false;
-    }
-
-    await Promise.allSettled(missingPaths.map((path) => resolveImagePath(path)));
-
-    return true;
-  }
-
-  function inlineMarkdown(text = "") {
-    const imageTokens = [];
-    const linkTokens = [];
-    const hiddenTokens = [];
-    let html = text;
-
-    html = html.replace(/!\[\[([^\]]+)\]\]/g, (_, inner) => {
-      const [rawPath = "", rawWidth = ""] = inner.split("|");
-      const cleanPath = rawPath.trim();
-      const widthValue = normalizeImageWidth(rawWidth);
-      const src = getCachedImageSrc(cleanPath) ?? "";
-      const style = widthValue
-        ? `width:${widthValue};max-width:100%;`
-        : "max-width:100%;";
-      const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(cleanPath)}" style="${escAttr(style)}" class="md-image" loading="lazy">`;
-      imageTokens.push(imageTag);
-      return `\u0000IMG${imageTokens.length - 1}\u0000`;
-    });
-
-    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, path) => {
-      const src = getCachedImageSrc(path.trim()) ?? "";
-      const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(alt)}" style="max-width:100%;" class="md-image" loading="lazy">`;
-      imageTokens.push(imageTag);
-      return `\u0000IMG${imageTokens.length - 1}\u0000`;
-    });
-
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (fullMatch, label, href) => {
-      const safeHref = sanitizeExternalHref(href);
-      if (!safeHref) {
-        return fullMatch;
-      }
-
-      const linkTag = `<a href="${escAttr(safeHref)}" target="_blank" rel="noopener noreferrer">${escHtml(label)}</a>`;
-      linkTokens.push(linkTag);
-      return `\u0000LNK${linkTokens.length - 1}\u0000`;
-    });
-
-    html = html.replace(/\bhttps?:\/\/[^\s<]+/gi, (rawUrl) => {
-      const { url, trailing } = splitTrailingUrlPunctuation(rawUrl);
-      const safeHref = sanitizeExternalHref(url);
-      if (!safeHref) {
-        return rawUrl;
-      }
-
-      const linkTag = `<a href="${escAttr(safeHref)}" target="_blank" rel="noopener noreferrer">${escHtml(url)}</a>`;
-      linkTokens.push(linkTag);
-      return `\u0000LNK${linkTokens.length - 1}\u0000${trailing}`;
-    });
-
-    html = html.replace(/(?:\u200B)?(__HD_\d+__)/g, (_, hiddenId) => {
-      hiddenTokens.push(
-        `<span class="hidden-inline-marker" data-hidden-id="${hiddenId}" contenteditable="false"></span>`,
-      );
-      return `\u0000HDN${hiddenTokens.length - 1}\u0000`;
-    });
-
-    html = escHtml(html);
-    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
-    html = html.replace(/`(.+?)`/g, "<code>$1</code>");
-    html = html.replace(/\[\[([^\]]+)\]\]/g, (_, inner) => {
-      const [rawTarget = "", rawDisplay = ""] = inner.split("|");
-      const target = rawTarget.trim();
-      const display = (rawDisplay || rawTarget).trim();
-      return `<span class="wikilink" data-target="${escAttr(target)}">[[${escHtml(display)}]]</span>`;
-    });
-    html = html.replace(/\u0000LNK(\d+)\u0000/g, (_, index) => {
-      return linkTokens[Number(index)] ?? "";
-    });
-    html = html.replace(/\u0000IMG(\d+)\u0000/g, (_, index) => {
-      return imageTokens[Number(index)] ?? "";
-    });
-    html = html.replace(/\u0000HDN(\d+)\u0000/g, (_, index) => {
-      return hiddenTokens[Number(index)] ?? "";
-    });
-    return html;
-  }
-
-  function capitalize(text = "") {
-    return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : "";
-  }
-
-  function calloutIcon(type) {
-    const icons = {
-      note: "ℹ",
-      info: "ℹ",
-      tip: "💡",
-      hint: "💡",
-      warning: "⚠",
-      caution: "⚠",
-      attention: "⚠",
-      danger: "🔥",
-      error: "✗",
-      bug: "🐛",
-      success: "✓",
-      check: "✓",
-      done: "✓",
-      question: "?",
-      help: "?",
-      faq: "?",
-      quote: '"',
-      cite: '"',
-      abstract: "◻",
-      summary: "◻",
-      tldr: "◻",
-      example: "◈",
-      important: "★",
-    };
-
-    return icons[type] ?? "ℹ";
-  }
-
-  function calloutColorClass(type) {
-    const map = {
-      note: "blue",
-      info: "blue",
-      abstract: "blue",
-      summary: "blue",
-      tip: "green",
-      hint: "green",
-      success: "green",
-      check: "green",
-      done: "green",
-      warning: "yellow",
-      caution: "yellow",
-      attention: "yellow",
-      danger: "red",
-      error: "red",
-      bug: "red",
-      question: "purple",
-      help: "purple",
-      faq: "purple",
-      quote: "gray",
-      cite: "gray",
-      example: "purple",
-      important: "orange",
-    };
-
-    return map[type] ?? "blue";
-  }
-
-  function processCallout(lines = []) {
-    const firstLine = lines[0] ?? "";
-    const calloutMatch = firstLine.match(/^>\s*\[!([\w]+)\]\s*(.*)/i);
-    if (!calloutMatch) return null;
-
-    const type = calloutMatch[1].toLowerCase();
-    const title = calloutMatch[2].trim() || capitalize(type);
-    const contentLines = lines
-      .slice(1)
-      .map((line) => line.replace(/^>\s?/, ""));
-
-    while (contentLines.length > 0 && !contentLines[0].trim()) {
-      contentLines.shift();
-    }
-
-    while (
-      contentLines.length > 0 &&
-      !contentLines[contentLines.length - 1].trim()
-    ) {
-      contentLines.pop();
-    }
-
-    const content = contentLines.length
-      ? contentLines.map((line) => inlineMarkdown(line)).join("<br>")
-      : "";
-    const icon = calloutIcon(type);
-    const colorClass = calloutColorClass(type);
-    const raw = lines.join("\n");
-
-    return `<div class="callout callout-${colorClass}" data-raw="${escAttr(raw)}"><div class="callout-title"><span class="callout-icon">${icon}</span><span class="callout-label">${escHtml(title)}</span></div>${content ? `<div class="callout-content">${content}</div>` : ""}</div>`;
-  }
-
-  function markdownLineToHtml(line) {
-    if (line === null || line === undefined) return "";
-    if (line.includes("\u200B")) {
-      console.log(
-        "[CB] Sentinel line entering renderer:",
-        JSON.stringify(line),
-      );
-    }
-
-    const trimmed = line.trim();
-    if (line.includes("\u200B")) {
-      console.log(
-        "[CB] trimmed starts with sentinel?",
-        trimmed.startsWith("\u200B"),
-        "first chars:",
-        JSON.stringify(trimmed.slice(0, 20)),
-      );
-    }
-    const codeblockMatch = trimmed.match(/\u200B(__CB_\d+__):([\w-]*)\u200B/);
-    if (codeblockMatch) {
-      const [, id, langValue] = codeblockMatch;
-      const lang = langValue || "code";
-      return `<div class="codeblock-pill" data-cbid="${id}" data-cblang="${escHtml(lang)}" contenteditable="false"><span class="codeblock-icon"></span><span class="codeblock-lang">${escHtml(lang)}</span></div>`;
-    }
-
-    const hiddenMatch = trimmed.match(/^(?:\u200B)?(__HD_\d+__)$/);
-    if (hiddenMatch) {
-      return `<div class="hidden-marker" data-hidden-id="${hiddenMatch[1]}" contenteditable="false"></div>`;
-    }
-
-    if (/^###### /.test(line)) return `<h6>${escHtml(line.slice(7))}</h6>`;
-    if (/^##### /.test(line)) return `<h5>${escHtml(line.slice(6))}</h5>`;
-    if (/^#### /.test(line)) return `<h4>${escHtml(line.slice(5))}</h4>`;
-    if (/^### /.test(line)) return `<h3>${escHtml(line.slice(4))}</h3>`;
-    if (/^## /.test(line)) return `<h2>${escHtml(line.slice(3))}</h2>`;
-    if (/^# /.test(line)) return `<h1>${escHtml(line.slice(2))}</h1>`;
-    if (line.trim() === "") return "<p><br></p>";
-    if (/^---+$/.test(line.trim())) return "<hr>";
-
-    if (/^- \[ \] /.test(line)) {
-      const label = line.slice(6);
-      return `<p><input type="checkbox" class="md-checkbox" contenteditable="false"> ${inlineMarkdown(label)}</p>`;
-    }
-
-    if (/^- \[x\] /i.test(line)) {
-      const label = line.slice(6);
-      return `<p><input type="checkbox" class="md-checkbox" contenteditable="false" checked> ${inlineMarkdown(label)}</p>`;
-    }
-
-    if (/^> /.test(line)) {
-      return `<blockquote>${inlineMarkdown(line.slice(2))}</blockquote>`;
-    }
-
-    if (/^- /.test(line)) {
-      return `<p class="list-item">${inlineMarkdown(line.slice(2))}</p>`;
-    }
-
-    return `<p>${inlineMarkdown(line)}</p>`;
-  }
-
-  function markdownToHtml(text = "") {
-    if (!text.trim()) return "";
-
-    const lines = normalizeNewlines(text).split("\n");
-    const htmlParts = [];
-    let index = 0;
-
-    while (index < lines.length) {
-      const line = lines[index];
-
-      if (/^>\s?/.test(line)) {
-        const group = [];
-        while (index < lines.length && /^>\s?/.test(lines[index])) {
-          group.push(lines[index]);
-          index += 1;
-        }
-
-        const callout = processCallout(group);
-        if (callout) {
-          htmlParts.push(callout);
-        } else {
-          const content = group
-            .map((groupLine) => inlineMarkdown(groupLine.replace(/^>\s?/, "")))
-            .join("<br>");
-          htmlParts.push(`<blockquote>${content}</blockquote>`);
-        }
-        continue;
-      }
-
-      htmlParts.push(markdownLineToHtml(line));
-      index += 1;
-    }
-
-    return htmlParts.join("");
-  }
-
-  function imageNodeToMarkdown(node) {
-    const alt = node.getAttribute?.("alt") ?? "";
-    const style = node.getAttribute?.("style") ?? "";
-    const widthMatch = style.match(/width:\s*(\d+)px/i);
-    const width = widthMatch ? widthMatch[1] : null;
-    const isWikilink = !alt.includes("http") && !alt.startsWith("/");
-    if (isWikilink) {
-      return width ? `![[${alt}|${width}]]` : `![[${alt}]]`;
-    }
-
-    return `![${alt}](${alt})`;
-  }
-
-  function elementInnerToMarkdown(el) {
-    let result = "";
-
-    el.childNodes.forEach((node) => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        result += node.textContent ?? "";
-        return;
-      }
-
-      if (node.nodeType !== Node.ELEMENT_NODE) {
-        return;
-      }
-
-      const tag = node.tagName?.toLowerCase();
-      const text = node.innerText ?? node.textContent ?? "";
-
-      if (tag === "img") {
-        result += imageNodeToMarkdown(node);
-        return;
-      }
-
-      if (tag === "strong" || tag === "b") {
-        result += `**${text}**`;
-        return;
-      }
-
-      if (tag === "em" || tag === "i") {
-        result += `*${text}*`;
-        return;
-      }
-
-      if (tag === "code") {
-        result += `\`${text}\``;
-        return;
-      }
-
-      if (tag === "a") {
-        result += `[${text}](${node.href})`;
-        return;
-      }
-
-      if (tag === "span" && node.classList?.contains("wikilink")) {
-        result += `[[${node.dataset.target ?? text}]]`;
-        return;
-      }
-
-      result += text;
-    });
-
-    return result;
-  }
-
-  function elementToMarkdownLine(el) {
-    if (!el) return "";
-
-    if (el.classList?.contains("raw-mode")) {
-      return el.textContent ?? "";
-    }
-
-    if (el.classList?.contains("codeblock-pill")) {
-      return null;
-    }
-
-    if (el.classList?.contains("hidden-marker")) {
-      return el.dataset.hiddenId ?? "";
-    }
-
-    if (el.classList?.contains("callout")) {
-      return el.dataset.raw ?? "";
-    }
-
-    const tag = el.tagName?.toLowerCase();
-    const inner = el.innerText ?? el.textContent ?? "";
-
-    if (tag === "h1") return `# ${inner}`;
-    if (tag === "h2") return `## ${inner}`;
-    if (tag === "h3") return `### ${inner}`;
-    if (tag === "h4") return `#### ${inner}`;
-    if (tag === "h5") return `##### ${inner}`;
-    if (tag === "h6") return `###### ${inner}`;
-    if (tag === "hr") return "---";
-    if (tag === "blockquote") return `> ${inner}`;
-
-    if (tag === "p") {
-      const checkbox = el.querySelector('input[type="checkbox"]');
-      if (checkbox) {
-        const text = (el.innerText ?? "").trim();
-        return `${checkbox.checked ? "- [x] " : "- [ ] "}${text}`;
-      }
-
-      if (el.classList.contains("list-item")) {
-        return `- ${elementInnerToMarkdown(el)}`;
-      }
-
-      const paragraphMarkdown = elementInnerToMarkdown(el);
-      if (!paragraphMarkdown.trim()) return "";
-      return paragraphMarkdown;
-    }
-
-    return inner;
   }
 
   function placeCursorAtEnd(el) {
@@ -1642,7 +925,8 @@
     if (!selection.isCollapsed) return;
 
     const node = selection.getRangeAt(0).startContainer;
-    const anchorEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    const anchorEl =
+      node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
     if (anchorEl?.closest?.(".wikilink")) return;
     if (!editorRef.contains(node)) return;
 
@@ -1662,257 +946,30 @@
     finalizeActiveBlock();
   }
 
-  function serializeInline(node) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return (node.textContent ?? "").replace(/\u00A0/g, " ");
-    }
-
-    if (node.nodeType !== Node.ELEMENT_NODE) {
-      return "";
-    }
-
-    const element = node;
-    const tag = element.tagName.toLowerCase();
-
-    if (tag === "br") return "";
-    if (tag === "input") return "";
-
-    if (tag === "strong" || tag === "b") {
-      return `**${serializeChildren(element)}**`;
-    }
-
-    if (tag === "em" || tag === "i") {
-      return `*${serializeChildren(element)}*`;
-    }
-
-    if (tag === "code") {
-      return `\`${serializeChildren(element)}\``;
-    }
-
-    if (tag === "img") {
-      return imageNodeToMarkdown(element);
-    }
-
-    if (tag === "a") {
-      const href = element.getAttribute("href") ?? "";
-      return `[${serializeChildren(element)}](${href})`;
-    }
-
-    if (element.classList.contains("callout")) {
-      return element.dataset.raw ?? "";
-    }
-
-    if (tag === "span" && element.classList.contains("hidden-inline-marker")) {
-      return element.dataset.hiddenId ?? "";
-    }
-
-    if (tag === "span" && element.classList.contains("wikilink")) {
-      return `[[${element.dataset.target ?? element.textContent ?? ""}]]`;
-    }
-
-    return serializeChildren(element);
-  }
-
-  function serializeChildren(node, { skipCheckbox = false } = {}) {
-    let result = "";
-
-    node.childNodes.forEach((child) => {
-      if (
-        skipCheckbox &&
-        child.nodeType === Node.ELEMENT_NODE &&
-        child.tagName.toLowerCase() === "input"
-      ) {
-        return;
-      }
-
-      result += serializeInline(child);
-    });
-
-    return result.replace(/\u200B/g, "");
-  }
-
-  function htmlToMarkdown(el) {
-    const lines = [];
-
-    el.childNodes.forEach((child) => {
-      if (child.nodeType === Node.TEXT_NODE) {
-        const text = (child.textContent ?? "").trim();
-        if (text) {
-          lines.push(text);
-        }
-        return;
-      }
-
-      if (child.nodeType !== Node.ELEMENT_NODE) return;
-
-      const element = child;
-      const tag = element.tagName.toLowerCase();
-
-      if (tag === "h1") {
-        lines.push(`# ${serializeChildren(element).trim()}`);
-        return;
-      }
-
-      if (tag === "h2") {
-        lines.push(`## ${serializeChildren(element).trim()}`);
-        return;
-      }
-
-      if (tag === "h3") {
-        lines.push(`### ${serializeChildren(element).trim()}`);
-        return;
-      }
-
-      if (tag === "h4") {
-        lines.push(`#### ${serializeChildren(element).trim()}`);
-        return;
-      }
-
-      if (tag === "h5") {
-        lines.push(`##### ${serializeChildren(element).trim()}`);
-        return;
-      }
-
-      if (tag === "h6") {
-        lines.push(`###### ${serializeChildren(element).trim()}`);
-        return;
-      }
-
-      if (tag === "hr") {
-        lines.push("---");
-        return;
-      }
-
-      if (tag === "blockquote") {
-        lines.push(`> ${serializeChildren(element).trim()}`);
-        return;
-      }
-
-      if (element.classList.contains("callout")) {
-        lines.push(element.dataset.raw ?? "");
-        return;
-      }
-
-      if (tag === "div" && element.classList.contains("codeblock-pill")) {
-        const id = element.dataset.cbid;
-        const lang = element.dataset.cblang ?? "code";
-        if (id) {
-          lines.push(`\u200B${id}:${lang}\u200B`);
-        }
-        return;
-      }
-
-      if (tag === "div" && element.classList.contains("hidden-marker")) {
-        const hiddenId = element.dataset.hiddenId;
-        if (hiddenId) {
-          lines.push(hiddenId);
-        }
-        return;
-      }
-
-      if (element.classList.contains("raw-mode")) {
-        lines.push(element.textContent ?? "");
-        return;
-      }
-
-      if (tag === "img") {
-        lines.push(imageNodeToMarkdown(element));
-        return;
-      }
-
-      if (tag === "p" || tag === "div") {
-        const checkbox = element.querySelector('input[type="checkbox"]');
-        if (checkbox) {
-          const checked = checkbox.checked;
-          const text = serializeChildren(element, { skipCheckbox: true }).trim();
-          lines.push(`${checked ? "- [x] " : "- [ ] "}${text}`);
-          return;
-        }
-
-        if (element.classList.contains("list-item")) {
-          lines.push(`- ${elementInnerToMarkdown(element).trim()}`);
-          return;
-        }
-
-        const text = elementInnerToMarkdown(element).trim();
-        const hasOnlyBreak =
-          element.childNodes.length === 1 &&
-          element.firstChild?.nodeType === Node.ELEMENT_NODE &&
-          element.firstChild?.tagName.toLowerCase() === "br";
-
-        if (!text && hasOnlyBreak) {
-          lines.push("");
-          return;
-        }
-
-        if (!text && !element.textContent?.trim()) {
-          lines.push("");
-          return;
-        }
-
-        lines.push(text);
-        return;
-      }
-
-      const fallbackText = serializeChildren(element).trim();
-      if (fallbackText) {
-        lines.push(fallbackText);
-      }
-    });
-
-    return lines.join("\n");
-  }
-
-  function restoreCodeblocks(markdown = "") {
-    let restored = markdown;
-    restored = restored.replace(
-      /\u200B(__CB_\d+__):[^\u200B]*\u200B/g,
-      (_, id) => codeblockMap.get(id) ?? "",
-    );
-
-    return restored;
-  }
-
-  function restoreHiddenBlocks(markdown = "") {
-    let restored = markdown;
-
-    hiddenBlockMap.forEach((block, id) => {
-      const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      restored = restored.replace(new RegExp(`(?:\\u200B)?${escaped}`, "g"), block);
-    });
-
-    return restored;
-  }
-
   function getCurrentMarkdown() {
     if (!editorRef) {
-      return preprocessContent(rawContent);
+      return preprocessContent(rawContent, {
+        appSettings,
+        codeblockMap,
+        hiddenBlockMap,
+        setStrippedFrontmatter: (value) => {
+          strippedFrontmatter = value;
+        },
+      });
     }
 
     return normalizeNewlines(htmlToMarkdown(editorRef));
   }
 
-  function composeContentFromMarkdown(markdown = "") {
-    const normalized = normalizeNewlines(markdown);
-    blocks = parseRawBlocks(normalized);
-
-    const withHiddenBlocks = restoreHiddenBlocks(normalized);
-    const restored = restoreCodeblocks(withHiddenBlocks);
-    const frontmatter = strippedFrontmatter.trim();
-
-    if (frontmatter && restored.trim()) {
-      return `${frontmatter}\n\n${restored}`;
-    }
-
-    if (frontmatter) {
-      return frontmatter;
-    }
-
-    return restored;
-  }
-
   async function renderContentToEditor(raw = "") {
-    const processed = preprocessContent(raw);
+    const processed = preprocessContent(raw, {
+      appSettings,
+      codeblockMap,
+      hiddenBlockMap,
+      setStrippedFrontmatter: (value) => {
+        strippedFrontmatter = value;
+      },
+    });
     blocks = parseRawBlocks(processed);
     activeParagraphEl = null;
 
@@ -2143,7 +1200,6 @@
       savedIndicatorTimeout = setTimeout(() => {
         showSavedIndicator = false;
       }, 1500);
-
     } catch (error) {
       showStatus(normalizeError(error), "error", 2200);
     } finally {
@@ -2186,7 +1242,12 @@
     pendingSave = null;
 
     const markdown = getCurrentMarkdown();
-    const content = composeContentFromMarkdown(markdown);
+    blocks = parseRawBlocks(normalizeNewlines(markdown));
+    const content = composeContentFromMarkdown(markdown, {
+      strippedFrontmatter,
+      hiddenBlockMap,
+      codeblockMap,
+    });
     rawContent = content;
     updateActiveTabContent(content);
     await saveTabByIndex(activeTabIndex, content, showConfirmation);
@@ -2200,7 +1261,12 @@
     if (isComposing || isRenderingContent || !editorRef) return;
 
     const markdown = getCurrentMarkdown();
-    const content = composeContentFromMarkdown(markdown);
+    blocks = parseRawBlocks(normalizeNewlines(markdown));
+    const content = composeContentFromMarkdown(markdown, {
+      strippedFrontmatter,
+      hiddenBlockMap,
+      codeblockMap,
+    });
     rawContent = content;
     updateActiveTabContent(content);
     scheduleSave(content);
@@ -2280,21 +1346,25 @@
     };
   }
 
-  function openTabContextMenu(event, index) {
-    const tab = tabs[index];
+  function openTabContextMenu(eventOrDetail, index) {
+    const detail =
+      typeof index === "number"
+        ? { index, x: eventOrDetail.clientX, y: eventOrDetail.clientY }
+        : eventOrDetail;
+    const tab = tabs[detail.index];
     if (!tab || tab.kind !== "opened") {
       closeTabContextMenu();
       return;
     }
 
-    event.preventDefault();
-    event.stopPropagation();
+    eventOrDetail?.preventDefault?.();
+    eventOrDetail?.stopPropagation?.();
 
     tabContextMenu = {
       open: true,
-      x: event.clientX,
-      y: event.clientY,
-      tabIndex: index,
+      x: detail.x,
+      y: detail.y,
+      tabIndex: detail.index,
     };
   }
 
@@ -2553,41 +1623,6 @@
     await activateTab(tabs.length - 1, true);
   }
 
-  function handlePaletteKeydown(event) {
-    if (!showPalette) return;
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      if (filteredVaultNotes.length > 0) {
-        selectedPaletteIndex = Math.min(
-          selectedPaletteIndex + 1,
-          filteredVaultNotes.length - 1,
-        );
-      }
-      return;
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      selectedPaletteIndex = Math.max(selectedPaletteIndex - 1, 0);
-      return;
-    }
-
-    if (event.key === "Enter") {
-      event.preventDefault();
-      const note = filteredVaultNotes[selectedPaletteIndex];
-      if (note) {
-        openVaultNote(note);
-      }
-      return;
-    }
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closePalette();
-    }
-  }
-
   async function handleGlobalKeydown(event) {
     const key = event.key.toLowerCase();
 
@@ -2599,13 +1634,6 @@
       event.preventDefault();
       closeTabContextMenu();
       return;
-    }
-
-    if (showPalette) {
-      handlePaletteKeydown(event);
-      if (["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(event.key)) {
-        return;
-      }
     }
 
     if ((event.metaKey || event.ctrlKey) && key === "w") {
@@ -2727,7 +1755,9 @@
     }
 
     await loadEditorContent(currentTab.content);
-    missingFileMessage = currentTab.missing ? currentTab.missingMessage || "" : "";
+    missingFileMessage = currentTab.missing
+      ? currentTab.missingMessage || ""
+      : "";
   }
 
   async function buildInitialTabs() {
@@ -2753,41 +1783,46 @@
         }
       });
 
-      unlistenSettingsChanged = await listen("settings_changed", async (event) => {
-        const previousFilters = getReaderFilterSettings();
-        const previousPinnedNotes = getPinnedNotesSignature(
-          appSettings.pinned_notes,
-        );
-        applySettings(event.payload);
-        const nextFilters = getReaderFilterSettings();
-        const nextPinnedNotes = getPinnedNotesSignature(appSettings.pinned_notes);
-        const filtersChanged =
-          previousFilters.reader_hide_frontmatter !==
-            nextFilters.reader_hide_frontmatter ||
-          previousFilters.reader_hide_dataview !==
-            nextFilters.reader_hide_dataview ||
-          previousFilters.reader_hide_obsidian_comments !==
-            nextFilters.reader_hide_obsidian_comments ||
-          previousFilters.reader_hide_inline_fields !==
-            nextFilters.reader_hide_inline_fields ||
-          previousFilters.reader_hide_html !== nextFilters.reader_hide_html;
-        const pinnedNotesChanged = previousPinnedNotes !== nextPinnedNotes;
+      unlistenSettingsChanged = await listen(
+        "settings_changed",
+        async (event) => {
+          const previousFilters = getReaderFilterSettings();
+          const previousPinnedNotes = getPinnedNotesSignature(
+            appSettings.pinned_notes,
+          );
+          applySettings(event.payload);
+          const nextFilters = getReaderFilterSettings();
+          const nextPinnedNotes = getPinnedNotesSignature(
+            appSettings.pinned_notes,
+          );
+          const filtersChanged =
+            previousFilters.reader_hide_frontmatter !==
+              nextFilters.reader_hide_frontmatter ||
+            previousFilters.reader_hide_dataview !==
+              nextFilters.reader_hide_dataview ||
+            previousFilters.reader_hide_obsidian_comments !==
+              nextFilters.reader_hide_obsidian_comments ||
+            previousFilters.reader_hide_inline_fields !==
+              nextFilters.reader_hide_inline_fields ||
+            previousFilters.reader_hide_html !== nextFilters.reader_hide_html;
+          const pinnedNotesChanged = previousPinnedNotes !== nextPinnedNotes;
 
-        if (pinnedNotesChanged) {
-          await flushPendingSave(false);
-          await rebuildTabsFromSettings(event.payload, {
-            preserveOpened: true,
-            forceReloadActive: false,
-          });
-          return;
-        }
+          if (pinnedNotesChanged) {
+            await flushPendingSave(false);
+            await rebuildTabsFromSettings(event.payload, {
+              preserveOpened: true,
+              forceReloadActive: false,
+            });
+            return;
+          }
 
-        if (filtersChanged) {
-          finalizeActiveBlock();
-          imagePathCache.clear();
-          await renderContentToEditor(rawContent);
-        }
-      });
+          if (filtersChanged) {
+            finalizeActiveBlock();
+            imagePathCache.clear();
+            await renderContentToEditor(rawContent);
+          }
+        },
+      );
 
       document.addEventListener("selectionchange", handleSelectionChange);
       window.addEventListener("keydown", handleGlobalKeydown);
@@ -2829,159 +1864,46 @@
   on:drop={handleEditorDrop}
   role="application"
 >
-  <div class="accent-line" role="presentation"></div>
+  <ReaderTopBar
+    {tabs}
+    {activeTabIndex}
+    {isSaving}
+    {isImportingImages}
+    {showSavedIndicator}
+    canGoBack={tabs[activeTabIndex]?.history?.length > 0}
+    canOpenInObsidian={Boolean(tabs[activeTabIndex]?.path)}
+    on:activateTab={(event) => activateTab(event.detail)}
+    on:newTab={openPalette}
+    on:goBack={navigateBack}
+    on:openInObsidian={openInObsidian}
+    on:closeReader={hideReader}
+    on:tabContextMenu={(event) => openTabContextMenu(event.detail)}
+  />
 
-  <div class="reader-topbar" data-tauri-drag-region>
-    <div class="topbar-row">
-      <div class="tab-strip">
-        <button
-          class="tab-action"
-          type="button"
-          title="Open Command Palette"
-          on:mousedown|stopPropagation
-          on:click|stopPropagation={openPalette}
-        >
-          +
-        </button>
+  <SearchBar
+    open={showSearch}
+    query={searchQuery}
+    matchCount={searchMatches.length}
+    activeIndex={searchIndex}
+    bind:inputRef={searchInputRef}
+    on:queryChange={(event) => runSearch(event.detail)}
+    on:step={(event) => stepSearch(event.detail)}
+    on:close={closeSearch}
+  />
 
-        <div class="tab-list">
-          {#each tabs as tab, index (tab.path)}
-            <button
-              class="tab-button"
-              class:active={index === activeTabIndex}
-              type="button"
-              title={tab.path}
-              on:mousedown|stopPropagation
-              on:click|stopPropagation={() => activateTab(index)}
-              on:contextmenu|stopPropagation={(event) =>
-                openTabContextMenu(event, index)}
-            >
-              {#if getTabIcon(tab)}
-                <span class="tab-icon" aria-hidden="true">
-                  <svelte:component
-                    this={getTabIcon(tab)}
-                    size={14}
-                    strokeWidth={1.9}
-                  />
-                </span>
-              {/if}
-              <span class="tab-label">{tab.label}</span>
-            </button>
-          {/each}
-        </div>
-      </div>
+  <TabContextMenu
+    open={tabContextMenu.open}
+    x={tabContextMenu.x}
+    y={tabContextMenu.y}
+    on:close={closeTabContextMenu}
+    on:closeTab={() => closeTabByIndex(tabContextMenu.tabIndex)}
+  />
 
-      <div class="topbar-actions">
-        {#if isImportingImages}
-          <span class="save-indicator busy">Importing image...</span>
-        {:else if isSaving}
-          <span class="save-indicator busy">Saving...</span>
-        {:else if showSavedIndicator}
-          <span class="save-indicator">Saved ✓</span>
-        {/if}
-
-        {#if tabs[activeTabIndex]?.history?.length > 0}
-          <button
-            class="topbar-btn back-button"
-            type="button"
-            title="Back (⌘[)"
-            on:mousedown|stopPropagation
-            on:click|stopPropagation={navigateBack}
-          >
-            ←
-          </button>
-        {/if}
-
-        {#if tabs[activeTabIndex]?.path}
-          <button
-            class="topbar-btn obsidian-btn"
-            type="button"
-            title="Open in Obsidian"
-            on:mousedown|stopPropagation
-            on:click|stopPropagation={openInObsidian}
-          >
-            <svg width="14" height="14" viewBox="0 0 100 100" fill="none">
-              <path
-                d="M73.8 13.8C67.4 7 58.4 3 49 3c-9.4 0-18.4 4-24.8 10.8L10 30.5c-6.4 6.8-9.5 16-8.6 25.2l2.8 28.7C5 93.5 11.5 99 19.2 99h61.6c7.7 0 14.2-5.5 15-13.1l2.8-28.7c.9-9.2-2.2-18.4-8.6-25.2L73.8 13.8z"
-                fill="currentColor"
-                opacity="0.9"
-              />
-              <path
-                d="M50 25c-8.3 0-15 6.7-15 15s6.7 15 15 15 15-6.7 15-15-6.7-15-15-15zm0 22c-3.9 0-7-3.1-7-7s3.1-7 7-7 7 3.1 7 7-3.1 7-7 7z"
-                fill="white"
-                opacity="0.6"
-              />
-            </svg>
-          </button>
-        {/if}
-
-        <button
-          class="topbar-btn close-btn"
-          type="button"
-          title="Close Reader"
-          on:mousedown|stopPropagation
-          on:click|stopPropagation={hideReader}
-        >
-          ✕
-        </button>
-      </div>
-    </div>
-
-    {#if showSearch}
-      <div class="search-bar">
-        <input
-          bind:this={searchInputRef}
-          bind:value={searchQuery}
-          class="search-input"
-          placeholder="Search…"
-          on:input={runSearch}
-          on:keydown={handleSearchKeydown}
-        />
-        <span class="search-count">
-          {searchMatches.length > 0
-            ? `${searchIndex + 1} of ${searchMatches.length}`
-            : searchQuery
-              ? "0 results"
-              : ""}
-        </span>
-        <button class="search-nav" type="button" on:click={() => stepSearch(-1)}
-          >↑</button
-        >
-        <button class="search-nav" type="button" on:click={() => stepSearch(1)}
-          >↓</button
-        >
-        <button class="search-close" type="button" on:click={closeSearch}
-          >✕</button
-        >
-      </div>
-    {/if}
-  </div>
-
-  {#if tabContextMenu.open}
-    <div
-      class="tab-context-backdrop"
-      role="presentation"
-      on:click={closeTabContextMenu}
-      on:contextmenu|preventDefault={closeTabContextMenu}
-    >
-      <div
-        class="tab-context-menu"
-        role="menu"
-        style={`left: ${tabContextMenu.x}px; top: ${tabContextMenu.y}px;`}
-      >
-        <button
-          class="tab-context-item"
-          type="button"
-          role="menuitem"
-          on:click={() => closeTabByIndex(tabContextMenu.tabIndex)}
-        >
-          Schliessen
-        </button>
-      </div>
-    </div>
-  {/if}
-
-  <div class="editor-scroll" bind:this={scrollRef} on:scroll={handleEditorScroll}>
+  <div
+    class="editor-scroll"
+    bind:this={scrollRef}
+    on:scroll={handleEditorScroll}
+  >
     {#if fileMissing}
       <div class="missing-file-banner">{missingFileMessage}</div>
     {/if}
@@ -3012,59 +1934,23 @@
     <div class="drop-overlay"></div>
   {/if}
 
-  {#if showPalette}
-    <div
-      class="palette-backdrop"
-      role="button"
-      tabindex="0"
-      on:click|self={closePalette}
-      on:keydown={(event) => {
-        if (["Escape", "Enter", " "].includes(event.key)) {
-          event.preventDefault();
-          closePalette();
-        }
-      }}
-    >
-      <div class="palette" role="dialog" aria-modal="true">
-        <input
-          bind:this={paletteInputRef}
-          bind:value={paletteQuery}
-          class="palette-input"
-          placeholder="Search vault notes..."
-          spellcheck="false"
-          on:keydown={(event) => {
-            event.stopPropagation();
-            handlePaletteKeydown(event);
-          }}
-        />
+  <CommandPalette
+    open={showPalette}
+    query={paletteQuery}
+    notes={filteredVaultNotes}
+    selectedIndex={selectedPaletteIndex}
+    bind:inputRef={paletteInputRef}
+    on:queryChange={(event) => {
+      paletteQuery = event.detail.currentTarget.value;
+    }}
+    on:selectIndex={(event) => {
+      selectedPaletteIndex = event.detail;
+    }}
+    on:openNote={(event) => openVaultNote(event.detail)}
+    on:close={closePalette}
+  />
 
-        <div class="palette-results">
-          {#if filteredVaultNotes.length === 0}
-            <div class="palette-empty">No matching notes</div>
-          {:else}
-            {#each filteredVaultNotes as note, index (note.path)}
-              <button
-                class="palette-item"
-                class:selected={index === selectedPaletteIndex}
-                type="button"
-                on:mouseenter={() => (selectedPaletteIndex = index)}
-                on:click={() => openVaultNote(note)}
-              >
-                <span class="palette-name">{note.name}</span>
-                <span class="palette-path">{note.relative_path}</span>
-              </button>
-            {/each}
-          {/if}
-        </div>
-      </div>
-    </div>
-  {/if}
-
-  {#if statusMessage && statusType === "error"}
-    <div class="status-toast" class:error={statusType === "error"}>
-      {statusMessage}
-    </div>
-  {/if}
+  <StatusToast message={statusMessage} type={statusType} />
 </div>
 
 {#if showAutocomplete && autocompleteResults.length > 0}
@@ -3139,10 +2025,11 @@
       0 2px 8px rgba(0, 0, 0, 0.04);
   }
 
-  .accent-line,
-  .reader-topbar,
+  :global(.accent-line),
+  :global(.reader-topbar),
+  :global(.search-bar),
   .editor-scroll,
-  .status-toast {
+  :global(.status-toast) {
     transition:
       filter 0.18s ease,
       opacity 0.18s ease,
@@ -3164,10 +2051,11 @@
     z-index: 30;
   }
 
-  .reader-container.palette-open .accent-line,
-  .reader-container.palette-open .reader-topbar,
+  .reader-container.palette-open :global(.accent-line),
+  .reader-container.palette-open :global(.reader-topbar),
+  .reader-container.palette-open :global(.search-bar),
   .reader-container.palette-open .editor-scroll,
-  .reader-container.palette-open .status-toast {
+  .reader-container.palette-open :global(.status-toast) {
     filter: blur(4px) brightness(0.85);
     opacity: 0.7;
     transform: scale(0.996);
@@ -3178,337 +2066,11 @@
       transform 0.2s;
   }
 
-  .accent-line {
-    height: 2px;
-    background: linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
-    );
-    background-size: 200% 100%;
-    animation: shimmer 3s linear infinite;
-  }
-
-  @keyframes shimmer {
-    0% {
-      background-position: 200% 0;
-    }
-    100% {
-      background-position: -200% 0;
-    }
-  }
-
-  .reader-topbar {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-    min-height: 40px;
-    padding: 8px 12px 8px;
-    gap: 6px;
-    background: transparent;
-  }
-
-  .topbar-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .tab-strip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    flex: 1;
-  }
-
-  .tab-list {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .tab-list::-webkit-scrollbar {
-    display: none;
-  }
-
-  .tab-button,
-  .tab-action,
-  .palette-item {
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-  }
-
-  .tab-button {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    flex: 0 0 auto;
-    max-width: 120px;
-    padding: 8px 10px 10px;
-    border-radius: 10px 10px 0 0;
-    color: rgba(255, 255, 255, 0.7);
-    cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .tab-icon {
-    flex: 0 0 auto;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .tab-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .tab-context-backdrop {
-    position: absolute;
-    inset: 0;
-    z-index: 115;
-  }
-
-  .tab-context-menu {
-    position: absolute;
-    display: inline-flex;
-    color: var(--app-text-color, #ffffff);
-  }
-
-  .tab-context-item {
-    position: relative;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    min-height: 32px;
-    padding: 8px 10px;
-    border-radius: 9px;
-    text-align: left;
-    cursor: pointer;
-    color: inherit;
-    font: inherit;
-    border: 0;
-    background: transparent;
-    overflow: hidden;
-    isolation: isolate;
-    transition:
-      background var(--transition-fast),
-      transform var(--transition-fast);
-  }
-
-  .tab-context-item::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
-    );
-    background-size: 200% 100%;
-    animation: shimmer 3s linear infinite;
-    pointer-events: none;
-    z-index: 2;
-  }
-
-  .tab-context-item::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: color-mix(
-      in srgb,
-      var(--app-background, #1e1e2e) 28%,
-      transparent
-    );
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.08),
-      0 2px 8px rgba(0, 0, 0, 0.04);
-    backdrop-filter: blur(28px) saturate(135%) brightness(0.92);
-    -webkit-backdrop-filter: blur(28px) saturate(135%) brightness(0.92);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  .tab-context-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .tab-context-item:active {
-    transform: translateY(1px);
-  }
-
-  .tab-button.active {
-    color: var(--app-text-color, #ffffff);
-    background: rgba(255, 255, 255, 0.04);
-  }
-
-  .tab-button.active::after {
-    content: "";
-    position: absolute;
-    left: 10px;
-    right: 10px;
-    bottom: 0;
-    height: 2px;
-    border-radius: 999px;
-    background: var(--accent-color, #8b5cf6);
-  }
-
-  .tab-action {
-    width: 26px;
-    height: 26px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    cursor: pointer;
-    transition:
-      background var(--transition-fast),
-      transform var(--transition-fast);
-  }
-
-  .topbar-actions {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    margin-left: auto;
-    flex: 0 0 auto;
-    -webkit-app-region: no-drag;
-  }
-
-  .topbar-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border: 0;
-    border-radius: 5px;
-    background: transparent;
-    color: var(--text-secondary);
-    font: inherit;
-    font-size: 14px;
-    cursor: pointer;
-    transition:
-      background var(--transition-fast),
-      color var(--transition-fast);
-  }
-
-  .topbar-btn:hover {
-    background: rgba(0, 0, 0, 0.08);
-    color: var(--app-text-color, #ffffff);
-  }
-
-  .back-button {
-    font-size: 16px;
-  }
-
-  .obsidian-btn {
-    opacity: 0.5;
-  }
-
-  .obsidian-btn:hover {
-    opacity: 1;
-  }
-
-  .tab-action:hover,
-  .tab-button:hover,
-  .palette-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .tab-action:active {
-    transform: translateY(1px);
-  }
-
-  .save-indicator {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.72);
-  }
-
-  .save-indicator.busy {
-    color: rgba(255, 255, 255, 0.9);
-  }
-
   .editor-scroll {
     position: relative;
     flex: 1;
     overflow-y: auto;
     background: transparent;
-  }
-
-  .search-bar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    flex-shrink: 0;
-    width: 100%;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    -webkit-app-region: no-drag;
-  }
-
-  .search-input {
-    flex: 1;
-    min-width: 0;
-    border: 0;
-    background: transparent;
-    color: var(--app-text-color, #ffffff);
-    font: inherit;
-    font-size: 13px;
-    outline: none;
-    -webkit-app-region: no-drag;
-  }
-
-  .search-count {
-    min-width: 56px;
-    color: var(--text-secondary);
-    font-size: 11px;
-    text-align: right;
-    white-space: nowrap;
-  }
-
-  .search-nav,
-  .search-close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border: 0;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 12px;
-    transition: background var(--transition-fast);
-    -webkit-app-region: no-drag;
-  }
-
-  .search-nav:hover,
-  .search-close:hover {
-    background: rgba(0, 0, 0, 0.08);
-    color: var(--app-text-color, #ffffff);
   }
 
   .missing-file-banner {
@@ -3801,152 +2363,6 @@
     );
   }
 
-  .palette-backdrop {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 52px 14px 14px;
-    z-index: 120;
-    background: transparent;
-    pointer-events: auto;
-  }
-
-  .palette {
-    position: relative;
-    width: 100%;
-    max-width: 520px;
-    max-height: min(70vh, 520px);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border-radius: 12px;
-    background: color-mix(
-      in srgb,
-      var(--app-background, #1e1e2e) var(--app-transparency, 55%),
-      transparent
-    );
-    backdrop-filter: blur(var(--app-blur, 80px))
-      saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
-    -webkit-backdrop-filter: blur(var(--app-blur, 80px))
-      saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
-    color: var(--app-text-color, #ffffff);
-    font-family: var(
-      --app-font-family,
-      -apple-system,
-      BlinkMacSystemFont,
-      "SF Pro Display",
-      sans-serif
-    );
-    border: 0.5px solid rgba(0, 0, 0, 0.08);
-    box-shadow:
-      0 18px 48px rgba(0, 0, 0, 0.24),
-      0 6px 18px rgba(0, 0, 0, 0.14);
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-    z-index: 1;
-  }
-
-  .palette::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
-    );
-    background-size: 200% 100%;
-    animation: shimmer 3s linear infinite;
-    z-index: 1;
-  }
-
-  .palette-input {
-    width: 100%;
-    padding: 14px 16px 12px;
-    border: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    background: transparent;
-    color: var(--app-text-color, #ffffff);
-    font: inherit;
-    outline: none;
-    position: relative;
-    z-index: 1;
-  }
-
-  .palette-input::placeholder {
-    color: rgba(255, 255, 255, 0.4);
-  }
-
-  .palette-results {
-    flex: 1;
-    max-height: 420px;
-    overflow-y: auto;
-    padding: 10px 8px 8px;
-  }
-
-  .palette-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 12px;
-    cursor: pointer;
-    text-align: left;
-    transition: background var(--transition-fast);
-  }
-
-  .palette-item.selected {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .palette-name {
-    color: var(--app-text-color, #ffffff);
-    font-weight: 600;
-  }
-
-  .palette-path {
-    margin-top: 2px;
-    color: rgba(255, 255, 255, 0.58);
-    font-size: 12px;
-  }
-
-  .palette-empty {
-    padding: 18px 12px;
-    color: rgba(255, 255, 255, 0.58);
-    text-align: center;
-  }
-
-  .status-toast {
-    position: absolute;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 8px 16px;
-    background: rgba(52, 199, 89, 0.12);
-    backdrop-filter: blur(20px);
-    border: 0.5px solid rgba(52, 199, 89, 0.3);
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #34c759;
-    animation: fadeInUp 0.2s ease-out;
-    white-space: nowrap;
-    z-index: 100;
-  }
-
-  .status-toast.error {
-    background: rgba(255, 59, 48, 0.12);
-    border-color: rgba(255, 59, 48, 0.3);
-    color: #ff3b30;
-  }
-
   .autocomplete-dropdown {
     position: fixed;
     z-index: 200;
@@ -4015,29 +2431,15 @@
     color: #1a1a1a;
   }
 
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-  }
-
-  .editor-scroll::-webkit-scrollbar,
-  .palette-results::-webkit-scrollbar {
+  .editor-scroll::-webkit-scrollbar {
     width: 6px;
   }
 
-  .editor-scroll::-webkit-scrollbar-track,
-  .palette-results::-webkit-scrollbar-track {
+  .editor-scroll::-webkit-scrollbar-track {
     background: transparent;
   }
 
-  .editor-scroll::-webkit-scrollbar-thumb,
-  .palette-results::-webkit-scrollbar-thumb {
+  .editor-scroll::-webkit-scrollbar-thumb {
     background: rgba(0, 0, 0, 0.12);
     border-radius: 3px;
   }
