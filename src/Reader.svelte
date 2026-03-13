@@ -994,6 +994,18 @@
     return null;
   }
 
+  function splitTrailingUrlPunctuation(rawUrl = "") {
+    let url = rawUrl;
+    let trailing = "";
+
+    while (/[),.!?;:]$/.test(url)) {
+      trailing = `${url.slice(-1)}${trailing}`;
+      url = url.slice(0, -1);
+    }
+
+    return { url, trailing };
+  }
+
   async function resolveImagePath(rawPath = "") {
     const cleanPath = rawPath.split("|")[0]?.trim() ?? "";
     if (!cleanPath) return "";
@@ -1039,6 +1051,7 @@
 
   function inlineMarkdown(text = "") {
     const imageTokens = [];
+    const linkTokens = [];
     let html = text;
 
     html = html.replace(/!\[\[([^\]]+)\]\]/g, (_, inner) => {
@@ -1061,6 +1074,29 @@
       return `\u0000IMG${imageTokens.length - 1}\u0000`;
     });
 
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (fullMatch, label, href) => {
+      const safeHref = sanitizeExternalHref(href);
+      if (!safeHref) {
+        return fullMatch;
+      }
+
+      const linkTag = `<a href="${escAttr(safeHref)}" target="_blank" rel="noopener noreferrer">${escHtml(label)}</a>`;
+      linkTokens.push(linkTag);
+      return `\u0000LNK${linkTokens.length - 1}\u0000`;
+    });
+
+    html = html.replace(/\bhttps?:\/\/[^\s<]+/gi, (rawUrl) => {
+      const { url, trailing } = splitTrailingUrlPunctuation(rawUrl);
+      const safeHref = sanitizeExternalHref(url);
+      if (!safeHref) {
+        return rawUrl;
+      }
+
+      const linkTag = `<a href="${escAttr(safeHref)}" target="_blank" rel="noopener noreferrer">${escHtml(url)}</a>`;
+      linkTokens.push(linkTag);
+      return `\u0000LNK${linkTokens.length - 1}\u0000${trailing}`;
+    });
+
     html = escHtml(html);
     html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
@@ -1071,13 +1107,8 @@
       const display = (rawDisplay || rawTarget).trim();
       return `<span class="wikilink" data-target="${escAttr(target)}">[[${escHtml(display)}]]</span>`;
     });
-    html = html.replace(/\[(.+?)\]\((.+?)\)/g, (_, label, href) => {
-      const safeHref = sanitizeExternalHref(href);
-      if (!safeHref) {
-        return `${escHtml(label)} (${escHtml(href)})`;
-      }
-
-      return `<a href="${escAttr(safeHref)}" target="_blank" rel="noopener noreferrer">${escHtml(label)}</a>`;
+    html = html.replace(/\u0000LNK(\d+)\u0000/g, (_, index) => {
+      return linkTokens[Number(index)] ?? "";
     });
     html = html.replace(/\u0000IMG(\d+)\u0000/g, (_, index) => {
       return imageTokens[Number(index)] ?? "";
