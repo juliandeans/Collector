@@ -1639,6 +1639,7 @@
 
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
+    if (!selection.isCollapsed) return;
 
     const node = selection.getRangeAt(0).startContainer;
     const anchorEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
