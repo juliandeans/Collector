@@ -1,4 +1,5 @@
 <script>
+  import "./lib/reader/reader-shell.css";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy, tick } from "svelte";
@@ -11,14 +12,53 @@
   import {
     imagePathCache,
     normalizeNewlines,
-    parseRawBlocks,
     preprocessContent,
   } from "./lib/reader/contentProcessing.js";
+  import { getAutocompleteResults } from "./lib/reader/autocomplete.js";
   import { composeContentFromMarkdown } from "./lib/reader/editorSerialization.js";
+  import {
+    createImportPlaceholder,
+    processDroppedFiles,
+    processDroppedPaths,
+  } from "./lib/reader/imageImport.js";
+  import { setupListeners } from "./lib/reader/lifecycleSetup.js";
+  import {
+    ensureVaultNotes,
+    navigateToWikilink,
+    openInObsidian,
+  } from "./lib/reader/navigation.js";
+  import { createDebouncedJob } from "./lib/reader/saveLoadPipeline.js";
+  import {
+    applyColorSettings,
+    applySettings,
+    computeBrightnessFilter,
+    getReaderFilterSettings,
+    haveReaderFilterChanges,
+  } from "./lib/reader/settingsBridge.js";
+  import {
+    applySearchHighlights,
+    clearSearchHighlights,
+    runSearch as collectSearchMatches,
+    stepSearch as getNextSearchIndex,
+  } from "./lib/reader/searchLogic.js";
+  import {
+    createTab,
+    fileLabel,
+    getPinnedNotesSignature,
+    rebuildTabsFromSettings,
+  } from "./lib/reader/tabState.js";
+  import {
+    getDailyNotePath,
+    loadTabContent,
+    saveTabContent,
+  } from "./lib/reader/tabIO.js";
+  import {
+    filterPaletteNotes,
+    openVaultNote as getOpenVaultNoteIntent,
+  } from "./lib/reader/paletteLogic.js";
 
   let tabs = [];
   let activeTabIndex = 0;
-  let blocks = [""];
   let showPalette = false;
   let paletteQuery = "";
   let vaultNotes = [];
@@ -56,7 +96,6 @@
   let selectedPaletteIndex = 0;
   let showSavedIndicator = false;
   let showAutocomplete = false;
-  let autocompleteQuery = "";
   let autocompleteIndex = 0;
   let autocompleteResults = [];
   let autocompleteRange = null;
@@ -77,141 +116,26 @@
 
   let editorComponent;
   let paletteInputRef;
-  let saveTimeout;
-  let pendingSave = null;
   let statusTimeout;
   let savedIndicatorTimeout;
   let unlistenShowReader;
   let unlistenSettingsChanged;
+  let cleanupGlobalListeners = () => {};
+  const saveScheduler = createDebouncedJob(600);
 
   $: activeTab = tabs[activeTabIndex] ?? null;
   $: fileMissing = missingFileMessage.trim() !== "";
-  $: filteredVaultNotes = vaultNotes.filter((note) => {
-    const query = paletteQuery.trim().toLowerCase();
-    if (!query) return true;
-    return (
-      note.name.toLowerCase().includes(query) ||
-      note.relative_path.toLowerCase().includes(query)
-    );
-  });
+  $: filteredVaultNotes = filterPaletteNotes(vaultNotes, paletteQuery);
   $: if (selectedPaletteIndex >= filteredVaultNotes.length) {
     selectedPaletteIndex = Math.max(filteredVaultNotes.length - 1, 0);
   }
-  $: brightnessFilter = (() => {
-    const b = appSettings.window_brightness;
-    if (b === 0) return "";
-    if (b > 0) {
-      const brightnessValue = 1 + (b / 100) * 0.6;
-      const contrastValue = 1 - (b / 100) * 0.25;
-      return ` brightness(${brightnessValue}) contrast(${contrastValue})`;
-    }
-    const brightnessValue = 1 + (b / 100) * 0.7;
-    const contrastValue = 1 + (-b / 100) * 0.3;
-    return ` brightness(${brightnessValue}) contrast(${contrastValue})`;
-  })();
+  $: brightnessFilter = computeBrightnessFilter(appSettings.window_brightness);
 
   function isFileDrag(event) {
     const types = event.dataTransfer?.types;
     if (types && Array.from(types).includes("Files")) return true;
     const items = event.dataTransfer?.items;
     return !!items && items.length > 0;
-  }
-
-  function applyColorSettings(settings = appSettings) {
-    const root = document.documentElement;
-    root.style.setProperty(
-      "--accent-color",
-      settings.accent_color ?? "#8b5cf6",
-    );
-    root.style.setProperty(
-      "--internal-link-color",
-      settings.internal_link_color ?? "#a78bfa",
-    );
-    root.style.setProperty(
-      "--external-link-color",
-      settings.external_link_color ?? "#60a5fa",
-    );
-  }
-
-  function isFrontmatterBlock(block, index) {
-    const trimmed = block.trim();
-    return index === 0 && trimmed.startsWith("---") && trimmed.endsWith("---");
-  }
-
-  function isCodeBlock(block) {
-    const trimmed = block.trim();
-    return trimmed.startsWith("```") && trimmed.endsWith("```");
-  }
-
-  function isObsidianComment(block) {
-    const trimmed = block.trim();
-    return trimmed.startsWith("%%") && trimmed.endsWith("%%");
-  }
-
-  function fileLabel(path) {
-    const filename = path.split("/").pop() || path;
-    return filename.replace(/\.md$/i, "");
-  }
-
-  function normalizePinnedNotes(pinnedNotes = []) {
-    return pinnedNotes
-      .map((entry) => {
-        if (typeof entry === "string") {
-          return {
-            path: entry,
-            label: fileLabel(entry),
-            icon: "",
-          };
-        }
-
-        return {
-          path: entry?.path ?? "",
-          label: entry?.label ?? "",
-          icon: entry?.icon ?? "",
-        };
-      })
-      .filter((entry) => entry.path.trim() !== "")
-      .map((entry) => ({
-        path: entry.path,
-        label: entry.label.trim(),
-        icon: entry.icon.trim(),
-      }));
-  }
-
-  function getPinnedNotesSignature(pinnedNotes = []) {
-    return JSON.stringify(
-      normalizePinnedNotes(pinnedNotes).map((note) => ({
-        path: note.path,
-        label: note.label,
-        icon: note.icon,
-      })),
-    );
-  }
-
-  function createTab({
-    kind = "opened",
-    path,
-    label = "",
-    icon = "",
-    isPinned = kind === "daily" || kind === "pinned",
-    history = [],
-    existingTab = null,
-  }) {
-    const fallbackLabel =
-      kind === "daily" ? "Daily" : kind === "pinned" ? "" : fileLabel(path);
-
-    return {
-      kind,
-      path,
-      label: label.trim() || fallbackLabel,
-      icon: icon.trim(),
-      content: existingTab?.content ?? "",
-      loaded: existingTab?.loaded ?? false,
-      missing: existingTab?.missing ?? false,
-      missingMessage: existingTab?.missingMessage ?? "",
-      isPinned: existingTab?.isPinned ?? isPinned,
-      history: [...(existingTab?.history ?? history)],
-    };
   }
 
   function normalizeError(error) {
@@ -239,22 +163,8 @@
     }, duration);
   }
 
-  function filterVaultNotes(query) {
-    if (!query) return vaultNotes.slice(0, 10);
-
-    const lower = query.toLowerCase();
-    return vaultNotes
-      .filter(
-        (note) =>
-          note.name.toLowerCase().includes(lower) ||
-          note.relative_path.toLowerCase().includes(lower),
-      )
-      .slice(0, 8);
-  }
-
   function closeAutocomplete() {
     showAutocomplete = false;
-    autocompleteQuery = "";
     autocompleteIndex = 0;
     autocompleteRange = null;
     autocompleteResults = [];
@@ -262,30 +172,11 @@
   }
 
   function clearHighlights() {
-    if (typeof CSS !== "undefined" && CSS.highlights) {
-      CSS.highlights.clear();
-    }
+    clearSearchHighlights();
   }
 
   function highlightMatches() {
-    clearHighlights();
-
-    if (
-      typeof CSS === "undefined" ||
-      !CSS.highlights ||
-      typeof Highlight === "undefined" ||
-      searchMatches.length === 0
-    ) {
-      return;
-    }
-
-    const allHighlight = new Highlight(...searchMatches);
-    CSS.highlights.set("search-result", allHighlight);
-
-    if (searchMatches[searchIndex]) {
-      const activeHighlight = new Highlight(searchMatches[searchIndex]);
-      CSS.highlights.set("search-active", activeHighlight);
-    }
+    applySearchHighlights(searchMatches, searchIndex);
   }
 
   function scrollToMatch(index) {
@@ -321,39 +212,10 @@
     searchIndex = 0;
 
     const editorEl = editorComponent?.getEditorElement?.();
-    if (!searchQuery.trim() || !editorEl) return;
-
-    const walker = document.createTreeWalker(
-      editorEl,
-      NodeFilter.SHOW_TEXT,
-      null,
-    );
-
-    const query = searchQuery.toLowerCase();
-    const ranges = [];
-    let node;
-
-    while ((node = walker.nextNode())) {
-      const text = node.textContent ?? "";
-      const lower = text.toLowerCase();
-      let position = 0;
-
-      while (true) {
-        const matchIndex = lower.indexOf(query, position);
-        if (matchIndex === -1) break;
-
-        const range = document.createRange();
-        range.setStart(node, matchIndex);
-        range.setEnd(node, matchIndex + query.length);
-        ranges.push(range);
-        position = matchIndex + 1;
-      }
-    }
-
-    searchMatches = ranges;
+    searchMatches = collectSearchMatches(searchQuery, editorEl);
     highlightMatches();
 
-    if (ranges.length > 0) {
+    if (searchMatches.length > 0) {
       scrollToMatch(0);
     }
   }
@@ -361,8 +223,7 @@
   function stepSearch(direction) {
     if (searchMatches.length === 0) return;
 
-    searchIndex =
-      (searchIndex + direction + searchMatches.length) % searchMatches.length;
+    searchIndex = getNextSearchIndex(searchMatches, searchIndex, direction);
     highlightMatches();
     scrollToMatch(searchIndex);
   }
@@ -381,67 +242,6 @@
       searchInputRef?.focus();
       searchInputRef?.select();
     });
-  }
-
-  function createImportPlaceholder(filename = "image") {
-    const label = filename.replace(/\s+/g, " ").trim() || "image";
-    return `[Importing image: ${label} · ${Date.now()}-${Math.random().toString(36).slice(2, 8)}]`;
-  }
-
-  function normalizeImportedImageResult(result) {
-    if (typeof result === "string") {
-      return { markdown: result };
-    }
-
-    return {
-      markdown: result?.markdown ?? "",
-    };
-  }
-
-  function fileExtension(name = "") {
-    return name.split(".").pop()?.toLowerCase() ?? "";
-  }
-
-  async function importImageFile(file, fallbackPath = null) {
-    const ext = fileExtension(file?.name ?? fallbackPath ?? "");
-    if (!["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
-      throw new Error(
-        `Unsupported image: ${file?.name ?? fallbackPath ?? "file"}`,
-      );
-    }
-
-    const candidatePath =
-      fallbackPath || file?.path || file?.webkitRelativePath || null;
-
-    if (candidatePath) {
-      const result = await invoke("save_image", {
-        filePath: candidatePath,
-      });
-      return normalizeImportedImageResult(result).markdown;
-    }
-
-    if (!file) {
-      throw new Error("Image file data not available");
-    }
-
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result;
-        const base64String =
-          typeof result === "string" ? result.split(",")[1] || result : "";
-        resolve(base64String);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-    const result = await invoke("save_image_from_bytes", {
-      bytesBase64: base64,
-      filename: file.name || "clipboard-image.png",
-    });
-
-    return normalizeImportedImageResult(result).markdown;
   }
 
   function insertImportedMarkdown(
@@ -493,7 +293,6 @@
 
   async function finalizeImportedImages(replacements) {
     const markdown = getCurrentMarkdown();
-    blocks = parseRawBlocks(normalizeNewlines(markdown));
     let nextContent = composeContentFromMarkdown(markdown, {
       strippedFrontmatter,
       hiddenBlockMap,
@@ -509,6 +308,30 @@
     imagePathCache.clear();
     await renderContentToEditor(rawContent);
     scheduleSave(rawContent);
+  }
+
+  function buildImportReplacements(results, jobs) {
+    return results.map((result, index) => {
+      if (result.status === "fulfilled") {
+        return {
+          placeholder: jobs[index].placeholder,
+          markdown: result.value,
+        };
+      }
+
+      showStatus(normalizeError(result.reason), "error", 2200);
+      return { placeholder: jobs[index].placeholder, markdown: "" };
+    });
+  }
+
+  async function resolveImportJobs(jobs, importer) {
+    insertImportedMarkdown(
+      jobs.map((job) => job.placeholder),
+      { syncEditor: false },
+    );
+
+    const results = await Promise.allSettled(jobs.map(importer));
+    await finalizeImportedImages(buildImportReplacements(results, jobs));
   }
 
   async function handleImportedImages(detail) {
@@ -541,31 +364,18 @@
           };
         });
 
-        insertImportedMarkdown(
-          jobs.map((job) => job.placeholder),
-          { syncEditor: false },
-        );
-
-        const results = await Promise.allSettled(
-          jobs.map((job) => importImageFile(job.file, job.fallbackPath)),
-        );
-
-        const replacements = results.map((result, index) => {
-          if (result.status === "fulfilled") {
-            return {
-              placeholder: jobs[index].placeholder,
-              markdown: result.value,
-            };
+        await resolveImportJobs(jobs, async (job) => {
+          if (job.fallbackPath) {
+            const [result] = await processDroppedPaths(
+              [job.fallbackPath],
+              appSettings,
+            );
+            return result?.markdown ?? "";
           }
 
-          showStatus(normalizeError(result.reason), "error", 2200);
-          return {
-            placeholder: jobs[index].placeholder,
-            markdown: "",
-          };
+          const [result] = await processDroppedFiles([job.file], appSettings);
+          return result?.markdown ?? "";
         });
-
-        await finalizeImportedImages(replacements);
       } catch (error) {
         showStatus(normalizeError(error), "error", 2200);
       } finally {
@@ -589,31 +399,10 @@
             placeholder: createImportPlaceholder(file.name),
           }));
 
-        insertImportedMarkdown(
-          jobs.map((job) => job.placeholder),
-          { syncEditor: false },
-        );
-
-        const results = await Promise.allSettled(
-          jobs.map((job) => importImageFile(job.file, null)),
-        );
-
-        const replacements = results.map((result, index) => {
-          if (result.status === "fulfilled") {
-            return {
-              placeholder: jobs[index].placeholder,
-              markdown: result.value,
-            };
-          }
-
-          showStatus(normalizeError(result.reason), "error", 2200);
-          return {
-            placeholder: jobs[index].placeholder,
-            markdown: "",
-          };
+        await resolveImportJobs(jobs, async (job) => {
+          const [result] = await processDroppedFiles([job.file], appSettings);
+          return result?.markdown ?? "";
         });
-
-        await finalizeImportedImages(replacements);
       } catch (error) {
         showStatus(normalizeError(error), "error", 2200);
       } finally {
@@ -676,58 +465,6 @@
     isDragging = true;
   }
 
-  function applySettings(settings) {
-    appSettings = {
-      ...appSettings,
-      vault_name: settings.vault_name ?? appSettings.vault_name,
-      vault_path: settings.vault_path ?? appSettings.vault_path,
-      background_color:
-        settings.background_color ?? appSettings.background_color,
-      font_family: settings.font_family ?? appSettings.font_family,
-      font_size: settings.font_size ?? appSettings.font_size,
-      border_radius: settings.border_radius ?? appSettings.border_radius,
-      window_transparency:
-        settings.window_transparency ?? appSettings.window_transparency,
-      window_blur: settings.window_blur ?? appSettings.window_blur,
-      window_saturation:
-        settings.window_saturation ?? appSettings.window_saturation,
-      window_brightness:
-        settings.window_brightness ?? appSettings.window_brightness,
-      text_color: settings.text_color ?? appSettings.text_color,
-      accent_color: settings.accent_color ?? appSettings.accent_color,
-      internal_link_color:
-        settings.internal_link_color ?? appSettings.internal_link_color,
-      external_link_color:
-        settings.external_link_color ?? appSettings.external_link_color,
-      pinned_notes: normalizePinnedNotes(
-        settings.pinned_notes ?? appSettings.pinned_notes,
-      ),
-      reader_hide_frontmatter:
-        settings.reader_hide_frontmatter ?? appSettings.reader_hide_frontmatter,
-      reader_hide_dataview:
-        settings.reader_hide_dataview ?? appSettings.reader_hide_dataview,
-      reader_hide_obsidian_comments:
-        settings.reader_hide_obsidian_comments ??
-        appSettings.reader_hide_obsidian_comments,
-      reader_hide_inline_fields:
-        settings.reader_hide_inline_fields ??
-        appSettings.reader_hide_inline_fields,
-      reader_hide_html:
-        settings.reader_hide_html ?? appSettings.reader_hide_html,
-    };
-    applyColorSettings(appSettings);
-  }
-
-  function getReaderFilterSettings(settings = appSettings) {
-    return {
-      reader_hide_frontmatter: settings.reader_hide_frontmatter,
-      reader_hide_dataview: settings.reader_hide_dataview,
-      reader_hide_obsidian_comments: settings.reader_hide_obsidian_comments,
-      reader_hide_inline_fields: settings.reader_hide_inline_fields,
-      reader_hide_html: settings.reader_hide_html,
-    };
-  }
-
   function replaceTab(index, updates) {
     tabs = tabs.map((tab, tabIndex) =>
       tabIndex === index ? { ...tab, ...updates } : tab,
@@ -766,12 +503,12 @@
         strippedFrontmatter = value;
       },
     });
-    blocks = parseRawBlocks(processed);
 
     if (!editorComponent) return;
     await editorComponent.renderContent(raw);
   }
 
+  // TODO: keep this in Reader until editor load/reset state can be passed via a dedicated pipeline object.
   async function loadEditorContent(raw = "") {
     editorComponent?.finalizeBlock?.();
     closeAutocomplete();
@@ -796,7 +533,6 @@
 
   function handleEditorChange() {
     const markdown = getCurrentMarkdown();
-    blocks = parseRawBlocks(normalizeNewlines(markdown));
     const content = composeContentFromMarkdown(markdown, {
       strippedFrontmatter,
       hiddenBlockMap,
@@ -813,8 +549,9 @@
 
   function handleEditorAutocompleteChange(event) {
     showAutocomplete = event.detail.open;
-    autocompleteQuery = event.detail.query;
-    autocompleteResults = event.detail.results;
+    autocompleteResults =
+      event.detail.results ??
+      getAutocompleteResults(event.detail.query, vaultNotes);
     autocompleteRange = event.detail.range;
     autocompleteIndex = event.detail.index ?? 0;
   }
@@ -823,9 +560,44 @@
     try {
       await invoke("open_external_url", { url });
     } catch (error) {
-      console.error("Failed to open external URL:", error);
       showStatus("Failed to open link", "error", 2200);
     }
+  }
+
+  // TODO: extract the tab load/save orchestration once Reader tab state is isolated from editor state.
+  function getMissingState(error) {
+    const message = normalizeError(error);
+    const missing = isFileMissingError(error);
+    return {
+      message,
+      missing,
+      missingMessage: missing ? "File not found - will be created on first save" : message,
+    };
+  }
+
+  function setLoadedTabState(index, content) {
+    replaceTab(index, {
+      content,
+      loaded: true,
+      missing: false,
+      missingMessage: "",
+    });
+  }
+
+  function setMissingTabState(index, missingState) {
+    replaceTab(index, {
+      content: "",
+      loaded: true,
+      missing: missingState.missing,
+      missingMessage: missingState.missingMessage,
+    });
+  }
+
+  async function syncActiveTabView(index, path, content, missingMessage = "") {
+    if (index !== activeTabIndex) return;
+    await loadEditorContent(content);
+    missingFileMessage = missingMessage;
+    await restoreScrollPosition(path);
   }
 
   async function loadTab(index, forceReload = false) {
@@ -833,50 +605,24 @@
     if (!tab) return;
 
     if (!forceReload && tab.loaded) {
-      await loadEditorContent(tab.content);
-      missingFileMessage = tab.missing ? tab.missingMessage || "" : "";
-      if (index === activeTabIndex) {
-        await restoreScrollPosition(tab.path);
-      }
+      await syncActiveTabView(
+        index,
+        tab.path,
+        tab.content,
+        tab.missing ? tab.missingMessage || "" : "",
+      );
       return;
     }
 
     try {
-      const content = await invoke("read_note_file", { path: tab.path });
-      replaceTab(index, {
-        content,
-        loaded: true,
-        missing: false,
-        missingMessage: "",
-      });
-
-      if (index === activeTabIndex) {
-        await loadEditorContent(content);
-        missingFileMessage = "";
-        await restoreScrollPosition(tab.path);
-      }
+      const content = await loadTabContent(tab.path);
+      setLoadedTabState(index, content);
+      await syncActiveTabView(index, tab.path, content);
     } catch (error) {
-      const message = normalizeError(error);
-      const missingMessage = isFileMissingError(error)
-        ? "File not found - will be created on first save"
-        : message;
-
-      replaceTab(index, {
-        content: "",
-        loaded: true,
-        missing: isFileMissingError(error),
-        missingMessage,
-      });
-
-      if (index === activeTabIndex) {
-        await loadEditorContent("");
-        missingFileMessage = missingMessage;
-        await restoreScrollPosition(tab.path);
-      }
-
-      if (!isFileMissingError(error)) {
-        showStatus(message, "error", 2200);
-      }
+      const missingState = getMissingState(error);
+      setMissingTabState(index, missingState);
+      await syncActiveTabView(index, tab.path, "", missingState.missingMessage);
+      if (!missingState.missing) showStatus(missingState.message, "error", 2200);
     }
   }
 
@@ -890,9 +636,7 @@
     }
 
     try {
-      const content = normalizeNewlines(
-        await invoke("read_note_file", { path: tab.path }),
-      );
+      const content = normalizeNewlines(await loadTabContent(tab.path));
       const currentContent = normalizeNewlines(tab.content ?? "");
 
       if (!tab.missing && content === currentContent) {
@@ -902,53 +646,24 @@
         return;
       }
 
-      replaceTab(index, {
-        content,
-        loaded: true,
-        missing: false,
-        missingMessage: "",
-      });
-
-      if (index === activeTabIndex) {
-        await loadEditorContent(content);
-        missingFileMessage = "";
-        await restoreScrollPosition(tab.path);
-      }
+      setLoadedTabState(index, content);
+      await syncActiveTabView(index, tab.path, content);
     } catch (error) {
-      const message = normalizeError(error);
-      const missing = isFileMissingError(error);
-      const missingMessage = missing
-        ? "File not found - will be created on first save"
-        : message;
+      const missingState = getMissingState(error);
       const isUnchangedMissingState =
-        missing &&
+        missingState.missing &&
         tab.missing &&
         normalizeNewlines(tab.content ?? "") === "" &&
-        (tab.missingMessage || "") === missingMessage;
+        (tab.missingMessage || "") === missingState.missingMessage;
 
       if (isUnchangedMissingState) {
-        if (index === activeTabIndex) {
-          missingFileMessage = missingMessage;
-        }
+        if (index === activeTabIndex) missingFileMessage = missingState.missingMessage;
         return;
       }
 
-      replaceTab(index, {
-        content: "",
-        loaded: true,
-        missing,
-        missingMessage,
-      });
-
-      if (index === activeTabIndex) {
-        await loadEditorContent("");
-        missingFileMessage = missingMessage;
-        await restoreScrollPosition(tab.path);
-      }
-
-      if (!missing) {
-        showStatus(message, "error", 2200);
-      }
+      setMissingTabState(index, missingState);
+      await syncActiveTabView(index, tab.path, "", missingState.missingMessage);
+      if (!missingState.missing) showStatus(missingState.message, "error", 2200);
     }
   }
 
@@ -964,11 +679,6 @@
     await loadTab(index, forceReload);
   }
 
-  async function reloadCurrentTab() {
-    if (!activeTab) return;
-    await loadTab(activeTabIndex, true);
-  }
-
   async function saveTabByIndex(index, content, showConfirmation = true) {
     const tab = tabs[index];
     if (!tab) return;
@@ -976,10 +686,7 @@
     isSaving = true;
 
     try {
-      await invoke("write_note_file", {
-        path: tab.path,
-        content,
-      });
+      await saveTabContent(tab.path, content);
 
       replaceTab(index, {
         content,
@@ -1005,41 +712,29 @@
   }
 
   function scheduleSave(content = rawContent) {
-    clearTimeout(saveTimeout);
-    pendingSave = {
-      index: activeTabIndex,
-      content,
-    };
-
-    saveTimeout = setTimeout(() => {
-      const job = pendingSave;
-      saveTimeout = null;
-      pendingSave = null;
-      if (job) {
+    saveScheduler.schedule(
+      {
+        index: activeTabIndex,
+        content,
+      },
+      (job) => {
         saveTabByIndex(job.index, job.content);
-      }
-    }, 600);
+      },
+    );
   }
 
   async function flushPendingSave(showConfirmation = false) {
-    if (!saveTimeout || !pendingSave) return;
-
-    clearTimeout(saveTimeout);
-    saveTimeout = null;
-    const job = pendingSave;
-    pendingSave = null;
+    const job = saveScheduler.flush();
+    if (!job) return;
     await saveTabByIndex(job.index, job.content, showConfirmation);
   }
 
   async function forceSave(showConfirmation = true) {
     if (!activeTab) return;
 
-    clearTimeout(saveTimeout);
-    saveTimeout = null;
-    pendingSave = null;
+    saveScheduler.clear();
 
     const markdown = getCurrentMarkdown();
-    blocks = parseRawBlocks(normalizeNewlines(markdown));
     const content = composeContentFromMarkdown(markdown, {
       strippedFrontmatter,
       hiddenBlockMap,
@@ -1048,10 +743,6 @@
     rawContent = content;
     updateActiveTabContent(content);
     await saveTabByIndex(activeTabIndex, content, showConfirmation);
-  }
-
-  async function saveCurrentTab(showConfirmation = true) {
-    await forceSave(showConfirmation);
   }
 
   function closeTabContextMenu() {
@@ -1138,122 +829,88 @@
     }
   }
 
-  async function openInObsidian() {
+  async function handleOpenInObsidian() {
     const tab = tabs[activeTabIndex];
     if (!tab?.path) return;
 
     try {
-      const settings = await invoke("load_settings");
-      const vaultName = settings.vault_name ?? "Vault";
-      const vaultPath = (settings.vault_path ?? "").replace(/[\\/]$/, "");
-      let relativePath = tab.path.replace(/\\/g, "/");
-
-      if (vaultPath) {
-        const normalizedVaultPath = vaultPath.replace(/\\/g, "/");
-        if (relativePath.startsWith(normalizedVaultPath)) {
-          relativePath = relativePath
-            .slice(normalizedVaultPath.length)
-            .replace(/^\/+/, "");
-        }
-      }
-
-      const noteRef = relativePath.replace(/\.md$/i, "");
-      const encodedVault = encodeURIComponent(vaultName);
-      const encodedNote = encodeURIComponent(noteRef).replace(/%2F/g, "/");
-      const obsidianUrl = `obsidian://open?vault=${encodedVault}&file=${encodedNote}`;
-      await invoke("open_external_url", { url: obsidianUrl });
+      await openInObsidian(
+        tab.path,
+        appSettings.vault_name ?? "Vault",
+        appSettings.vault_path ?? "",
+      );
     } catch (error) {
-      console.error("Failed to open in Obsidian:", error);
       showStatus("Failed to open in Obsidian", "error", 2200);
     }
   }
 
-  async function ensureVaultNotes() {
-    if (vaultNotes.length > 0) return;
+  function createOpenedNoteTab(note, history = []) {
+    return createTab({
+      kind: "opened",
+      path: note.path,
+      label: note.name,
+      isPinned: false,
+      history,
+    });
+  }
 
+  async function applyOpenVaultNoteIntent(intent) {
+    if (intent.action === "activateExisting") {
+      await activateTab(intent.index, true);
+      return true;
+    }
+
+    if (intent.action === "newTab") {
+      tabs = [...tabs, createOpenedNoteTab(intent.note)];
+      await activateTab(tabs.length - 1, true);
+      return true;
+    }
+
+    return false;
+  }
+
+  async function handleNavigateToWikilink(target, forceNewTab = false) {
     try {
-      vaultNotes = await invoke("list_vault_notes");
+      vaultNotes = await ensureVaultNotes(vaultNotes);
     } catch (error) {
       showStatus(normalizeError(error), "error", 2200);
+      return;
     }
-  }
 
-  async function resolveWikilink(target) {
-    const withoutDisplay = target.split("|")[0].trim();
-    const cleanTarget = withoutDisplay.split("#")[0].trim();
-    if (!cleanTarget) return null;
-
-    await ensureVaultNotes();
-
-    const normalizedTarget = cleanTarget.toLowerCase().replace(/\\/g, "/");
-    const withExtension = normalizedTarget.endsWith(".md")
-      ? normalizedTarget
-      : `${normalizedTarget}.md`;
-
-    let found = vaultNotes.find((note) => {
-      const relativePath = note.relative_path.toLowerCase().replace(/\\/g, "/");
-      return (
-        note.name.toLowerCase() === normalizedTarget ||
-        relativePath === normalizedTarget ||
-        relativePath === withExtension
-      );
+    const intent = navigateToWikilink(target, tabs, activeTabIndex, {
+      vaultNotes,
+      forceNewTab,
     });
 
-    if (!found) {
-      found = vaultNotes.find((note) =>
-        note.name.toLowerCase().includes(normalizedTarget),
-      );
-    }
-
-    return found ?? null;
-  }
-
-  async function navigateToWikilink(target, forceNewTab = false) {
-    const note = await resolveWikilink(target);
-    if (!note) {
+    if (intent.action === "notFound") {
       showStatus(`Note not found: [[${target}]]`, "error", 2200);
       return;
     }
 
-    const currentTab = tabs[activeTabIndex];
-    if (!currentTab) return;
-
-    saveScrollPosition();
-    const openNewTab = forceNewTab || currentTab.isPinned;
-
-    if (openNewTab) {
-      const existingIndex = tabs.findIndex((tab) => tab.path === note.path);
-      if (existingIndex >= 0) {
-        await activateTab(existingIndex, true);
-        return;
-      }
-
-      tabs = [
-        ...tabs,
-        createTab({
-          kind: "opened",
-          path: note.path,
-          label: note.name,
-          isPinned: false,
-          history: [],
-        }),
-      ];
-      await activateTab(tabs.length - 1, true);
+    if (intent.action === "noop") {
       return;
     }
 
-    await forceSave(false);
-    replaceTab(activeTabIndex, {
-      path: note.path,
-      label: note.name,
-      content: "",
-      loaded: false,
-      missing: false,
-      missingMessage: "",
-      history: [...(currentTab.history ?? []), currentTab.path],
-      isPinned: false,
-    });
-    await loadTab(activeTabIndex, true);
+    saveScrollPosition();
+
+    if (await applyOpenVaultNoteIntent(intent)) {
+      return;
+    }
+
+    if (intent.action === "replaceCurrent") {
+      await forceSave(false);
+      replaceTab(activeTabIndex, {
+        path: intent.note.path,
+        label: intent.note.name,
+        content: "",
+        loaded: false,
+        missing: false,
+        missingMessage: "",
+        history: intent.history,
+        isPinned: false,
+      });
+      await loadTab(activeTabIndex, true);
+    }
   }
 
   async function navigateBack() {
@@ -1279,11 +936,15 @@
   }
 
   async function openPalette() {
-    await ensureVaultNotes();
-    showPalette = true;
-    paletteQuery = "";
-    selectedPaletteIndex = 0;
-    setTimeout(() => paletteInputRef?.focus(), 0);
+    try {
+      vaultNotes = await ensureVaultNotes(vaultNotes);
+      showPalette = true;
+      paletteQuery = "";
+      selectedPaletteIndex = 0;
+      setTimeout(() => paletteInputRef?.focus(), 0);
+    } catch (error) {
+      showStatus(normalizeError(error), "error", 2200);
+    }
   }
 
   function closePalette() {
@@ -1293,146 +954,59 @@
   }
 
   async function openVaultNote(note) {
-    const existingIndex = tabs.findIndex((tab) => tab.path === note.path);
     closePalette();
-
-    if (existingIndex >= 0) {
-      await activateTab(existingIndex, true);
-      return;
-    }
-
-    tabs = [
-      ...tabs,
-      createTab({
-        kind: "opened",
-        path: note.path,
-        label: note.name,
-        isPinned: false,
-        history: [],
-      }),
-    ];
-
-    await activateTab(tabs.length - 1, true);
+    await applyOpenVaultNoteIntent(getOpenVaultNoteIntent(note, tabs));
   }
 
-  async function handleGlobalKeydown(event) {
-    const key = event.key.toLowerCase();
-
-    if (tabContextMenu.open && event.key === "Escape") {
-      event.preventDefault();
-      closeTabContextMenu();
-      return;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && key === "w") {
-      event.preventDefault();
-      await closeActiveTab();
-      return;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && key === "k") {
-      event.preventDefault();
-      await openPalette();
-      return;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && key === "f") {
-      event.preventDefault();
-      if (showSearch) {
-        searchInputRef?.focus();
-      } else {
-        openSearch();
-      }
-      return;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && key === "p") {
-      event.preventDefault();
-      await openPalette();
-      return;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && key === "s") {
-      event.preventDefault();
-      await forceSave();
-      return;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && /^[1-9]$/.test(event.key)) {
-      event.preventDefault();
-      const tabIndex = Number(event.key) - 1;
-      if (tabs[tabIndex]) {
-        await activateTab(tabIndex);
-      }
-      return;
-    }
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      if (showAutocomplete) {
-        closeAutocomplete();
-        return;
-      }
-      if (showSearch) {
-        closeSearch();
-        return;
-      }
-      if (showPalette) {
-        closePalette();
-      } else {
-        await hideReader();
-      }
+  async function handleShowReader() {
+    saveScrollPosition();
+    editorComponent?.finalizeBlock?.();
+    isDragging = false;
+    dragCounter = 0;
+    await flushPendingSave(false);
+    if (tabs[activeTabIndex]) {
+      await syncTabWithDisk(activeTabIndex);
     }
   }
 
-  async function rebuildTabsFromSettings(
+  async function handleSettingsChanged(settings) {
+    const previousFilters = getReaderFilterSettings(appSettings);
+    const previousPinnedNotes = getPinnedNotesSignature(appSettings.pinned_notes);
+    appSettings = applySettings(appSettings, settings);
+    applyColorSettings(appSettings);
+    const nextFilters = getReaderFilterSettings(appSettings);
+    const nextPinnedNotes = getPinnedNotesSignature(appSettings.pinned_notes);
+    const filtersChanged = haveReaderFilterChanges(previousFilters, nextFilters);
+
+    if (previousPinnedNotes !== nextPinnedNotes) {
+      await flushPendingSave(false);
+      await applyTabSettings(settings, {
+        preserveOpened: true,
+        forceReloadActive: false,
+      });
+      return;
+    }
+
+    if (filtersChanged) {
+      editorComponent?.finalizeBlock?.();
+      imagePathCache.clear();
+      await renderContentToEditor(rawContent);
+    }
+  }
+
+  async function applyTabSettings(
     settings,
     { preserveOpened = true, forceReloadActive = false } = {},
   ) {
-    const dailyPath = await invoke("get_daily_note_path");
-    const pinnedNotes = normalizePinnedNotes(settings.pinned_notes);
-    const previousTabs = tabs;
-    const previousActivePath = activeTab?.path ?? null;
-    const existingByPath = new Map(previousTabs.map((tab) => [tab.path, tab]));
+    const dailyPath = await getDailyNotePath(settings);
+    const nextState = rebuildTabsFromSettings(settings, tabs, {
+      preserveOpened,
+      previousActivePath: activeTab?.path ?? null,
+      dailyPath,
+    });
 
-    const nextTabs = [
-      createTab({
-        kind: "daily",
-        path: dailyPath,
-        label: "Daily",
-        isPinned: true,
-        existingTab:
-          previousTabs.find((tab) => tab.kind === "daily") ??
-          existingByPath.get(dailyPath),
-      }),
-      ...pinnedNotes.map((note) =>
-        createTab({
-          kind: "pinned",
-          path: note.path,
-          label: note.label,
-          icon: note.icon,
-          isPinned: true,
-          existingTab: existingByPath.get(note.path),
-        }),
-      ),
-    ];
-
-    if (preserveOpened) {
-      const reservedPaths = new Set(nextTabs.map((tab) => tab.path));
-      previousTabs
-        .filter((tab) => tab.kind === "opened" && !reservedPaths.has(tab.path))
-        .forEach((tab) => {
-          nextTabs.push({ ...tab });
-        });
-    }
-
-    tabs = nextTabs;
-
-    const nextActiveIndex = previousActivePath
-      ? nextTabs.findIndex((tab) => tab.path === previousActivePath)
-      : 0;
-
-    activeTabIndex = nextActiveIndex >= 0 ? nextActiveIndex : 0;
+    tabs = nextState.tabs;
+    activeTabIndex = nextState.activeTabIndex;
 
     const currentTab = tabs[activeTabIndex];
     if (!currentTab) return;
@@ -1450,8 +1024,9 @@
 
   async function buildInitialTabs() {
     const settings = await invoke("load_settings");
-    applySettings(settings);
-    await rebuildTabsFromSettings(settings, {
+    appSettings = applySettings(appSettings, settings);
+    applyColorSettings(appSettings);
+    await applyTabSettings(settings, {
       preserveOpened: false,
       forceReloadActive: true,
     });
@@ -1462,72 +1037,44 @@
   onMount(async () => {
     try {
       await buildInitialTabs();
-      await ensureVaultNotes();
+      vaultNotes = await ensureVaultNotes(vaultNotes);
 
-      unlistenShowReader = await listen("show_reader", async () => {
-        saveScrollPosition();
-        editorComponent?.finalizeBlock?.();
-        isDragging = false;
-        dragCounter = 0;
-        await flushPendingSave(false);
-        if (tabs[activeTabIndex]) {
-          await syncTabWithDisk(activeTabIndex);
-        }
-      });
+      unlistenShowReader = await listen("show_reader", handleShowReader);
 
       unlistenSettingsChanged = await listen(
         "settings_changed",
-        async (event) => {
-          const previousFilters = getReaderFilterSettings();
-          const previousPinnedNotes = getPinnedNotesSignature(
-            appSettings.pinned_notes,
-          );
-          applySettings(event.payload);
-          const nextFilters = getReaderFilterSettings();
-          const nextPinnedNotes = getPinnedNotesSignature(
-            appSettings.pinned_notes,
-          );
-          const filtersChanged =
-            previousFilters.reader_hide_frontmatter !==
-              nextFilters.reader_hide_frontmatter ||
-            previousFilters.reader_hide_dataview !==
-              nextFilters.reader_hide_dataview ||
-            previousFilters.reader_hide_obsidian_comments !==
-              nextFilters.reader_hide_obsidian_comments ||
-            previousFilters.reader_hide_inline_fields !==
-              nextFilters.reader_hide_inline_fields ||
-            previousFilters.reader_hide_html !== nextFilters.reader_hide_html;
-          const pinnedNotesChanged = previousPinnedNotes !== nextPinnedNotes;
-
-          if (pinnedNotesChanged) {
-            await flushPendingSave(false);
-            await rebuildTabsFromSettings(event.payload, {
-              preserveOpened: true,
-              forceReloadActive: false,
-            });
-            return;
-          }
-
-          if (filtersChanged) {
-            editorComponent?.finalizeBlock?.();
-            imagePathCache.clear();
-            await renderContentToEditor(rawContent);
-          }
-        },
+        (event) => handleSettingsChanged(event.payload),
       );
 
-      window.addEventListener("keydown", handleGlobalKeydown);
+      cleanupGlobalListeners = setupListeners({
+        isTabContextMenuOpen: () => tabContextMenu.open,
+        isAutocompleteOpen: () => showAutocomplete,
+        isSearchOpen: () => showSearch,
+        isPaletteOpen: () => showPalette,
+        hasTabAtIndex: (index) => Boolean(tabs[index]),
+        onCloseTabContextMenu: closeTabContextMenu,
+        onCloseActiveTab: closeActiveTab,
+        onOpenPalette: openPalette,
+        onFocusSearch: () => searchInputRef?.focus(),
+        onSearch: openSearch,
+        onSave: forceSave,
+        onActivateTab: activateTab,
+        onCloseAutocomplete: closeAutocomplete,
+        onCloseSearch: closeSearch,
+        onClosePalette: closePalette,
+        onCloseReader: hideReader,
+      });
     } catch (error) {
       showStatus(normalizeError(error), "error", 2400);
     }
   });
 
   onDestroy(() => {
-    clearTimeout(saveTimeout);
+    saveScheduler.clear();
     clearTimeout(statusTimeout);
     clearTimeout(savedIndicatorTimeout);
     clearHighlights();
-    window.removeEventListener("keydown", handleGlobalKeydown);
+    cleanupGlobalListeners?.();
     unlistenShowReader?.();
     unlistenSettingsChanged?.();
   });
@@ -1565,7 +1112,7 @@
     on:activateTab={(event) => activateTab(event.detail)}
     on:newTab={openPalette}
     on:goBack={navigateBack}
-    on:openInObsidian={openInObsidian}
+    on:openInObsidian={handleOpenInObsidian}
     on:closeReader={hideReader}
     on:tabContextMenu={(event) => openTabContextMenu(event.detail)}
   />
@@ -1611,7 +1158,7 @@
     on:openPaletteRequest={openPalette}
     on:closeRequest={hideReader}
     on:navigateWikilink={(event) =>
-      navigateToWikilink(event.detail.target, event.detail.newTab)}
+      handleNavigateToWikilink(event.detail.target, event.detail.newTab)}
     on:openExternalLink={(event) => openExternalUrl(event.detail)}
     on:importImages={(event) => handleImportedImages(event.detail)}
     on:autocompleteChange={handleEditorAutocompleteChange}
@@ -1665,216 +1212,3 @@
     {/each}
   </div>
 {/if}
-
-<style>
-  :global(*) {
-    box-sizing: border-box;
-  }
-
-  :global(body) {
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    background: transparent;
-  }
-
-  .reader-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    background: color-mix(
-      in srgb,
-      var(--app-background, #1e1e2e) var(--app-transparency, 55%),
-      transparent
-    );
-    color: var(--app-text-color, #ffffff);
-    font-family: var(--app-font-family, var(--font-family));
-    font-size: var(--app-font-size, 15px);
-    backdrop-filter: blur(var(--app-blur, 80px))
-      saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
-    -webkit-backdrop-filter: blur(var(--app-blur, 80px))
-      saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
-    border-radius: var(--app-border-radius, 12px);
-    border: 0.5px solid rgba(0, 0, 0, 0.08);
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.08),
-      0 2px 8px rgba(0, 0, 0, 0.04);
-    overflow: clip;
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-  }
-
-  .reader-container.dragging {
-    background: rgba(255, 255, 255, 0.7);
-    border-color: rgba(255, 255, 255, 0.7);
-    border-width: 2px;
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.08),
-      0 2px 8px rgba(0, 0, 0, 0.04);
-  }
-
-  :global(.accent-line),
-  :global(.reader-topbar),
-  :global(.search-bar),
-  :global(.editor-scroll),
-  :global(.status-toast) {
-    transition:
-      filter 0.18s ease,
-      opacity 0.18s ease,
-      transform 0.18s ease;
-  }
-
-  .drop-overlay {
-    position: absolute;
-    inset: 2px;
-    background: none;
-    border: 2px dashed rgba(255, 255, 255, 0.7);
-    border-radius: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    pointer-events: none;
-    z-index: 30;
-  }
-
-  .reader-container.palette-open :global(.accent-line),
-  .reader-container.palette-open :global(.reader-topbar),
-  .reader-container.palette-open :global(.search-bar),
-  .reader-container.palette-open :global(.editor-scroll),
-  .reader-container.palette-open :global(.status-toast) {
-    filter: blur(4px) brightness(0.85);
-    opacity: 0.7;
-    transform: scale(0.996);
-    pointer-events: none;
-    transition:
-      filter 0.2s,
-      opacity 0.2s,
-      transform 0.2s;
-  }
-
-  :global(.callout-blue) {
-    background: rgba(59, 130, 246, 0.1);
-    border-color: rgba(59, 130, 246, 0.6);
-    color: #3b82f6;
-  }
-
-  :global(.callout-green) {
-    background: rgba(34, 197, 94, 0.1);
-    border-color: rgba(34, 197, 94, 0.6);
-    color: #22c55e;
-  }
-
-  :global(.callout-yellow) {
-    background: rgba(234, 179, 8, 0.1);
-    border-color: rgba(234, 179, 8, 0.6);
-    color: #eab308;
-  }
-
-  :global(.callout-red) {
-    background: rgba(239, 68, 68, 0.1);
-    border-color: rgba(239, 68, 68, 0.6);
-    color: #ef4444;
-  }
-
-  :global(.callout-purple) {
-    background: rgba(139, 92, 246, 0.1);
-    border-color: rgba(139, 92, 246, 0.6);
-    color: #8b5cf6;
-  }
-
-  :global(.callout-orange) {
-    background: rgba(249, 115, 22, 0.1);
-    border-color: rgba(249, 115, 22, 0.6);
-    color: #f97316;
-  }
-
-  :global(.callout-gray) {
-    background: rgba(107, 114, 128, 0.1);
-    border-color: rgba(107, 114, 128, 0.6);
-    color: #6b7280;
-  }
-
-  :global(.callout-blue .callout-content),
-  :global(.callout-green .callout-content),
-  :global(.callout-yellow .callout-content),
-  :global(.callout-red .callout-content),
-  :global(.callout-purple .callout-content),
-  :global(.callout-orange .callout-content),
-  :global(.callout-gray .callout-content) {
-    color: var(--app-text-color, #ffffff);
-  }
-
-  .autocomplete-dropdown {
-    position: fixed;
-    z-index: 200;
-    min-width: 220px;
-    max-width: 320px;
-    overflow: hidden;
-    border-radius: 8px;
-    background: color-mix(
-      in srgb,
-      var(--app-background, #1e1e2e) var(--app-transparency, 55%),
-      transparent
-    );
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow:
-      0 18px 40px rgba(0, 0, 0, 0.22),
-      0 6px 16px rgba(0, 0, 0, 0.14);
-    backdrop-filter: blur(20px) saturate(130%);
-    -webkit-backdrop-filter: blur(20px) saturate(130%);
-  }
-
-  .autocomplete-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    width: 100%;
-    padding: 7px 12px;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-    transition: background var(--transition-fast);
-  }
-
-  .autocomplete-item:hover,
-  .autocomplete-item.selected {
-    background: color-mix(
-      in srgb,
-      var(--accent-color, #8b5cf6) 14%,
-      transparent
-    );
-  }
-
-  .autocomplete-name {
-    color: var(--app-text-color, #ffffff);
-    font-size: 13px;
-    font-weight: 500;
-  }
-
-  .autocomplete-path {
-    overflow: hidden;
-    color: var(--text-secondary);
-    font-size: 10px;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  :global(::highlight(search-result)) {
-    background-color: rgba(234, 179, 8, 0.35);
-    color: inherit;
-  }
-
-  :global(::highlight(search-active)) {
-    background-color: rgba(234, 179, 8, 0.8);
-    color: #1a1a1a;
-  }
-</style>
