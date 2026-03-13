@@ -157,6 +157,7 @@
     clearTimeout(statusTimeout);
     statusMessage = message;
     statusType = type;
+    // Hide the transient status toast after its display period.
     statusTimeout = setTimeout(() => {
       statusMessage = "";
       statusType = "";
@@ -236,12 +237,11 @@
     searchIndex = 0;
   }
 
-  function openSearch() {
+  async function openSearch() {
     showSearch = true;
-    tick().then(() => {
-      searchInputRef?.focus();
-      searchInputRef?.select();
-    });
+    await tick();
+    searchInputRef?.focus();
+    searchInputRef?.select();
   }
 
   function insertImportedMarkdown(
@@ -442,12 +442,11 @@
     if (!isFileDrag(event)) return;
     event.preventDefault();
 
-    const rect = event.currentTarget?.getBoundingClientRect?.();
+    const rect = event.currentTarget.getBoundingClientRect();
     const x = event.clientX;
     const y = event.clientY;
     const isLeaving =
-      rect &&
-      (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom);
+      x < rect.left || x > rect.right || y < rect.top || y > rect.bottom;
 
     if (!isLeaving) return;
 
@@ -495,7 +494,7 @@
   }
 
   async function renderContentToEditor(raw = "") {
-    const processed = preprocessContent(raw, {
+    preprocessContent(raw, {
       appSettings,
       codeblockMap,
       hiddenBlockMap,
@@ -521,14 +520,12 @@
   function saveScrollPosition() {
     const currentTab = tabs[activeTabIndex];
     if (!currentTab || !editorComponent) return;
-    scrollPositions.set(
-      currentTab.path,
-      editorComponent.getScrollTop?.() ?? 0,
-    );
+    scrollPositions.set(currentTab.path, editorComponent.getScrollTop());
   }
 
   async function restoreScrollPosition(path) {
-    await editorComponent?.restoreScroll?.(path, scrollPositions);
+    if (!editorComponent) return;
+    await editorComponent.restoreScroll(path, scrollPositions);
   }
 
   function handleEditorChange() {
@@ -701,6 +698,7 @@
 
       showSavedIndicator = true;
       clearTimeout(savedIndicatorTimeout);
+      // Keep the saved indicator visible briefly so the save feedback is noticeable.
       savedIndicatorTimeout = setTimeout(() => {
         showSavedIndicator = false;
       }, 1500);
@@ -941,7 +939,8 @@
       showPalette = true;
       paletteQuery = "";
       selectedPaletteIndex = 0;
-      setTimeout(() => paletteInputRef?.focus(), 0);
+      await tick();
+      paletteInputRef?.focus();
     } catch (error) {
       showStatus(normalizeError(error), "error", 2200);
     }

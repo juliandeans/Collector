@@ -223,14 +223,6 @@ export function preprocessContent(
 
   if (appSettings.reader_hide_dataview) {
     text = replaceCodeblocks(text, codeblockMap);
-    console.log(
-      "[CB] After replaceCodeblocks, text excerpt:",
-      text.slice(0, 500),
-    );
-    console.log(
-      "[CB] codeblockMap contents:",
-      [...codeblockMap.entries()].map(([k, v]) => `${k} => ${v.slice(0, 30)}`),
-    );
   }
 
   if (appSettings.reader_hide_inline_fields) {
@@ -535,19 +527,7 @@ function processCallout(lines = []) {
 
 export function markdownLineToHtml(line) {
   if (line === null || line === undefined) return "";
-  if (line.includes("\u200B")) {
-    console.log("[CB] Sentinel line entering renderer:", JSON.stringify(line));
-  }
-
   const trimmed = line.trim();
-  if (line.includes("\u200B")) {
-    console.log(
-      "[CB] trimmed starts with sentinel?",
-      trimmed.startsWith("\u200B"),
-      "first chars:",
-      JSON.stringify(trimmed.slice(0, 20)),
-    );
-  }
   const codeblockMatch = trimmed.match(/\u200B(__CB_\d+__):([\w-]*)\u200B/);
   if (codeblockMatch) {
     const [, id, langValue] = codeblockMatch;

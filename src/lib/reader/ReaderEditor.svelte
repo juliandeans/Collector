@@ -31,7 +31,7 @@
   let renderRequestId = 0;
   let autocompleteRange = null;
 
-  function filterVaultNotes(query) {
+  function getAutocompleteMatches(query) {
     if (!query) return vaultNotes.slice(0, 10);
 
     const lower = query.toLowerCase();
@@ -103,7 +103,7 @@
       return;
     }
 
-    const results = filterVaultNotes(between);
+    const results = getAutocompleteMatches(between);
     const triggerRange = document.createRange();
     triggerRange.setStart(node, triggerIndex);
     triggerRange.collapse(true);
@@ -198,7 +198,7 @@
   }
 
   function rerenderBlock(el) {
-    if (!el || !editorRef?.contains(el)) return null;
+    if (!editorRef || !el || !editorRef.contains(el)) return null;
 
     const raw = elementToMarkdownLine(el);
     if (raw === null) return el;
@@ -213,19 +213,19 @@
   }
 
   function finalizeActiveBlock() {
-    if (activeParagraphEl && editorRef?.contains(activeParagraphEl)) {
+    if (activeParagraphEl && editorRef && editorRef.contains(activeParagraphEl)) {
       rerenderBlock(activeParagraphEl);
     }
     activeParagraphEl = null;
   }
 
   function switchActiveBlock(newEl) {
-    if (activeParagraphEl && editorRef?.contains(activeParagraphEl)) {
+    if (activeParagraphEl && editorRef && editorRef.contains(activeParagraphEl)) {
       rerenderBlock(activeParagraphEl);
       activeParagraphEl = null;
     }
 
-    if (!newEl || !editorRef?.contains(newEl)) {
+    if (!editorRef || !newEl || !editorRef.contains(newEl)) {
       activeParagraphEl = null;
       return;
     }
@@ -269,7 +269,7 @@
   }
 
   function handleEditorBlur(event) {
-    if (editorRef?.contains(event.relatedTarget)) return;
+    if (editorRef && editorRef.contains(event.relatedTarget)) return;
     finalizeActiveBlock();
   }
 

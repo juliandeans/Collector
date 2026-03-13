@@ -7,6 +7,7 @@ export function createDebouncedJob(delay = 600) {
       clearTimeout(timeoutId);
       pendingJob = job;
 
+      // Debounce note saves so rapid edits collapse into one write.
       timeoutId = setTimeout(() => {
         const nextJob = pendingJob;
         timeoutId = null;

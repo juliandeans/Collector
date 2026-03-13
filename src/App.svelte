@@ -1,7 +1,7 @@
 <script>
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
 
   let textareaRef;
@@ -134,6 +134,7 @@
       await getCurrentWindow();
       isTauri = true;
     } catch (e) {
+      // Browser preview mode has no Tauri window API.
       isTauri = false;
     }
 
@@ -186,6 +187,8 @@
           isDragging = false;
           dragCounter = 0;
           isLoading = false;
+          // Required: after the native Tauri show event, macOS needs a short delay
+          // before the textarea reliably accepts focus.
           setTimeout(() => textareaRef?.focus(), 50);
         });
 
@@ -193,6 +196,8 @@
           const text = typeof event.payload === "string" ? event.payload : "";
           if (!text.trim()) return;
           content = text;
+          // Required: after the native Tauri insert event, macOS needs a short delay
+          // before the textarea reliably accepts focus.
           setTimeout(() => textareaRef?.focus(), 50);
         });
 
@@ -301,6 +306,7 @@
     if (type !== "error") return;
     statusMessage = message;
     statusType = type;
+    // Hide the transient error toast after its display period.
     setTimeout(() => (statusMessage = ""), 2000);
   }
 
@@ -333,6 +339,8 @@
       dragCounter = 0;
       isLoading = false;
 
+      // Required: hiding the capture window immediately after save can race the
+      // native save flow on macOS, so the close is delayed slightly.
       setTimeout(async () => {
         try {
           await invoke("hide_capture");
@@ -389,6 +397,8 @@
 
       isLoading = false;
 
+      // Required: hiding the capture window immediately after save can race the
+      // native save flow on macOS, so the close is delayed slightly.
       setTimeout(async () => {
         try {
           await invoke("hide_capture");
@@ -717,11 +727,10 @@
       );
 
       if (textareaRef) {
-        setTimeout(() => {
-          const newPosition = currentPosition;
-          textareaRef.setSelectionRange(newPosition, newPosition);
-          textareaRef.focus();
-        }, 10);
+        await tick();
+        const newPosition = currentPosition;
+        textareaRef.setSelectionRange(newPosition, newPosition);
+        textareaRef.focus();
       }
     }
   }
@@ -791,6 +800,8 @@
       );
     }
 
+    // Required: after the native Tauri drag-drop bridge finishes, macOS needs a
+    // short delay before the textarea reliably regains focus.
     setTimeout(() => textareaRef?.focus(), 50);
   }
 
