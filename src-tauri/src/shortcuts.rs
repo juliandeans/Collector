@@ -6,8 +6,16 @@ use tokio::sync::Mutex;
 use crate::log_safety::summarize_text_len;
 use crate::settings::Settings;
 
+const CAPTURE_TEXT_INSERT_DELAY_MS: u64 = 30;
+
 pub struct ShortcutManager {
     current_shortcut: Arc<Mutex<Option<String>>>,
+}
+
+fn warn_if_failed<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) {
+    if let Err(error) = result {
+        log::warn!("{}: {}", context, error);
+    }
 }
 
 impl ShortcutManager {
@@ -17,17 +25,15 @@ impl ShortcutManager {
         }
     }
 
-    async fn unregister_current_shortcut(
-        &self,
-        app: &AppHandle,
-        context: &str,
-    ) -> Option<String> {
+    async fn unregister_current_shortcut(&self, app: &AppHandle, context: &str) -> Option<String> {
         let current_shortcut = self.current_shortcut.lock().await.take();
 
         if let Some(shortcut_str) = &current_shortcut {
-            log::info!("Unregistering {} shortcut: {}", context, shortcut_str);
             if let Ok(shortcut) = shortcut_str.parse::<Shortcut>() {
-                let _ = app.global_shortcut().unregister(shortcut);
+                warn_if_failed(
+                    app.global_shortcut().unregister(shortcut),
+                    &format!("Failed to unregister {} shortcut", context),
+                );
             }
         }
 
@@ -36,47 +42,42 @@ impl ShortcutManager {
 
     pub async fn register(&self, app: &AppHandle, settings: &Settings) -> Result<(), String> {
         let shortcut_str = normalize_shortcut(&settings.global_shortcut);
-        log::info!("Attempting to register global shortcut: '{}'", shortcut_str);
-
-        // Skip if shortcut is empty
         if shortcut_str.trim().is_empty() {
-            log::info!("Global shortcut is empty, skipping registration");
             self.unregister_current_shortcut(app, "global").await;
             return Ok(());
         }
 
         self.unregister_current_shortcut(app, "global").await;
 
-        log::info!("Parsing shortcut: '{}'", shortcut_str);
         let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
             let err_msg = format!("Invalid shortcut '{}': {:?}", shortcut_str, e);
             log::error!("{}", err_msg);
             err_msg
         })?;
 
-        log::info!("Registering shortcut handler...");
         let app_handle = app.clone();
         let closes_window = settings.global_shortcut_closes_window;
         app.global_shortcut()
             .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
                 if event.state == ShortcutState::Pressed {
-                    log::info!("Global shortcut triggered (open window)");
                     let app_handle2 = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         if let Some(window) = app_handle2.get_webview_window("capture") {
                             if closes_window && window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
+                                warn_if_failed(window.hide(), "Failed to hide capture window");
                                 let state = app_handle2.state::<crate::AppState>();
                                 state.edge_detector.set_capture_open(false).await;
                                 return;
                             }
                         }
 
-                        // Open/focus capture window and reset UI state
-                        let _ = app_handle2.emit("show_capture", ());
+                        warn_if_failed(
+                            app_handle2.emit("show_capture", ()),
+                            "Failed to emit show_capture",
+                        );
                         if let Some(window) = app_handle2.get_webview_window("capture") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
+                            warn_if_failed(window.show(), "Failed to show capture window");
+                            warn_if_failed(window.set_focus(), "Failed to focus capture window");
                         }
                     });
                 }
@@ -88,19 +89,6 @@ impl ShortcutManager {
             })?;
 
         *self.current_shortcut.lock().await = Some(shortcut_str.clone());
-        log::info!("Global shortcut successfully registered: {}", shortcut_str);
-        Ok(())
-    }
-
-    #[allow(dead_code)]
-    pub async fn unregister(&self, app: &AppHandle) -> Result<(), String> {
-        let shortcut_str = self.current_shortcut.lock().await.take();
-        if let Some(shortcut_str) = shortcut_str {
-            if let Ok(shortcut) = shortcut_str.parse::<Shortcut>() {
-                let _ = app.global_shortcut().unregister(shortcut);
-                log::info!("Unregistered shortcut: {}", shortcut_str);
-            }
-        }
         Ok(())
     }
 
@@ -114,38 +102,25 @@ impl ShortcutManager {
         settings: &Settings,
     ) -> Result<(), String> {
         let shortcut_str = normalize_shortcut(&settings.capture_text_shortcut);
-        log::info!(
-            "Attempting to register capture_text shortcut: '{}'",
-            shortcut_str
-        );
-
-        // Skip if shortcut is empty
         if shortcut_str.trim().is_empty() {
-            log::info!("Capture text shortcut is empty, skipping registration");
             self.unregister_current_shortcut(app, "capture_text").await;
             return Ok(());
         }
 
         self.unregister_current_shortcut(app, "capture_text").await;
 
-        log::info!("Parsing capture_text shortcut: '{}'", shortcut_str);
         let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
             let err_msg = format!("Invalid capture_text shortcut '{}': {:?}", shortcut_str, e);
             log::error!("{}", err_msg);
             err_msg
         })?;
 
-        log::info!("Registering capture_text shortcut handler...");
         let app_handle = app.clone();
         app.global_shortcut()
             .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
                 if event.state == ShortcutState::Pressed {
-                    log::info!("Capture text shortcut triggered");
                     let app_handle2 = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        // WICHTIG: Capture text FIRST, before opening window
-                        // Otherwise the window steals focus and Cmd+C goes to the wrong app
-                        log::info!("Capturing selected text (BEFORE opening window)...");
                         let selected = tauri::async_runtime::spawn_blocking(
                             crate::selected_text::capture_selected_text,
                         )
@@ -155,12 +130,13 @@ impl ShortcutManager {
                         .unwrap_or_default();
 
                         log::info!("Captured text length={}", summarize_text_len(&selected));
-
-                        // NOW open/focus capture window
-                        let _ = app_handle2.emit("show_capture", ());
+                        warn_if_failed(
+                            app_handle2.emit("show_capture", ()),
+                            "Failed to emit show_capture",
+                        );
                         if let Some(window) = app_handle2.get_webview_window("capture") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
+                            warn_if_failed(window.show(), "Failed to show capture window");
+                            warn_if_failed(window.set_focus(), "Failed to focus capture window");
                         }
 
                         if selected.trim().is_empty() {
@@ -168,12 +144,15 @@ impl ShortcutManager {
                             return;
                         }
 
-                        // Ensure show_capture listeners ran first (they clear content).
-                        tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_millis(
+                            CAPTURE_TEXT_INSERT_DELAY_MS,
+                        ))
+                        .await;
 
-                        // Send to all windows (frontend listens globally)
-                        log::info!("Emitting insert_capture_text event");
-                        let _ = app_handle2.emit("insert_capture_text", selected);
+                        warn_if_failed(
+                            app_handle2.emit("insert_capture_text", selected),
+                            "Failed to emit insert_capture_text",
+                        );
                     });
                 }
             })
@@ -187,10 +166,6 @@ impl ShortcutManager {
             })?;
 
         *self.current_shortcut.lock().await = Some(shortcut_str.clone());
-        log::info!(
-            "Capture text shortcut successfully registered: {}",
-            shortcut_str
-        );
         Ok(())
     }
 
@@ -200,34 +175,27 @@ impl ShortcutManager {
         settings: &Settings,
     ) -> Result<(), String> {
         let shortcut_str = normalize_shortcut(&settings.save_as_note_shortcut);
-        log::info!(
-            "Attempting to register save_as_note shortcut: '{}'",
-            shortcut_str
-        );
-
-        // Skip if shortcut is empty
         if shortcut_str.trim().is_empty() {
-            log::info!("Save as note shortcut is empty, skipping registration");
             self.unregister_current_shortcut(app, "save_as_note").await;
             return Ok(());
         }
 
         self.unregister_current_shortcut(app, "save_as_note").await;
 
-        log::info!("Parsing save_as_note shortcut: '{}'", shortcut_str);
         let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
             let err_msg = format!("Invalid save_as_note shortcut '{}': {:?}", shortcut_str, e);
             log::error!("{}", err_msg);
             err_msg
         })?;
 
-        log::info!("Registering save_as_note shortcut handler...");
         let app_handle = app.clone();
         app.global_shortcut()
             .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
                 if event.state == ShortcutState::Pressed {
-                    log::info!("Save as note shortcut triggered");
-                    let _ = app_handle.emit("save_as_note", ());
+                    warn_if_failed(
+                        app_handle.emit("save_as_note", ()),
+                        "Failed to emit save_as_note",
+                    );
                 }
             })
             .map_err(|e| {
@@ -240,10 +208,6 @@ impl ShortcutManager {
             })?;
 
         *self.current_shortcut.lock().await = Some(shortcut_str.clone());
-        log::info!(
-            "Save as note shortcut successfully registered: {}",
-            shortcut_str
-        );
         Ok(())
     }
 
@@ -253,41 +217,38 @@ impl ShortcutManager {
         settings: &Settings,
     ) -> Result<(), String> {
         let shortcut_str = normalize_shortcut(&settings.reader_shortcut);
-        log::info!("Attempting to register reader shortcut: '{}'", shortcut_str);
-
         if shortcut_str.trim().is_empty() {
-            log::info!("Reader shortcut is empty, skipping registration");
             self.unregister_current_shortcut(app, "reader").await;
             return Ok(());
         }
 
         self.unregister_current_shortcut(app, "reader").await;
 
-        log::info!("Parsing reader shortcut: '{}'", shortcut_str);
         let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
             let err_msg = format!("Invalid reader shortcut '{}': {:?}", shortcut_str, e);
             log::error!("{}", err_msg);
             err_msg
         })?;
 
-        log::info!("Registering reader shortcut handler...");
         let app_handle = app.clone();
         let closes_window = settings.reader_shortcut_closes_window;
         app.global_shortcut()
             .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
                 if event.state == ShortcutState::Pressed {
-                    log::info!("Reader shortcut triggered");
                     let app_handle2 = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         if let Some(window) = app_handle2.get_webview_window("reader") {
                             if closes_window && window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
+                                warn_if_failed(window.hide(), "Failed to hide reader window");
                                 let state = app_handle2.state::<crate::AppState>();
                                 state.edge_detector.set_reader_open(false).await;
                                 return;
                             }
                         }
-                        let _ = app_handle2.emit("show_reader", ());
+                        warn_if_failed(
+                            app_handle2.emit("show_reader", ()),
+                            "Failed to emit show_reader",
+                        );
                     });
                 }
             })
@@ -301,7 +262,6 @@ impl ShortcutManager {
             })?;
 
         *self.current_shortcut.lock().await = Some(shortcut_str.clone());
-        log::info!("Reader shortcut successfully registered: {}", shortcut_str);
         Ok(())
     }
 }

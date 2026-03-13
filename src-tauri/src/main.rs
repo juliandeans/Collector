@@ -29,12 +29,17 @@ use objc::{class, msg_send, sel, sel_impl};
 
 use crate::edge_detect::EdgeDetector;
 use crate::image_handler::ProcessedImage;
-use crate::log_safety::{redact_path_str, summarize_bytes};
 use crate::settings::Settings;
 use crate::shortcuts::ShortcutManager;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Component;
+
+const SAVE_AS_NOTE_HIDE_DELAY_MS: u64 = 50;
+const WINDOW_INIT_DELAY_MS: u64 = 100;
+const SETTINGS_WINDOW_WIDTH: f64 = 980.0;
+const SETTINGS_WINDOW_HEIGHT: f64 = 720.0;
+const MAX_IMAGE_PAYLOAD_BYTES: usize = 20 * 1024 * 1024;
 
 struct AppState {
     settings: Arc<RwLock<Settings>>,
@@ -43,6 +48,12 @@ struct AppState {
     reader_shortcut_manager: Arc<ShortcutManager>,
     capture_text_shortcut_manager: Arc<ShortcutManager>,
     save_as_note_shortcut_manager: Arc<ShortcutManager>,
+}
+
+fn warn_if_failed<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) {
+    if let Err(error) = result {
+        log::warn!("{}: {}", context, error);
+    }
 }
 
 fn normalize_path(path: &Path) -> Result<PathBuf, String> {
@@ -306,8 +317,6 @@ async fn save_settings(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    log::info!("save_settings received settings payload");
-
     new_settings.validate().map_err(|e| {
         log::error!("Settings validation failed: {}", e);
         e
@@ -319,14 +328,7 @@ async fn save_settings(
     })?;
 
     match Settings::load() {
-        Ok(loaded) => {
-            log::info!(
-                "Settings verified (window_blur={}, window_transparency={}, window_saturation={})",
-                loaded.window_blur,
-                loaded.window_transparency,
-                loaded.window_saturation
-            );
-        }
+        Ok(_) => {}
         Err(e) => {
             log::error!("Failed to verify saved settings: {}", e);
         }
@@ -342,8 +344,6 @@ async fn save_settings(
     if let Some(window) = app.get_webview_window("capture") {
         if let Err(e) = position_window_logical(&window, &new_settings) {
             log::warn!("Failed to update window position: {}", e);
-        } else {
-            log::info!("Window position/size updated");
         }
 
         configure_macos_window(&window, new_settings.border_radius as f64);
@@ -352,8 +352,6 @@ async fn save_settings(
     if let Some(reader_window) = app.get_webview_window("reader") {
         if let Err(e) = position_reader_window_logical(&reader_window, &new_settings) {
             log::warn!("Failed to update reader window position: {}", e);
-        } else {
-            log::info!("Reader window position/size updated");
         }
 
         configure_macos_window(&reader_window, new_settings.border_radius as f64);
@@ -363,60 +361,49 @@ async fn save_settings(
     if let Some(capture_window) = app.get_webview_window("capture") {
         if let Err(e) = capture_window.emit("settings_changed", &new_settings) {
             log::warn!("Failed to emit settings_changed to capture window: {}", e);
-        } else {
-            log::info!("Settings changed event emitted to capture window");
         }
     }
 
     if let Some(settings_window) = app.get_webview_window("settings") {
         if let Err(e) = settings_window.emit("settings_changed", &new_settings) {
             log::warn!("Failed to emit settings_changed to settings window: {}", e);
-        } else {
-            log::info!("Settings changed event emitted to settings window");
         }
     }
 
     if let Some(reader_window) = app.get_webview_window("reader") {
         if let Err(e) = reader_window.emit("settings_changed", &new_settings) {
             log::warn!("Failed to emit settings_changed to reader window: {}", e);
-        } else {
-            log::info!("Settings changed event emitted to reader window");
         }
     }
 
-    match state.shortcut_manager.update(&app, &new_settings).await {
-        Ok(_) => log::info!("Global shortcut updated"),
-        Err(e) => log::warn!("Failed to update global shortcut (non-fatal): {}", e),
+    if let Err(e) = state.shortcut_manager.update(&app, &new_settings).await {
+        log::warn!("Failed to update global shortcut (non-fatal): {}", e);
     }
 
-    match state
+    if let Err(e) = state
         .reader_shortcut_manager
         .register_reader(&app, &new_settings)
         .await
     {
-        Ok(_) => log::info!("Reader shortcut updated"),
-        Err(e) => log::warn!("Failed to update reader shortcut (non-fatal): {}", e),
+        log::warn!("Failed to update reader shortcut (non-fatal): {}", e);
     }
 
-    match state
+    if let Err(e) = state
         .capture_text_shortcut_manager
         .register_capture_text(&app, &new_settings)
         .await
     {
-        Ok(_) => log::info!("Capture text shortcut updated"),
-        Err(e) => log::warn!("Failed to update capture_text shortcut (non-fatal): {}", e),
+        log::warn!("Failed to update capture_text shortcut (non-fatal): {}", e);
     }
 
-    match state
+    if let Err(e) = state
         .save_as_note_shortcut_manager
         .register_save_as_note(&app, &new_settings)
         .await
     {
-        Ok(_) => log::info!("Save as note shortcut updated"),
-        Err(e) => log::warn!("Failed to update save_as_note shortcut (non-fatal): {}", e),
+        log::warn!("Failed to update save_as_note shortcut (non-fatal): {}", e);
     }
 
-    log::info!("Settings updated successfully");
     Ok(())
 }
 
@@ -432,14 +419,16 @@ async fn save_as_note(
     state.edge_detector.set_capture_open(false).await;
 
     if let Some(window) = app.get_webview_window("capture") {
-        let _ = window.hide();
+        warn_if_failed(window.hide(), "Failed to hide capture window");
     }
 
-    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(
+        SAVE_AS_NOTE_HIDE_DELAY_MS,
+    ))
+    .await;
 
     let result = capture::save_as_note(&content.trim(), &settings)?;
 
-    log::info!("Content saved as note");
     Ok(result.message)
 }
 
@@ -453,7 +442,6 @@ async fn append_to_daily_note(
 
     capture::append_to_daily_note(&text, &settings)?;
 
-    log::info!("Content appended to daily note");
     Ok(())
 }
 
@@ -552,10 +540,6 @@ async fn save_image(
 
     let result = image_handler::process_dropped_file(&file_path, &settings)?;
 
-    log::info!(
-        "Image saved (link_chars={})",
-        result.markdown.chars().count()
-    );
     Ok(result)
 }
 
@@ -568,13 +552,7 @@ async fn save_image_from_bytes(
     let settings = state.settings.read().await.clone();
     settings.validate()?;
 
-    log::info!(
-        "Received base64 string (file={}, chars={})",
-        redact_path_str(&filename),
-        bytes_base64.len()
-    );
-
-    if bytes_base64.len() > 20 * 1024 * 1024 {
+    if bytes_base64.len() > MAX_IMAGE_PAYLOAD_BYTES {
         return Err("Image payload too large".to_string());
     }
 
@@ -583,18 +561,8 @@ async fn save_image_from_bytes(
         .decode(&bytes_base64)
         .map_err(|e| format!("Failed to decode base64: {}", e))?;
 
-    log::info!(
-        "Decoded bytes (file={}, size={})",
-        redact_path_str(&filename),
-        summarize_bytes(bytes.len())
-    );
-
     let result = image_handler::process_dropped_file_from_bytes(bytes, &filename, &settings)?;
 
-    log::info!(
-        "Image saved from bytes (link_chars={})",
-        result.markdown.chars().count()
-    );
     Ok(result)
 }
 
@@ -620,12 +588,10 @@ async fn set_autostart(enabled: bool, app: AppHandle) -> Result<(), String> {
         manager
             .enable()
             .map_err(|e| format!("Failed to enable autostart: {}", e))?;
-        log::info!("Autostart enabled");
     } else {
         manager
             .disable()
             .map_err(|e| format!("Failed to disable autostart: {}", e))?;
-        log::info!("Autostart disabled");
     }
 
     Ok(())
@@ -644,10 +610,9 @@ async fn hide_capture(app: AppHandle, state: tauri::State<'_, AppState>) -> Resu
     state.edge_detector.set_capture_open(false).await;
 
     if let Some(window) = app.get_webview_window("capture") {
-        let _ = window.hide();
+        warn_if_failed(window.hide(), "Failed to hide capture window");
     }
 
-    log::info!("Window hidden");
     Ok(())
 }
 
@@ -656,11 +621,10 @@ async fn show_capture(app: AppHandle, state: tauri::State<'_, AppState>) -> Resu
     if let Some(window) = app.get_webview_window("capture") {
         let settings = state.settings.read().await;
         position_window_logical(&window, &settings)?;
-        let _ = window.show();
-        let _ = window.set_focus();
+        warn_if_failed(window.show(), "Failed to show capture window");
+        warn_if_failed(window.set_focus(), "Failed to focus capture window");
     }
     state.edge_detector.set_capture_open(true).await;
-    log::info!("Window shown");
     Ok(())
 }
 
@@ -669,8 +633,8 @@ async fn show_capture_internal(app: &AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("capture") {
         let settings = state.settings.read().await;
         position_window_logical(&window, &settings)?;
-        let _ = window.show();
-        let _ = window.set_focus();
+        warn_if_failed(window.show(), "Failed to show capture window");
+        warn_if_failed(window.set_focus(), "Failed to focus capture window");
     }
     state.edge_detector.set_capture_open(true).await;
     Ok(())
@@ -682,8 +646,8 @@ async fn show_reader_internal(app: &AppHandle) -> Result<(), String> {
         let settings = state.settings.read().await;
         position_reader_window_logical(&window, &settings)?;
         configure_macos_window(&window, settings.border_radius as f64);
-        let _ = window.show();
-        let _ = window.set_focus();
+        warn_if_failed(window.show(), "Failed to show reader window");
+        warn_if_failed(window.set_focus(), "Failed to focus reader window");
     }
     state.edge_detector.set_reader_open(true).await;
     Ok(())
@@ -697,7 +661,7 @@ async fn show_reader(app: AppHandle, _state: tauri::State<'_, AppState>) -> Resu
 #[tauri::command]
 async fn hide_reader(app: AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("reader") {
-        let _ = window.hide();
+        warn_if_failed(window.hide(), "Failed to hide reader window");
     }
     state.edge_detector.set_reader_open(false).await;
     Ok(())
@@ -721,40 +685,37 @@ async fn get_window_info(state: tauri::State<'_, AppState>) -> Result<serde_json
 
 #[tauri::command]
 async fn open_settings(app: AppHandle) -> Result<(), String> {
-    log::info!("Opening settings window");
     if let Some(window) = app.get_webview_window("settings") {
-        log::info!("Settings window exists, showing it");
-        let _ = window.show();
-        let _ = window.center();
-        let _ = window.set_focus();
-        let _ = window.unminimize();
+        warn_if_failed(window.show(), "Failed to show settings window");
+        warn_if_failed(window.center(), "Failed to center settings window");
+        warn_if_failed(window.set_focus(), "Failed to focus settings window");
+        warn_if_failed(window.unminimize(), "Failed to unminimize settings window");
     } else {
-        log::warn!("Settings window does not exist, creating it");
         use tauri::WebviewUrl;
         use tauri::WebviewWindowBuilder;
 
         let settings_window =
             WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("settings.html".into()))
                 .title("Collector - Einstellungen")
-                .inner_size(980.0, 720.0)
+                .inner_size(SETTINGS_WINDOW_WIDTH, SETTINGS_WINDOW_HEIGHT)
                 .resizable(true)
                 .center()
                 .build()
                 .map_err(|e| format!("Failed to create settings window: {}", e))?;
 
-        let _ = settings_window.show();
-        let _ = settings_window.set_focus();
-        log::info!("Settings window created and shown");
+        warn_if_failed(settings_window.show(), "Failed to show settings window");
+        warn_if_failed(
+            settings_window.set_focus(),
+            "Failed to focus settings window",
+        );
     }
     Ok(())
 }
 
 #[tauri::command]
 async fn close_settings(app: AppHandle) -> Result<(), String> {
-    log::info!("Closing settings window");
     if let Some(window) = app.get_webview_window("settings") {
-        let _ = window.hide();
-        log::info!("Settings window hidden");
+        warn_if_failed(window.hide(), "Failed to hide settings window");
     }
     Ok(())
 }
@@ -817,11 +778,6 @@ fn configure_macos_window(window: &tauri::WebviewWindow, corner_radius: f64) {
         let _: () = msg_send![ns_window, setHasShadow: YES];
 
         let _: () = msg_send![ns_window, invalidateShadow];
-
-        log::info!(
-            "macOS window configured with corner radius: {}",
-            corner_radius
-        );
     }
 }
 
@@ -920,10 +876,13 @@ fn handle_tray_event(app: &AppHandle, event: TrayIconEvent) {
 
 fn show_capture_window(app: &AppHandle, settings: &Settings) {
     if let Some(window) = app.get_webview_window("capture") {
-        let _ = position_window_logical(&window, settings);
-        let _ = window.show();
-        let _ = window.set_focus();
-        let _ = app.emit("show_capture", ());
+        warn_if_failed(
+            position_window_logical(&window, settings),
+            "Failed to position capture window",
+        );
+        warn_if_failed(window.show(), "Failed to show capture window");
+        warn_if_failed(window.set_focus(), "Failed to focus capture window");
+        warn_if_failed(app.emit("show_capture", ()), "Failed to emit show_capture");
     }
 }
 
@@ -936,12 +895,6 @@ fn main() {
         log::error!("Failed to load settings: {}, using defaults", e);
         Settings::default()
     });
-
-    log::info!(
-        "Settings loaded: vault={}, edge={}",
-        settings.vault_name,
-        settings.edge_side
-    );
 
     let edge_detector = Arc::new(EdgeDetector::new(settings.clone()));
     let shortcut_manager = Arc::new(ShortcutManager::new());
@@ -961,7 +914,10 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--hidden"]),
+        ))
         .setup(move |app| {
             let app_handle = app.handle().clone();
             app_handle.listen("show_capture", {
@@ -969,7 +925,9 @@ fn main() {
                 move |_| {
                     let app = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        let _ = show_capture_internal(&app).await;
+                        if let Err(error) = show_capture_internal(&app).await {
+                            log::warn!("Failed to show capture window: {}", error);
+                        }
                     });
                 }
             });
@@ -978,7 +936,9 @@ fn main() {
                 move |_| {
                     let app = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
-                        let _ = show_reader_internal(&app).await;
+                        if let Err(error) = show_reader_internal(&app).await {
+                            log::warn!("Failed to show reader window: {}", error);
+                        }
                     });
                 }
             });
@@ -991,11 +951,13 @@ fn main() {
                 .on_menu_event(move |app, event| match event.id().as_ref() {
                     "quick_capture" => {
                         show_capture_window(app, &settings_for_tray);
-                    },
+                    }
                     "settings" => {
                         let app_clone = app.clone();
                         tauri::async_runtime::spawn(async move {
-                            let _ = open_settings(app_clone).await;
+                            if let Err(error) = open_settings(app_clone).await {
+                                log::warn!("Failed to open settings window: {}", error);
+                            }
                         });
                     }
                     "quit" => std::process::exit(0),
@@ -1016,7 +978,10 @@ fn main() {
             let app_handle_shortcut = app_handle.clone();
             let settings_for_shortcut = settings.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = shortcut_mgr.register(&app_handle_shortcut, &settings_for_shortcut).await {
+                if let Err(e) = shortcut_mgr
+                    .register(&app_handle_shortcut, &settings_for_shortcut)
+                    .await
+                {
                     log::error!("Failed to register shortcut: {}", e);
                 }
             });
@@ -1025,7 +990,10 @@ fn main() {
             let app_handle_capture_text = app_handle.clone();
             let settings_for_capture_text = settings.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = capture_text_mgr.register_capture_text(&app_handle_capture_text, &settings_for_capture_text).await {
+                if let Err(e) = capture_text_mgr
+                    .register_capture_text(&app_handle_capture_text, &settings_for_capture_text)
+                    .await
+                {
                     log::error!("Failed to register capture_text shortcut: {}", e);
                 }
             });
@@ -1034,7 +1002,10 @@ fn main() {
             let app_handle_reader_shortcut = app_handle.clone();
             let settings_for_reader_shortcut = settings.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = reader_shortcut_mgr.register_reader(&app_handle_reader_shortcut, &settings_for_reader_shortcut).await {
+                if let Err(e) = reader_shortcut_mgr
+                    .register_reader(&app_handle_reader_shortcut, &settings_for_reader_shortcut)
+                    .await
+                {
                     log::error!("Failed to register reader shortcut: {}", e);
                 }
             });
@@ -1043,31 +1014,40 @@ fn main() {
             let app_handle_save_as_note = app_handle.clone();
             let settings_for_save_as_note = settings.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = save_as_note_mgr.register_save_as_note(&app_handle_save_as_note, &settings_for_save_as_note).await {
+                if let Err(e) = save_as_note_mgr
+                    .register_save_as_note(&app_handle_save_as_note, &settings_for_save_as_note)
+                    .await
+                {
                     log::error!("Failed to register save_as_note shortcut: {}", e);
                 }
             });
 
             if let Some(window) = app.get_webview_window("capture") {
-                let _ = position_window_logical(&window, &settings);
+                warn_if_failed(
+                    position_window_logical(&window, &settings),
+                    "Failed to position capture window",
+                );
 
                 let window_clone = window.clone();
                 let border_radius = settings.border_radius;
                 tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(WINDOW_INIT_DELAY_MS))
+                        .await;
                     configure_macos_window(&window_clone, border_radius as f64);
                 });
-
-                log::info!("Capture window initialized from config (transparent: true, dragDropEnabled: false)");
             }
 
             if let Some(window) = app.get_webview_window("reader") {
-                let _ = position_reader_window_logical(&window, &settings);
+                warn_if_failed(
+                    position_reader_window_logical(&window, &settings),
+                    "Failed to position reader window",
+                );
 
                 let window_clone = window.clone();
                 let border_radius = settings.border_radius;
                 tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(WINDOW_INIT_DELAY_MS))
+                        .await;
                     configure_macos_window(&window_clone, border_radius as f64);
                 });
             }

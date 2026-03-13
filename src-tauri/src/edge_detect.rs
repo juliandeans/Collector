@@ -6,6 +6,14 @@ use tokio::sync::RwLock;
 
 use crate::settings::Settings;
 
+const WINDOW_CLOSE_COOLDOWN_MS: u64 = 500;
+const EDGE_POLL_INTERVAL_MS: u64 = 50;
+const EDGE_TRIGGER_ZONE_PX: i32 = 5;
+#[cfg(not(target_os = "macos"))]
+const FALLBACK_SCREEN_WIDTH_PX: i32 = 1920;
+#[cfg(not(target_os = "macos"))]
+const FALLBACK_SCREEN_HEIGHT_PX: i32 = 1080;
+
 /// Edge detection state
 pub struct EdgeDetector {
     /// Whether edge detection is enabled
@@ -53,32 +61,18 @@ impl EdgeDetector {
 
     /// Update settings
     pub async fn update_settings(&self, settings: Settings) {
-        // Update enabled flag
         let mut e = self.enabled.write().await;
         *e = settings.edge_detection_enabled;
         drop(e);
 
-        // Update settings
         let mut s = self.settings.write().await;
         *s = settings;
-
-        log::info!(
-            "Edge detection settings updated, enabled: {}",
-            self.enabled.read().await
-        );
     }
 
     /// Enable or disable edge detection
     pub async fn set_enabled(&self, enabled: bool) {
         let mut e = self.enabled.write().await;
         *e = enabled;
-        log::info!("Edge detection enabled: {}", enabled);
-    }
-
-    /// Check if edge detection is enabled
-    #[allow(dead_code)]
-    pub async fn is_enabled(&self) -> bool {
-        *self.enabled.read().await
     }
 
     /// Set capture open state (called from main when capture visibility changes)
@@ -103,22 +97,10 @@ impl EdgeDetector {
         }
     }
 
-    /// Check if capture window is open
-    #[allow(dead_code)]
-    pub async fn is_capture_open(&self) -> bool {
-        *self.is_capture_open.read().await
-    }
-
-    /// Check if reader window is open
-    #[allow(dead_code)]
-    pub async fn is_reader_open(&self) -> bool {
-        *self.is_reader_open.read().await
-    }
-
     /// Check if capture is in cooldown period after closing
     async fn is_capture_in_cooldown(&self) -> bool {
         if let Some(close_time) = *self.last_capture_close_time.read().await {
-            close_time.elapsed() < Duration::from_millis(500)
+            close_time.elapsed() < Duration::from_millis(WINDOW_CLOSE_COOLDOWN_MS)
         } else {
             false
         }
@@ -127,15 +109,15 @@ impl EdgeDetector {
     /// Check if reader is in cooldown period after closing
     async fn is_reader_in_cooldown(&self) -> bool {
         if let Some(close_time) = *self.last_reader_close_time.read().await {
-            close_time.elapsed() < Duration::from_millis(500)
+            close_time.elapsed() < Duration::from_millis(WINDOW_CLOSE_COOLDOWN_MS)
         } else {
             false
         }
     }
 
-    /// Main polling loop - checks mouse position every 50ms
+    /// Main polling loop - checks mouse position on a short interval.
     async fn poll_loop(&self, app: AppHandle) {
-        let poll_interval = Duration::from_millis(50);
+        let poll_interval = Duration::from_millis(EDGE_POLL_INTERVAL_MS);
         let mut trigger_start: Option<Instant> = None;
         let mut trigger_target: Option<&'static str> = None;
 
@@ -144,7 +126,6 @@ impl EdgeDetector {
         loop {
             tokio::time::sleep(poll_interval).await;
 
-            // Get current mouse position and screen bounds
             let mouse_pos = get_mouse_position();
             let screen = get_primary_screen_bounds();
 
@@ -156,7 +137,7 @@ impl EdgeDetector {
             }
 
             let trigger_delay = Duration::from_millis(settings.edge_reaction_time_ms);
-            let edge_zone = 5;
+            let edge_zone = EDGE_TRIGGER_ZONE_PX;
             let at_left_edge = mouse_pos.0 <= edge_zone;
             let at_right_edge = mouse_pos.0 >= screen.width - edge_zone;
 
@@ -194,8 +175,9 @@ impl EdgeDetector {
                         continue;
                     }
 
-                    log::info!("Edge triggered! Emitting {}", target);
-                    let _ = app.emit(target, ());
+                    if let Err(error) = app.emit(target, ()) {
+                        log::warn!("Failed to emit edge event {}: {}", target, error);
+                    }
                     trigger_start = None;
                     trigger_target = None;
                 }
@@ -309,8 +291,8 @@ fn get_primary_screen_bounds() -> ScreenBounds {
     #[cfg(not(target_os = "macos"))]
     {
         ScreenBounds {
-            width: 1920,
-            height: 1080,
+            width: FALLBACK_SCREEN_WIDTH_PX,
+            height: FALLBACK_SCREEN_HEIGHT_PX,
         }
     }
 }

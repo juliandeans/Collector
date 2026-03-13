@@ -2,7 +2,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-use crate::log_safety::{redact_path, redact_path_str, summarize_bytes};
+use crate::log_safety::redact_path_str;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PinnedNote {
@@ -268,12 +268,9 @@ fn default_daily_note_format() -> String {
 fn is_safe_relative_path(path: &str) -> bool {
     let candidate = Path::new(path);
     !candidate.is_absolute()
-        && candidate.components().all(|component| {
-            matches!(
-                component,
-                Component::Normal(_) | Component::CurDir
-            )
-        })
+        && candidate
+            .components()
+            .all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
 }
 
 fn is_safe_filename_template(template: &str) -> bool {
@@ -359,7 +356,12 @@ impl Settings {
                 serde_json::from_str(&content).or_else(|e| -> Result<Settings, String> {
                     log::warn!("Config corrupted, using defaults: {}", e);
                     let defaults = Self::default();
-                    let _ = defaults.save();
+                    if let Err(save_error) = defaults.save() {
+                        log::warn!(
+                            "Failed to persist default settings after config recovery: {}",
+                            save_error
+                        );
+                    }
                     Ok(defaults)
                 })?;
 
@@ -386,7 +388,12 @@ impl Settings {
 
                 settings.daily_note_path = String::new();
 
-                let _ = settings.save();
+                if let Err(save_error) = settings.save() {
+                    log::warn!(
+                        "Failed to persist migrated daily note settings: {}",
+                        save_error
+                    );
+                }
             }
 
             Ok(settings)
@@ -408,13 +415,6 @@ impl Settings {
         let content = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize settings: {}", e))?;
 
-        log::info!(
-            "Writing settings (file={}, size={})",
-            redact_path(&config_path),
-            summarize_bytes(content.len())
-        );
-        log::info!("window_blur in serialized content: {}", self.window_blur);
-
         fs::write(&config_path, content)
             .map_err(|e| format!("Failed to write config file: {}", e))?;
 
@@ -429,10 +429,6 @@ impl Settings {
             log::warn!("window_blur field not found in written config file!");
         }
 
-        log::info!(
-            "Settings saved (file={}, verified)",
-            redact_path(&config_path)
-        );
         Ok(())
     }
 
@@ -504,7 +500,9 @@ impl Settings {
         }
 
         if !is_safe_filename_template(&self.note_filename_template) {
-            return Err("note_filename_template must be a filename without path separators".to_string());
+            return Err(
+                "note_filename_template must be a filename without path separators".to_string(),
+            );
         }
 
         if !is_safe_filename_template(&self.image_filename) {
@@ -520,20 +518,21 @@ impl Settings {
                 vault_path.join(screenshot_path)
             };
 
-            let normalized = absolute_screenshot_path
-                .components()
-                .fold(PathBuf::new(), |mut acc, component| {
-                    match component {
-                        Component::Prefix(prefix) => acc.push(prefix.as_os_str()),
-                        Component::RootDir => acc.push(component.as_os_str()),
-                        Component::CurDir => {}
-                        Component::Normal(part) => acc.push(part),
-                        Component::ParentDir => {
-                            let _ = acc.pop();
+            let normalized =
+                absolute_screenshot_path
+                    .components()
+                    .fold(PathBuf::new(), |mut acc, component| {
+                        match component {
+                            Component::Prefix(prefix) => acc.push(prefix.as_os_str()),
+                            Component::RootDir => acc.push(component.as_os_str()),
+                            Component::CurDir => {}
+                            Component::Normal(part) => acc.push(part),
+                            Component::ParentDir => {
+                                acc.pop();
+                            }
                         }
-                    }
-                    acc
-                });
+                        acc
+                    });
 
             if !normalized.starts_with(&vault_path) {
                 return Err("screenshot_path must stay inside the vault".to_string());
