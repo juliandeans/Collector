@@ -52,6 +52,9 @@
   let searchMatches = [];
   let searchIndex = 0;
   let searchInputRef;
+  let isDragging = false;
+  let dragCounter = 0;
+  let isImportingImages = false;
   let tabContextMenu = {
     open: false,
     x: 0,
@@ -101,6 +104,13 @@
 
   function normalizeNewlines(content = "") {
     return content.replace(/\r\n/g, "\n");
+  }
+
+  function isFileDrag(event) {
+    const types = event.dataTransfer?.types;
+    if (types && Array.from(types).includes("Files")) return true;
+    const items = event.dataTransfer?.items;
+    return !!items && items.length > 0;
   }
 
   function applyColorSettings(settings = appSettings) {
@@ -521,6 +531,11 @@
     handleInput();
   }
 
+  function createImportPlaceholder(filename = "image") {
+    const label = filename.replace(/\s+/g, " ").trim() || "image";
+    return `[Importing image: ${label} · ${Date.now()}-${Math.random().toString(36).slice(2, 8)}]`;
+  }
+
   function normalizeImportedImageResult(result) {
     if (typeof result === "string") {
       return { markdown: result };
@@ -575,7 +590,7 @@
     return normalizeImportedImageResult(result).markdown;
   }
 
-  function insertImportedMarkdown(markdownLinks = []) {
+  function insertImportedMarkdown(markdownLinks = [], { syncEditor = true } = {}) {
     if (!editorRef || markdownLinks.length === 0) return;
 
     editorRef.focus();
@@ -588,14 +603,18 @@
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) {
       editorRef.append(document.createTextNode(content));
-      handleInput();
+      if (syncEditor) {
+        handleInput();
+      }
       return;
     }
 
     const range = selection.getRangeAt(0);
     if (!editorRef.contains(range.commonAncestorContainer)) {
       editorRef.append(document.createTextNode(content));
-      handleInput();
+      if (syncEditor) {
+        handleInput();
+      }
       return;
     }
 
@@ -609,7 +628,23 @@
     selection.removeAllRanges();
     selection.addRange(afterRange);
 
-    handleInput();
+    if (syncEditor) {
+      handleInput();
+    }
+  }
+
+  async function finalizeImportedImages(replacements) {
+    let nextContent = composeContentFromMarkdown(getCurrentMarkdown());
+
+    replacements.forEach(({ placeholder, markdown }) => {
+      nextContent = nextContent.replace(placeholder, markdown);
+    });
+
+    rawContent = normalizeNewlines(nextContent);
+    updateActiveTabContent(rawContent);
+    imagePathCache.clear();
+    await renderContentToEditor(rawContent);
+    scheduleSave(rawContent);
   }
 
   async function handleEditorDrop(event) {
@@ -621,29 +656,59 @@
 
     event.preventDefault();
     event.stopPropagation();
+    isDragging = false;
+    dragCounter = 0;
 
     try {
-      const markdownLinks = (
-        await Promise.all(
-          files.map(async (file, index) => {
-            const item = items[index];
-            const itemFile =
-              item?.kind === "file" ? item.getAsFile?.() ?? null : null;
-            const fallbackPath =
-              file.path ||
-              file.webkitRelativePath ||
-              itemFile?.path ||
-              itemFile?.webkitRelativePath ||
-              null;
+      isImportingImages = true;
 
-            return importImageFile(file, fallbackPath);
-          }),
-        )
-      ).filter(Boolean);
+      const jobs = files.map((file, index) => {
+        const item = items[index];
+        const itemFile = item?.kind === "file" ? item.getAsFile?.() ?? null : null;
+        const fallbackPath =
+          file.path ||
+          file.webkitRelativePath ||
+          itemFile?.path ||
+          itemFile?.webkitRelativePath ||
+          null;
+        const placeholder = createImportPlaceholder(file.name || fallbackPath);
 
-      insertImportedMarkdown(markdownLinks);
+        return {
+          file,
+          fallbackPath,
+          placeholder,
+        };
+      });
+
+      insertImportedMarkdown(
+        jobs.map((job) => job.placeholder),
+        { syncEditor: false },
+      );
+
+      const results = await Promise.allSettled(
+        jobs.map((job) => importImageFile(job.file, job.fallbackPath)),
+      );
+
+      const replacements = results.map((result, index) => {
+        if (result.status === "fulfilled") {
+          return {
+            placeholder: jobs[index].placeholder,
+            markdown: result.value,
+          };
+        }
+
+        showStatus(normalizeError(result.reason), "error", 2200);
+        return {
+          placeholder: jobs[index].placeholder,
+          markdown: "",
+        };
+      });
+
+      await finalizeImportedImages(replacements);
     } catch (error) {
       showStatus(normalizeError(error), "error", 2200);
+    } finally {
+      isImportingImages = false;
     }
   }
 
@@ -659,20 +724,82 @@
     event.stopPropagation();
 
     try {
-      const markdownLinks = (
-        await Promise.all(
-          imageItems.map(async (item) => {
-            const file = item.getAsFile?.();
-            if (!file) return null;
-            return importImageFile(file, null);
-          }),
-        )
-      ).filter(Boolean);
+      isImportingImages = true;
 
-      insertImportedMarkdown(markdownLinks);
+      const jobs = imageItems
+        .map((item) => item.getAsFile?.())
+        .filter(Boolean)
+        .map((file) => ({
+          file,
+          placeholder: createImportPlaceholder(file.name),
+        }));
+
+      insertImportedMarkdown(
+        jobs.map((job) => job.placeholder),
+        { syncEditor: false },
+      );
+
+      const results = await Promise.allSettled(
+        jobs.map((job) => importImageFile(job.file, null)),
+      );
+
+      const replacements = results.map((result, index) => {
+        if (result.status === "fulfilled") {
+          return {
+            placeholder: jobs[index].placeholder,
+            markdown: result.value,
+          };
+        }
+
+        showStatus(normalizeError(result.reason), "error", 2200);
+        return {
+          placeholder: jobs[index].placeholder,
+          markdown: "",
+        };
+      });
+
+      await finalizeImportedImages(replacements);
     } catch (error) {
       showStatus(normalizeError(error), "error", 2200);
+    } finally {
+      isImportingImages = false;
     }
+  }
+
+  function handleDragEnter(event) {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    dragCounter += 1;
+    if (dragCounter === 1) {
+      isDragging = true;
+    }
+  }
+
+  function handleDragLeave(event) {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+
+    const rect = event.currentTarget?.getBoundingClientRect?.();
+    const x = event.clientX;
+    const y = event.clientY;
+    const isLeaving =
+      rect &&
+      (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom);
+
+    if (!isLeaving) return;
+
+    dragCounter = Math.max(dragCounter - 1, 0);
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      isDragging = false;
+    }
+  }
+
+  function handleDragOver(event) {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    isDragging = true;
   }
 
   function handleAutocompleteKeydown(event) {
@@ -2483,6 +2610,7 @@
 <div
   class="reader-container"
   class:palette-open={showPalette}
+  class:dragging={isDragging}
   style="
     --app-background: {appSettings.background_color};
     --app-font-family: {appSettings.font_family};
@@ -2494,6 +2622,10 @@
     --app-text-color: {appSettings.text_color};
     --app-brightness-filter: {brightnessFilter};
   "
+  on:dragenter={handleDragEnter}
+  on:dragleave={handleDragLeave}
+  on:dragover={handleDragOver}
+  on:drop={handleEditorDrop}
   role="application"
 >
   <div class="accent-line" role="presentation"></div>
@@ -2539,7 +2671,9 @@
       </div>
 
       <div class="topbar-actions">
-        {#if isSaving}
+        {#if isImportingImages}
+          <span class="save-indicator busy">Importing image...</span>
+        {:else if isSaving}
           <span class="save-indicator busy">Saving...</span>
         {:else if showSavedIndicator}
           <span class="save-indicator">Saved ✓</span>
@@ -2661,7 +2795,9 @@
       data-placeholder="Start writing..."
       on:input={handleInput}
       on:keydown={handleKeydown}
-      on:dragover|preventDefault
+      on:dragenter={handleDragEnter}
+      on:dragleave={handleDragLeave}
+      on:dragover={handleDragOver}
       on:drop={handleEditorDrop}
       on:paste={handleEditorPaste}
       on:mousedown={handleEditorMouseDown}
@@ -2670,6 +2806,10 @@
       on:compositionend={handleCompositionEnd}
     ></div>
   </div>
+
+  {#if isDragging}
+    <div class="drop-overlay"></div>
+  {/if}
 
   {#if showPalette}
     <div
@@ -2789,6 +2929,15 @@
     -webkit-transform: translateZ(0);
   }
 
+  .reader-container.dragging {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(255, 255, 255, 0.7);
+    border-width: 2px;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.08),
+      0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
   .accent-line,
   .reader-topbar,
   .editor-scroll,
@@ -2797,6 +2946,21 @@
       filter 0.18s ease,
       opacity 0.18s ease,
       transform 0.18s ease;
+  }
+
+  .drop-overlay {
+    position: absolute;
+    inset: 2px;
+    background: none;
+    border: 2px dashed rgba(255, 255, 255, 0.7);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    pointer-events: none;
+    z-index: 30;
   }
 
   .reader-container.palette-open .accent-line,

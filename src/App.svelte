@@ -910,10 +910,7 @@
   <div class="resize-handle"></div>
 
   {#if isDragging}
-    <div class="drop-overlay">
-      <div class="drop-icon">📎</div>
-      <span>Drop Image</span>
-    </div>
+    <div class="drop-overlay"></div>
   {/if}
 
   {#if statusMessage}
@@ -1190,17 +1187,6 @@
     justify-content: center;
     gap: 8px;
     pointer-events: none;
-  }
-
-  .drop-icon {
-    font-size: 48px;
-    opacity: 0.8;
-  }
-
-  .drop-overlay span {
-    font-size: 15px;
-    color: rgba(255, 255, 255, 0.9);
-    font-weight: 600;
   }
 
   .status-toast {
