@@ -521,6 +521,160 @@
     handleInput();
   }
 
+  function normalizeImportedImageResult(result) {
+    if (typeof result === "string") {
+      return { markdown: result };
+    }
+
+    return {
+      markdown: result?.markdown ?? "",
+    };
+  }
+
+  function fileExtension(name = "") {
+    return name.split(".").pop()?.toLowerCase() ?? "";
+  }
+
+  async function importImageFile(file, fallbackPath = null) {
+    const ext = fileExtension(file?.name ?? fallbackPath ?? "");
+    if (!["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
+      throw new Error(`Unsupported image: ${file?.name ?? fallbackPath ?? "file"}`);
+    }
+
+    const candidatePath =
+      fallbackPath || file?.path || file?.webkitRelativePath || null;
+
+    if (candidatePath) {
+      const result = await invoke("save_image", {
+        filePath: candidatePath,
+      });
+      return normalizeImportedImageResult(result).markdown;
+    }
+
+    if (!file) {
+      throw new Error("Image file data not available");
+    }
+
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        const base64String =
+          typeof result === "string" ? result.split(",")[1] || result : "";
+        resolve(base64String);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const result = await invoke("save_image_from_bytes", {
+      bytesBase64: base64,
+      filename: file.name || "clipboard-image.png",
+    });
+
+    return normalizeImportedImageResult(result).markdown;
+  }
+
+  function insertImportedMarkdown(markdownLinks = []) {
+    if (!editorRef || markdownLinks.length === 0) return;
+
+    editorRef.focus();
+
+    const content = markdownLinks
+      .filter((entry) => entry?.trim())
+      .map((entry) => `\n${entry}\n`)
+      .join("\n");
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      editorRef.append(document.createTextNode(content));
+      handleInput();
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    if (!editorRef.contains(range.commonAncestorContainer)) {
+      editorRef.append(document.createTextNode(content));
+      handleInput();
+      return;
+    }
+
+    range.deleteContents();
+    const textNode = document.createTextNode(content);
+    range.insertNode(textNode);
+
+    const afterRange = document.createRange();
+    afterRange.setStartAfter(textNode);
+    afterRange.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(afterRange);
+
+    handleInput();
+  }
+
+  async function handleEditorDrop(event) {
+    if (!event.dataTransfer) return;
+
+    const items = Array.from(event.dataTransfer.items || []);
+    const files = Array.from(event.dataTransfer.files || []);
+    if (files.length === 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    try {
+      const markdownLinks = (
+        await Promise.all(
+          files.map(async (file, index) => {
+            const item = items[index];
+            const itemFile =
+              item?.kind === "file" ? item.getAsFile?.() ?? null : null;
+            const fallbackPath =
+              file.path ||
+              file.webkitRelativePath ||
+              itemFile?.path ||
+              itemFile?.webkitRelativePath ||
+              null;
+
+            return importImageFile(file, fallbackPath);
+          }),
+        )
+      ).filter(Boolean);
+
+      insertImportedMarkdown(markdownLinks);
+    } catch (error) {
+      showStatus(normalizeError(error), "error", 2200);
+    }
+  }
+
+  async function handleEditorPaste(event) {
+    const items = Array.from(event.clipboardData?.items || []);
+    const imageItems = items.filter(
+      (item) => item.kind === "file" && item.type.startsWith("image/"),
+    );
+
+    if (imageItems.length === 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    try {
+      const markdownLinks = (
+        await Promise.all(
+          imageItems.map(async (item) => {
+            const file = item.getAsFile?.();
+            if (!file) return null;
+            return importImageFile(file, null);
+          }),
+        )
+      ).filter(Boolean);
+
+      insertImportedMarkdown(markdownLinks);
+    } catch (error) {
+      showStatus(normalizeError(error), "error", 2200);
+    }
+  }
+
   function handleAutocompleteKeydown(event) {
     if (!showAutocomplete) return false;
 
@@ -2507,6 +2661,9 @@
       data-placeholder="Start writing..."
       on:input={handleInput}
       on:keydown={handleKeydown}
+      on:dragover|preventDefault
+      on:drop={handleEditorDrop}
+      on:paste={handleEditorPaste}
       on:mousedown={handleEditorMouseDown}
       on:blur={handleEditorBlur}
       on:compositionstart={handleCompositionStart}

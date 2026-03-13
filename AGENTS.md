@@ -8,7 +8,6 @@
 ## Build, Test, and Development Commands
 Run `npm install` once to install the Svelte, Vite, and Tauri CLI dependencies.
 
-- `npm run dev` starts the Vite frontend only.
 - `npm run tauri dev` runs the desktop app with the Rust backend and live frontend.
 - `npm run build` builds the web frontend into `dist/`.
 - `npm run tauri build` creates a macOS app bundle under `src-tauri/target/release/bundle/`.
