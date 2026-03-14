@@ -41,7 +41,7 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 - Apple Silicon Mac
 - Obsidian installed
 
-![Collector Screenshot](public/screenshot/collector.jpg)
+![Collector Screenshot](public/screenshot/notewindow.jpg)
 
 ## Installation
 
@@ -58,6 +58,7 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 ![Collector Preview](public/screenshot/preview.gif)
 
 ## Reader Window
+![Collector Screenshot](public/screenshot/readerwindow.jpg)
 
 ## macOS Security on First Launch
 
