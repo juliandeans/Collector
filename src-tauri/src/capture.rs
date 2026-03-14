@@ -1,7 +1,7 @@
 use chrono::Local;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::PathBuf;
+use std::path::Path;
 
 use crate::log_safety::{redact_path, summarize_text_len};
 use crate::settings::Settings;
@@ -59,16 +59,27 @@ pub fn parse_daily_note_path(template: &str) -> String {
         .replace("DD", &now.format("%d").to_string())
 }
 
-pub fn save_as_note(content: &str, settings: &Settings) -> Result<CaptureResult, String> {
-    let notes_folder = &settings.notes_folder;
-
-    let notes_path = PathBuf::from(&settings.vault_path).join(notes_folder);
-
-    fs::create_dir_all(&notes_path)
-        .map_err(|e| format!("Failed to create notes directory: {}", e))?;
-
+pub fn build_note_relative_path(settings: &Settings) -> String {
     let filename = generate_filename_from_template(&settings.note_filename_template);
-    let file_path = notes_path.join(&filename);
+    let notes_folder = settings.notes_folder.trim_end_matches('/');
+
+    if notes_folder.is_empty() {
+        filename
+    } else {
+        format!("{notes_folder}/{filename}")
+    }
+}
+
+pub fn save_note_at_path(
+    content: &str,
+    file_path: &Path,
+    filename: &str,
+    settings: &Settings,
+) -> Result<CaptureResult, String> {
+    if let Some(parent) = file_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create notes directory: {}", e))?;
+    }
 
     let final_content = if !settings.note_template.is_empty() {
         format!("{}\n\n{}", settings.note_template, content)
@@ -105,19 +116,18 @@ fn generate_filename_from_template(template: &str) -> String {
     filename
 }
 
-pub fn append_to_daily_note(captured_text: &str, settings: &Settings) -> Result<(), String> {
+pub fn append_to_daily_note(
+    captured_text: &str,
+    file_path: &Path,
+    settings: &Settings,
+) -> Result<(), String> {
     if captured_text.trim().is_empty() {
         return Err("Nothing to append".to_string());
     }
 
-    let daily_path_template = build_daily_note_path(settings);
-
-    let vault_path = PathBuf::from(&settings.vault_path);
-    let file_path = vault_path.join(&daily_path_template);
-
     log::info!(
         "Appending to daily note (file={}, chars={})",
-        redact_path(&file_path),
+        redact_path(file_path),
         summarize_text_len(captured_text)
     );
 
@@ -170,7 +180,7 @@ pub fn append_to_daily_note(captured_text: &str, settings: &Settings) -> Result<
     let mut file = OpenOptions::new()
         .write(true)
         .append(true)
-        .open(&file_path)
+        .open(file_path)
         .map_err(|e| format!("Cannot open daily note: {}", e))?;
 
     if needs_leading_newline {

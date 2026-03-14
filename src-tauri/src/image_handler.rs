@@ -5,6 +5,7 @@ use std::fs;
 use std::io::Cursor;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::log_safety::{redact_path, summarize_bytes};
 use crate::settings::Settings;
@@ -44,16 +45,24 @@ pub fn save_image(source_path: &Path, settings: &Settings) -> Result<SavedImage,
 
     let output_path = output_dir.join(&filename);
 
-    let size_bytes = compress_and_save(&img, &output_path, settings.compression_max_kb)?;
+    let final_path = compress_and_save(&img, &output_path, settings.compression_max_kb)?;
+    let size_bytes = fs::metadata(&final_path)
+        .map_err(|e| format!("Failed to inspect saved image: {}", e))?
+        .len() as usize;
+    let filename = final_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| "Failed to determine saved image filename".to_string())?
+        .to_string();
 
     log::info!(
         "Image saved (file={}, size={})",
-        redact_path(&output_path),
+        redact_path(&final_path),
         summarize_bytes(size_bytes)
     );
 
     Ok(SavedImage {
-        full_path: output_path,
+        full_path: final_path,
         filename,
         size_bytes,
     })
@@ -64,7 +73,7 @@ fn compress_and_save(
     img: &DynamicImage,
     output_path: &Path,
     max_size_kb: u32,
-) -> Result<usize, String> {
+) -> Result<PathBuf, String> {
     let max_size_bytes = (max_size_kb * 1024) as usize;
 
     // Resize if too large (max 1920px width)
@@ -97,7 +106,7 @@ fn compress_and_save(
         // If PNG is small enough, save it
         if buffer.len() <= max_size_bytes {
             fs::write(output_path, &buffer).map_err(|e| format!("Failed to write image: {}", e))?;
-            return Ok(buffer.len());
+            return Ok(output_path.to_path_buf());
         }
         // Otherwise, fall through to JPEG compression
     }
@@ -131,7 +140,7 @@ fn compress_and_save(
 
             fs::write(&jpg_path, &buffer).map_err(|e| format!("Failed to write image: {}", e))?;
 
-            return Ok(buffer.len());
+            return Ok(jpg_path);
         }
 
         // Reduce quality for next iteration
@@ -210,35 +219,27 @@ pub fn process_dropped_file_from_bytes(
     original_filename: &str,
     settings: &Settings,
 ) -> Result<ProcessedImage, String> {
-    // Create temp directory if it doesn't exist
     let temp_dir = std::env::temp_dir();
-    let temp_path = temp_dir.join(format!("tauri_drop_{}", original_filename));
+    let temp_path = temp_dir.join(build_temp_import_name(original_filename));
 
-    // Write bytes to temp file
     let mut file =
         fs::File::create(&temp_path).map_err(|e| format!("Failed to create temp file: {}", e))?;
     file.write_all(&bytes)
         .map_err(|e| format!("Failed to write temp file: {}", e))?;
-    drop(file); // Close file before processing
+    drop(file);
 
-    // Check if it's a supported image based on extension
     let source_path = Path::new(&temp_path);
     if !is_supported_image(source_path) {
-        // Try to clean up temp file
         let _ = fs::remove_file(&temp_path);
         return Err(format!(
             "Unsupported file type. Supported: PNG, JPG, JPEG, WebP, GIF"
         ));
     }
 
-    // Save and compress the image
-    let saved = save_image(source_path, settings)?;
-
-    // Clean up temp file
+    let saved = save_image(source_path, settings);
     let _ = fs::remove_file(&temp_path);
+    let saved = saved?;
 
-    // Generate Obsidian wikilink
-    // Format: ![[filename.jpg]]
     let markdown_link = build_markdown_link(&saved.filename, settings);
     Ok(ProcessedImage {
         markdown: markdown_link,
@@ -254,6 +255,20 @@ fn build_markdown_link(filename: &str, settings: &Settings) -> String {
     } else {
         format!("![[{}|{}]]", filename, width)
     }
+}
+
+fn build_temp_import_name(original_filename: &str) -> String {
+    let basename = Path::new(original_filename)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or("clipboard-image.png");
+    let unique_suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|value| value.as_nanos())
+        .unwrap_or(0);
+
+    format!("tauri_drop_{}_{}", unique_suffix, basename)
 }
 
 /// Get the Obsidian vault path from settings

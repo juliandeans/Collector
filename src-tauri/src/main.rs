@@ -324,6 +324,13 @@ async fn save_as_note(
 ) -> Result<String, String> {
     let settings = state.settings.read().await.clone();
     settings.validate()?;
+    let relative_path = capture::build_note_relative_path(&settings);
+    let resolved = resolve_vault_write_path(&settings, &relative_path)?;
+    let filename = resolved
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| "Invalid note filename".to_string())?
+        .to_string();
 
     state.edge_detector.set_capture_open(false).await;
 
@@ -336,7 +343,7 @@ async fn save_as_note(
     ))
     .await;
 
-    let result = capture::save_as_note(&content.trim(), &settings)?;
+    let result = capture::save_note_at_path(&content.trim(), &resolved, &filename, &settings)?;
 
     Ok(result.message)
 }
@@ -348,8 +355,10 @@ async fn append_to_daily_note(
 ) -> Result<(), String> {
     let settings = state.settings.read().await.clone();
     settings.validate()?;
+    let daily_path = capture::build_daily_note_path(&settings);
+    let resolved = resolve_vault_write_path(&settings, &daily_path)?;
 
-    capture::append_to_daily_note(&text, &settings)?;
+    capture::append_to_daily_note(&text, &resolved, &settings)?;
 
     Ok(())
 }
@@ -817,8 +826,7 @@ fn create_tray_menu(app: &AppHandle) -> Menu<tauri::Wry> {
         None::<String>,
     )
     .unwrap();
-    let settings =
-        MenuItem::with_id(app, "settings", "Settings...", true, None::<String>).unwrap();
+    let settings = MenuItem::with_id(app, "settings", "Settings...", true, None::<String>).unwrap();
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<String>).unwrap();
 
     Menu::with_items(
@@ -1118,6 +1126,20 @@ mod tests {
         };
 
         let result = resolve_vault_read_path(&settings, "../safe.md");
+        assert!(result.is_err());
+
+        let _ = fs::remove_dir_all(vault_dir);
+    }
+
+    #[test]
+    fn resolve_vault_write_path_rejects_outside_file() {
+        let vault_dir = temp_vault_dir();
+        let settings = Settings {
+            vault_path: vault_dir.to_string_lossy().to_string(),
+            ..Default::default()
+        };
+
+        let result = resolve_vault_write_path(&settings, "../outside.md");
         assert!(result.is_err());
 
         let _ = fs::remove_dir_all(vault_dir);

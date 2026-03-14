@@ -10,11 +10,12 @@ function basename(path = "") {
 
 function normalizeImportedImageResult(result) {
   if (typeof result === "string") {
-    return { markdown: result };
+    return { markdown: result, filename: "" };
   }
 
   return {
     markdown: result?.markdown ?? "",
+    filename: result?.filename ?? "",
   };
 }
 
@@ -59,10 +60,11 @@ export async function processDroppedPaths(paths = [], settings = {}) {
       const result = await invoke("save_image", {
         filePath: path,
       });
+      const normalized = normalizeImportedImageResult(result);
 
       return {
-        markdown: normalizeImportedImageResult(result).markdown,
-        filename: basename(path),
+        markdown: normalized.markdown,
+        filename: normalized.filename || basename(path),
         previewUrl: "",
       };
     }),
@@ -84,10 +86,11 @@ export async function processDroppedFiles(files = [], settings = {}) {
         bytesBase64: base64,
         filename,
       });
+      const normalized = normalizeImportedImageResult(result);
 
       return {
-        markdown: normalizeImportedImageResult(result).markdown,
-        filename,
+        markdown: normalized.markdown,
+        filename: normalized.filename || filename,
         previewUrl: "",
       };
     }),

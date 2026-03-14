@@ -576,13 +576,13 @@
           }
         }
 
-        let markdownLink;
+        let normalizedResult;
 
         if (filePath) {
           const result = await invoke("save_image", {
             filePath: filePath,
           });
-          markdownLink = normalizeImageResult(result).markdown;
+          normalizedResult = normalizeImageResult(result);
         } else {
           if (!isTauri) {
             showStatus("Failed to import images outside the Tauri app", "error");
@@ -620,7 +620,7 @@
               bytesBase64: base64,
               filename: file.name,
             });
-            markdownLink = normalizeImageResult(result).markdown;
+            normalizedResult = normalizeImageResult(result);
           } catch (invokeError) {
             console.error("Invoke error:", invokeError);
             throw invokeError;
@@ -631,8 +631,8 @@
 
         return {
           id: Date.now() + Math.random() + index,
-          filename: file.name,
-          markdown: markdownLink,
+          filename: normalizedResult?.filename || file.name,
+          markdown: normalizedResult?.markdown || "",
           preview: previewUrl,
           file: file,
         };

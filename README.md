@@ -54,7 +54,10 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 2. Download the latest `.dmg` or archive for Apple Silicon
 3. Open the installer and move Collector into `Applications`
 
+## Note Window
 ![Collector Preview](public/screenshot/preview.gif)
+
+## Reader Window
 
 ## macOS Security on First Launch
 

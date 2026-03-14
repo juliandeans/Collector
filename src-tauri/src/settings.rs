@@ -509,6 +509,10 @@ impl Settings {
             return Err("daily_note_folder must stay inside the vault".to_string());
         }
 
+        if !is_safe_filename_template(&self.daily_note_format) {
+            return Err("daily_note_format must be a filename without path separators".to_string());
+        }
+
         if !is_safe_filename_template(&self.note_filename_template) {
             return Err(
                 "note_filename_template must be a filename without path separators".to_string(),
@@ -611,6 +615,17 @@ mod tests {
         let settings = Settings {
             vault_path: "/tmp/vault".to_string(),
             image_filename: "nested/file".to_string(),
+            ..Default::default()
+        };
+
+        assert!(settings.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_daily_note_format_with_separator() {
+        let settings = Settings {
+            vault_path: "/tmp/vault".to_string(),
+            daily_note_format: "../outside".to_string(),
             ..Default::default()
         };
 
