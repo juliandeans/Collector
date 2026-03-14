@@ -14,6 +14,8 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 - Drag and drop images: drop screenshots or images into the capture window and compress them automatically
 - Menu bar app: runs quietly in the background and stays one shortcut away
 
+![Collector Preview](public/screenshot/preview.gif)
+
 ## Reader Panel in v1.1
 
 - Tab-based reader: keep the Daily Note open, pin notes from settings, and open extra notes on demand
@@ -41,7 +43,7 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 - Apple Silicon Mac
 - Obsidian installed
 
-![Collector Screenshot](public/screenshot/notewindow.jpg)
+
 
 ## Installation
 
@@ -55,7 +57,7 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 3. Open the installer and move Collector into `Applications`
 
 ## Note Window
-![Collector Preview](public/screenshot/preview.gif)
+![Collector Screenshot](public/screenshot/notewindow.jpg)
 
 ## Reader Window
 ![Collector Screenshot](public/screenshot/readerwindow.jpg)
