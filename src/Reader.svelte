@@ -513,7 +513,6 @@
     closeAutocomplete();
     closeSearch();
     rawContent = normalizeNewlines(raw);
-    imagePathCache.clear();
     await renderContentToEditor(rawContent);
   }
 

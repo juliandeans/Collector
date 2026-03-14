@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher } from "svelte";
+  import { createEventDispatcher, tick } from "svelte";
 
   export let open = false;
   export let query = "";
@@ -8,6 +8,34 @@
   export let inputRef;
 
   const dispatch = createEventDispatcher();
+  let resultsRef;
+
+  function ensureSelectedItemVisible() {
+    if (!resultsRef || !open || notes.length === 0) return;
+
+    const activeItem = resultsRef.querySelector(".palette-item.selected");
+    if (!activeItem) return;
+
+    const itemTop = activeItem.offsetTop;
+    const itemBottom = itemTop + activeItem.offsetHeight;
+    const viewTop = resultsRef.scrollTop;
+    const viewBottom = viewTop + resultsRef.clientHeight;
+
+    if (itemTop < viewTop) {
+      resultsRef.scrollTop = itemTop;
+      return;
+    }
+
+    if (itemBottom > viewBottom) {
+      resultsRef.scrollTop = itemBottom - resultsRef.clientHeight;
+    }
+  }
+
+  $: if (open && notes.length > 0 && selectedIndex >= 0) {
+    void tick().then(() => {
+      ensureSelectedItemVisible();
+    });
+  }
 
   function handleInput(event) {
     dispatch("queryChange", event);
@@ -70,7 +98,7 @@
         on:keydown={handleKeydown}
       />
 
-      <div class="palette-results">
+      <div class="palette-results" bind:this={resultsRef}>
         {#if notes.length === 0}
           <div class="palette-empty">No matching notes</div>
         {:else}

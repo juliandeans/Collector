@@ -21,6 +21,8 @@
   let filteredRunningApps = [];
   let appPickerQuery = "";
   let activePanel = "obsidian";
+  let isIndexing = false;
+  let indexStatus = "";
 
   const systemFonts = getSystemFonts();
   const settingsPanels = [
@@ -117,6 +119,21 @@
     });
     if (selected) {
       settings.vault_path = selected;
+      indexStatus = "";
+    }
+  }
+
+  async function handleReindex() {
+    isIndexing = true;
+    indexStatus = "";
+
+    try {
+      const count = await invoke("reindex_vault");
+      indexStatus = `✓ Index built (${count} files)`;
+    } catch (e) {
+      indexStatus = `Failed to index vault: ${e}`;
+    } finally {
+      isIndexing = false;
     }
   }
 
@@ -390,7 +407,24 @@
                   >Choose...</button
                 >
               </div>
+              <div class="reindex-row">
+                <button
+                  class="secondary"
+                  type="button"
+                  on:click={handleReindex}
+                  disabled={isIndexing}
+                >
+                  {isIndexing ? "Indexing..." : "↻ Re-index Vault"}
+                </button>
+                {#if indexStatus}
+                  <span class="index-status">{indexStatus}</span>
+                {/if}
+              </div>
               <small>Full path to your Obsidian vault</small>
+              <small>
+                Re-index if images or notes added outside Collector are not
+                appearing correctly.
+              </small>
             </div>
             <div class="field">
               <label for="daily_note_folder">Daily Note Path</label>
@@ -1621,6 +1655,18 @@
   .path-picker button {
     padding: 8px 16px;
     white-space: nowrap;
+  }
+
+  .reindex-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 8px;
+  }
+
+  .index-status {
+    color: #666;
+    font-size: 11px;
   }
 
   .note-list {

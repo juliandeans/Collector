@@ -367,15 +367,18 @@ export function inlineMarkdown(text = "") {
     const cleanPath = rawPath.trim();
     const widthValue = normalizeImageWidth(rawWidth);
     const src = getCachedImageSrc(cleanPath) ?? "";
-    const style = widthValue ? `width:${widthValue};max-width:100%;` : "max-width:100%;";
-    const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(cleanPath)}" style="${escAttr(style)}" class="md-image" loading="lazy">`;
+    const style = widthValue
+      ? `width:${widthValue};max-width:100%;min-height:20px;`
+      : "max-width:100%;min-height:20px;";
+    const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(cleanPath)}" data-path="${escAttr(cleanPath)}" style="${escAttr(style)}" class="md-image" loading="lazy">`;
     imageTokens.push(imageTag);
     return `\u0000IMG${imageTokens.length - 1}\u0000`;
   });
 
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, path) => {
-    const src = getCachedImageSrc(path.trim()) ?? "";
-    const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(alt)}" style="max-width:100%;" class="md-image" loading="lazy">`;
+    const cleanPath = path.trim();
+    const src = getCachedImageSrc(cleanPath) ?? "";
+    const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(alt)}" data-path="${escAttr(cleanPath)}" style="max-width:100%;min-height:20px;" class="md-image" loading="lazy">`;
     imageTokens.push(imageTag);
     return `\u0000IMG${imageTokens.length - 1}\u0000`;
   });

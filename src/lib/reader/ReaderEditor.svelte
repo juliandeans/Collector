@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher, onMount, onDestroy, tick } from "svelte";
   import {
+    getCachedImageSrc,
     markdownLineToHtml,
     markdownToHtml,
     normalizeNewlines,
@@ -273,6 +274,21 @@
     finalizeActiveBlock();
   }
 
+  function patchResolvedImages() {
+    if (!editorRef) return;
+
+    const blankImages = editorRef.querySelectorAll('img[src=""]');
+    for (const image of blankImages) {
+      const path = image.getAttribute("data-path") || image.getAttribute("alt");
+      if (!path) continue;
+
+      const cachedSrc = getCachedImageSrc(path);
+      if (cachedSrc) {
+        image.src = cachedSrc;
+      }
+    }
+  }
+
   export function getMarkdown() {
     if (!editorRef) {
       return preprocessContent(rawContent, {
@@ -312,9 +328,7 @@
       return;
     }
 
-    isRenderingContent = true;
-    editorRef.innerHTML = markdownToHtml(processed);
-    isRenderingContent = false;
+    patchResolvedImages();
   }
 
   export async function restoreScroll(path, scrollPositions) {

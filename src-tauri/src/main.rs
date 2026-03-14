@@ -11,6 +11,7 @@ mod log_safety;
 mod selected_text;
 mod settings;
 mod shortcuts;
+mod vault_index;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -31,7 +32,6 @@ use crate::edge_detect::EdgeDetector;
 use crate::image_handler::ProcessedImage;
 use crate::settings::Settings;
 use crate::shortcuts::ShortcutManager;
-use std::collections::HashSet;
 use std::fs;
 use std::path::Component;
 
@@ -48,6 +48,7 @@ struct AppState {
     reader_shortcut_manager: Arc<ShortcutManager>,
     capture_text_shortcut_manager: Arc<ShortcutManager>,
     save_as_note_shortcut_manager: Arc<ShortcutManager>,
+    vault_index: Arc<RwLock<Option<vault_index::VaultIndex>>>,
 }
 
 fn warn_if_failed<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) {
@@ -142,144 +143,6 @@ fn resolve_vault_write_path(settings: &Settings, requested_path: &str) -> Result
     Ok(canonical_parent.join(filename))
 }
 
-fn collect_md_files(
-    base: &Path,
-    dir: &Path,
-    out: &mut Vec<serde_json::Value>,
-    visited: &mut HashSet<PathBuf>,
-) {
-    let canonical_dir = match fs::canonicalize(dir) {
-        Ok(path) => path,
-        Err(_) => return,
-    };
-
-    if !visited.insert(canonical_dir.clone()) {
-        return;
-    }
-
-    if let Ok(entries) = fs::read_dir(&canonical_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let Ok(file_type) = entry.file_type() else {
-                continue;
-            };
-
-            if path
-                .file_name()
-                .map(|n| n.to_string_lossy().starts_with('.'))
-                .unwrap_or(false)
-            {
-                continue;
-            }
-
-            if file_type.is_symlink() {
-                continue;
-            }
-
-            if file_type.is_dir() {
-                collect_md_files(base, &path, out, visited);
-            } else if path.extension().map(|e| e == "md").unwrap_or(false) {
-                let name = path
-                    .file_stem()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                let relative = path
-                    .strip_prefix(base)
-                    .unwrap_or(&path)
-                    .to_string_lossy()
-                    .to_string();
-                out.push(serde_json::json!({
-                    "path": path.to_string_lossy(),
-                    "name": name,
-                    "relative_path": relative,
-                }));
-            }
-        }
-    }
-}
-
-fn find_file_in_vault(
-    dir: &Path,
-    filename: &str,
-    visited: &mut HashSet<PathBuf>,
-) -> Option<PathBuf> {
-    let canonical_dir = fs::canonicalize(dir).ok()?;
-    if !visited.insert(canonical_dir.clone()) {
-        return None;
-    }
-
-    let entries = fs::read_dir(&canonical_dir).ok()?;
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let file_type = entry.file_type().ok()?;
-
-        if path
-            .file_name()
-            .map(|name| name.to_string_lossy().starts_with('.'))
-            .unwrap_or(false)
-        {
-            continue;
-        }
-
-        if file_type.is_symlink() {
-            continue;
-        }
-
-        if file_type.is_dir() {
-            if let Some(found) = find_file_in_vault(&path, filename, visited) {
-                return Some(found);
-            }
-        } else if path
-            .file_name()
-            .map(|name| name.to_string_lossy().eq_ignore_ascii_case(filename))
-            .unwrap_or(false)
-        {
-            return Some(path);
-        }
-    }
-
-    None
-}
-
-fn resolve_image_file_path(settings: &Settings, requested_path: &str) -> Result<PathBuf, String> {
-    let vault_root = canonical_vault_root(settings)?;
-    let normalized = normalize_path(Path::new(requested_path))?;
-
-    if normalized.is_absolute() {
-        let canonical = fs::canonicalize(&normalized)
-            .map_err(|e| format!("Failed to resolve image path: {}", e))?;
-        if canonical.starts_with(&vault_root) && image_handler::is_supported_image(&canonical) {
-            return Ok(canonical);
-        }
-        return Err("Image path must stay inside the vault".to_string());
-    }
-
-    if requested_path.contains('/') || requested_path.contains('\\') {
-        let candidate = vault_root.join(&normalized);
-        let canonical = fs::canonicalize(&candidate)
-            .map_err(|e| format!("Failed to resolve image path: {}", e))?;
-        if canonical.starts_with(&vault_root) && image_handler::is_supported_image(&canonical) {
-            return Ok(canonical);
-        }
-    }
-
-    let bare_name = normalized
-        .file_name()
-        .map(|name| name.to_string_lossy().to_string())
-        .unwrap_or_else(|| requested_path.to_string());
-    let mut visited = HashSet::new();
-    let found = find_file_in_vault(&vault_root, &bare_name, &mut visited)
-        .ok_or_else(|| "Image not found inside the vault".to_string())?;
-
-    if image_handler::is_supported_image(&found) {
-        Ok(found)
-    } else {
-        Err("Unsupported image type".to_string())
-    }
-}
-
 fn build_image_data_url(path: &Path) -> Result<String, String> {
     let bytes = fs::read(path).map_err(|e| format!("Failed to read image: {}", e))?;
     let mime = match path
@@ -300,6 +163,42 @@ fn build_image_data_url(path: &Path) -> Result<String, String> {
         mime,
         general_purpose::STANDARD.encode(bytes)
     ))
+}
+
+async fn get_or_build_index(state: &tauri::State<'_, AppState>) -> Result<(), String> {
+    let vault_path = {
+        let settings = state.settings.read().await;
+        settings.vault_path.clone()
+    };
+    let canonical_vault_path = fs::canonicalize(&vault_path)
+        .unwrap_or_else(|_| PathBuf::from(&vault_path))
+        .to_string_lossy()
+        .to_string();
+
+    {
+        let index = state.vault_index.read().await;
+        if let Some(ref idx) = *index {
+            if idx.vault_path == canonical_vault_path {
+                return Ok(());
+            }
+        }
+    }
+
+    log::info!(
+        "Building vault index for: {}",
+        crate::log_safety::redact_path_str(&vault_path)
+    );
+    let new_index = vault_index::VaultIndex::build(&vault_path)?;
+    let build_duration_ms = new_index.built_at.elapsed().as_millis();
+    let _ = new_index.resolve_note("");
+    log::info!(
+        "Vault index built: {} files in {} ms",
+        new_index.file_count,
+        build_duration_ms
+    );
+
+    *state.vault_index.write().await = Some(new_index);
+    Ok(())
 }
 
 #[tauri::command]
@@ -332,6 +231,16 @@ async fn save_settings(
         Err(e) => {
             log::error!("Failed to verify saved settings: {}", e);
         }
+    }
+
+    let old_vault_path = {
+        let old = state.settings.read().await;
+        old.vault_path.clone()
+    };
+
+    if old_vault_path != new_settings.vault_path {
+        *state.vault_index.write().await = None;
+        log::info!("Vault index invalidated: vault path changed");
     }
 
     *state.settings.write().await = new_settings.clone();
@@ -504,21 +413,34 @@ async fn load_image_data_url(
     path: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    let settings = state.settings.read().await.clone();
-    let resolved = resolve_image_file_path(&settings, &path)?;
+    get_or_build_index(&state).await?;
+
+    let resolved = {
+        let index = state.vault_index.read().await;
+        let idx = index
+            .as_ref()
+            .ok_or_else(|| "Vault index not available".to_string())?;
+
+        idx.resolve_image(&path)
+            .cloned()
+            .ok_or_else(|| format!("Image not found: {}", path))?
+    };
+
     build_image_data_url(&resolved)
 }
 
 #[tauri::command]
-async fn list_vault_notes(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
-    let settings = state.settings.read().await.clone();
-    let vault_path = canonical_vault_root(&settings)?;
+async fn list_vault_notes(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<vault_index::NoteEntry>, String> {
+    get_or_build_index(&state).await?;
 
-    let mut notes = Vec::new();
-    let mut visited = HashSet::new();
-    collect_md_files(&vault_path, &vault_path, &mut notes, &mut visited);
+    let index = state.vault_index.read().await;
+    let idx = index
+        .as_ref()
+        .ok_or_else(|| "Vault index not available".to_string())?;
 
-    Ok(serde_json::json!(notes))
+    Ok(idx.all_notes())
 }
 
 #[tauri::command]
@@ -528,6 +450,28 @@ async fn get_daily_note_path(state: tauri::State<'_, AppState>) -> Result<String
     let daily_path = capture::build_daily_note_path(&settings);
     let file_path = resolve_vault_write_path(&settings, &daily_path)?;
     Ok(file_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn reindex_vault(state: tauri::State<'_, AppState>) -> Result<usize, String> {
+    let vault_path = {
+        let settings = state.settings.read().await;
+        settings.vault_path.clone()
+    };
+
+    log::info!("Manual vault reindex requested");
+    let new_index = vault_index::VaultIndex::build(&vault_path)?;
+    let count = new_index.file_count;
+    let build_duration_ms = new_index.built_at.elapsed().as_millis();
+    let _ = new_index.resolve_note("");
+    *state.vault_index.write().await = Some(new_index);
+    log::info!(
+        "Vault reindex complete: {} files in {} ms",
+        count,
+        build_duration_ms
+    );
+
+    Ok(count)
 }
 
 #[tauri::command]
@@ -909,6 +853,7 @@ fn main() {
         reader_shortcut_manager: reader_shortcut_manager.clone(),
         capture_text_shortcut_manager: capture_text_shortcut_manager.clone(),
         save_as_note_shortcut_manager: save_as_note_shortcut_manager.clone(),
+        vault_index: Arc::new(RwLock::new(None)),
     };
 
     tauri::Builder::default()
@@ -1068,6 +1013,7 @@ fn main() {
             load_image_data_url,
             list_vault_notes,
             get_daily_note_path,
+            reindex_vault,
             save_image,
             save_image_from_bytes,
             toggle_edge_detection,
