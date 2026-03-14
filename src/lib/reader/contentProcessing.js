@@ -351,9 +351,20 @@ export async function warmImagesInText(text = "") {
     return false;
   }
 
-  await Promise.allSettled(missingPaths.map((path) => resolveImagePath(path)));
+  try {
+    const results = await invoke("load_images_batch", {
+      paths: missingPaths,
+    });
 
-  return true;
+    for (const [path, dataUrl] of results) {
+      setCachedImageSrc(path, dataUrl);
+    }
+
+    return results.length > 0;
+  } catch (error) {
+    console.warn("Batch image load failed:", error);
+    return false;
+  }
 }
 
 export function inlineMarkdown(text = "") {

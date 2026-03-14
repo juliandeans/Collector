@@ -430,6 +430,39 @@ async fn load_image_data_url(
 }
 
 #[tauri::command]
+async fn load_images_batch(
+    paths: Vec<String>,
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<(String, String)>, String> {
+    get_or_build_index(&state).await?;
+
+    let index = state.vault_index.read().await;
+    let idx = index
+        .as_ref()
+        .ok_or_else(|| "Vault index not available".to_string())?;
+
+    let mut results = Vec::new();
+
+    for path in paths {
+        let clean = path.split('|').next().unwrap_or("").trim().to_string();
+        if clean.is_empty() {
+            continue;
+        }
+
+        match idx.resolve_image(&clean) {
+            Some(resolved) => {
+                if let Ok(data_url) = build_image_data_url(resolved) {
+                    results.push((clean, data_url));
+                }
+            }
+            None => {}
+        }
+    }
+
+    Ok(results)
+}
+
+#[tauri::command]
 async fn list_vault_notes(
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<vault_index::NoteEntry>, String> {
@@ -967,6 +1000,27 @@ fn main() {
                 }
             });
 
+            let app_handle_index = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                let state = app_handle_index.state::<AppState>();
+                let vault_path = {
+                    let settings = state.settings.read().await;
+                    settings.vault_path.clone()
+                };
+
+                if !vault_path.is_empty() {
+                    match vault_index::VaultIndex::build(&vault_path) {
+                        Ok(index) => {
+                            *state.vault_index.write().await = Some(index);
+                            log::info!("Vault index ready at startup");
+                        }
+                        Err(error) => {
+                            log::warn!("Startup vault index failed: {}", error);
+                        }
+                    }
+                }
+            });
+
             if let Some(window) = app.get_webview_window("capture") {
                 warn_if_failed(
                     position_window_logical(&window, &settings),
@@ -1011,6 +1065,7 @@ fn main() {
             open_external_url,
             get_running_apps,
             load_image_data_url,
+            load_images_batch,
             list_vault_notes,
             get_daily_note_path,
             reindex_vault,

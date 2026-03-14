@@ -949,13 +949,18 @@
   }
 
   async function openPalette() {
+    showPalette = true;
+    paletteQuery = "";
+    selectedPaletteIndex = 0;
+    await tick();
+    paletteInputRef?.focus();
+
+    if (vaultNotes.length > 0) {
+      return;
+    }
+
     try {
       vaultNotes = await ensureVaultNotes(vaultNotes);
-      showPalette = true;
-      paletteQuery = "";
-      selectedPaletteIndex = 0;
-      await tick();
-      paletteInputRef?.focus();
     } catch (error) {
       showStatus(normalizeError(error), "error", 2200);
     }
