@@ -1,8 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 
+export const OBSIDIAN_ONLY_EXTENSIONS = [".excalidraw", ".canvas"];
+
 function normalizeTarget(target = "") {
   const withoutDisplay = target.split("|")[0].trim();
   return withoutDisplay.split("#")[0].trim();
+}
+
+function isObsidianOnlyPath(path = "") {
+  const normalizedPath = path.toLowerCase();
+  return OBSIDIAN_ONLY_EXTENSIONS.some((extension) =>
+    normalizedPath.endsWith(extension),
+  );
 }
 
 export async function ensureVaultNotes(vaultNotes = []) {
@@ -51,6 +60,10 @@ export function navigateToWikilink(
   const currentTab = tabs[activeTabIndex];
   if (!currentTab) {
     return { action: "noop" };
+  }
+
+  if (isObsidianOnlyPath(note.path) || isObsidianOnlyPath(note.relative_path)) {
+    return { action: "openInObsidian", note };
   }
 
   const openNewTab = forceNewTab || currentTab.isPinned;

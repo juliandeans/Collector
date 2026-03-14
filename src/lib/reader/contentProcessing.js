@@ -540,12 +540,12 @@ export function markdownLineToHtml(line) {
     return `<div class="hidden-marker" data-hidden-id="${hiddenMatch[1]}" contenteditable="false"></div>`;
   }
 
-  if (/^###### /.test(line)) return `<h6>${escHtml(line.slice(7))}</h6>`;
-  if (/^##### /.test(line)) return `<h5>${escHtml(line.slice(6))}</h5>`;
-  if (/^#### /.test(line)) return `<h4>${escHtml(line.slice(5))}</h4>`;
-  if (/^### /.test(line)) return `<h3>${escHtml(line.slice(4))}</h3>`;
-  if (/^## /.test(line)) return `<h2>${escHtml(line.slice(3))}</h2>`;
-  if (/^# /.test(line)) return `<h1>${escHtml(line.slice(2))}</h1>`;
+  if (/^###### /.test(line)) return `<h6>${inlineMarkdown(line.slice(7))}</h6>`;
+  if (/^##### /.test(line)) return `<h5>${inlineMarkdown(line.slice(6))}</h5>`;
+  if (/^#### /.test(line)) return `<h4>${inlineMarkdown(line.slice(5))}</h4>`;
+  if (/^### /.test(line)) return `<h3>${inlineMarkdown(line.slice(4))}</h3>`;
+  if (/^## /.test(line)) return `<h2>${inlineMarkdown(line.slice(3))}</h2>`;
+  if (/^# /.test(line)) return `<h1>${inlineMarkdown(line.slice(2))}</h1>`;
   if (line.trim() === "") return "<p><br></p>";
   if (/^---+$/.test(line.trim())) return "<hr>";
 

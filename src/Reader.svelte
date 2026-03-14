@@ -885,6 +885,22 @@
       return;
     }
 
+    if (intent.action === "openInObsidian") {
+      showStatus("Opening in Obsidian...", "success", 1200);
+
+      try {
+        await openInObsidian(
+          intent.note.path,
+          appSettings.vault_name ?? "Vault",
+          appSettings.vault_path ?? "",
+        );
+      } catch (error) {
+        showStatus("Failed to open in Obsidian", "error", 2200);
+      }
+
+      return;
+    }
+
     if (intent.action === "noop") {
       return;
     }

@@ -100,7 +100,7 @@
             />
             <path
               d="M50 25c-8.3 0-15 6.7-15 15s6.7 15 15 15 15-6.7 15-15-6.7-15-15-15zm0 22c-3.9 0-7-3.1-7-7s3.1-7 7-7 7 3.1 7 7-3.1 7-7 7z"
-              fill="white"
+              fill="currentColor"
               opacity="0.6"
             />
           </svg>
@@ -265,30 +265,25 @@
     border: 0;
     border-radius: 5px;
     background: transparent;
-    color: var(--text-secondary);
+    color: var(--app-text-color, #ffffff);
+    fill: var(--app-text-color, #ffffff);
+    stroke: var(--app-text-color, #ffffff);
+    opacity: 0.75;
     font: inherit;
     font-size: 14px;
     cursor: pointer;
     transition:
       background var(--transition-fast),
-      color var(--transition-fast);
+      opacity var(--transition-fast);
   }
 
   .topbar-btn:hover {
     background: rgba(0, 0, 0, 0.08);
-    color: var(--app-text-color, #ffffff);
+    opacity: 1;
   }
 
   .back-button {
     font-size: 16px;
-  }
-
-  .obsidian-btn {
-    opacity: 0.5;
-  }
-
-  .obsidian-btn:hover {
-    opacity: 1;
   }
 
   .tab-action:hover,
