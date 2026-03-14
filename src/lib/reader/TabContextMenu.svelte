@@ -26,7 +26,7 @@
         role="menuitem"
         on:click={() => dispatch("closeTab")}
       >
-        Schliessen
+        Close
       </button>
     </div>
   </div>

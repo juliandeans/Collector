@@ -200,7 +200,7 @@
     filteredRunningApps = filterApps(runningApps, appPickerQuery);
   }
 
-  async function openAppPicker() {
+  async function toggleAppPicker() {
     showAppPicker = !showAppPicker;
     if (!showAppPicker) return;
 
@@ -245,11 +245,11 @@
       settings = { ...payload };
       originalSettings = { ...payload };
 
-      showStatus("Settings saved!", "success");
+      showStatus("✓ Settings saved", "success");
     } catch (e) {
       console.error("Failed to save settings:", e);
       console.error("Error details:", JSON.stringify(e));
-      showStatus("Error: " + e.toString(), "error");
+      showStatus("Failed to save settings: " + e.toString(), "error");
     } finally {
       isSaving = false;
       settings = { ...settings };
@@ -1003,7 +1003,7 @@
               <button
                 class="secondary add-app-btn"
                 type="button"
-                on:click={openAppPicker}
+                on:click={toggleAppPicker}
               >
                 + Add App
               </button>

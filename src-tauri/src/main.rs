@@ -696,7 +696,7 @@ async fn open_settings(app: AppHandle) -> Result<(), String> {
 
         let settings_window =
             WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("settings.html".into()))
-                .title("Collector - Einstellungen")
+                .title("Collector - Settings")
                 .inner_size(SETTINGS_WINDOW_WIDTH, SETTINGS_WINDOW_HEIGHT)
                 .resizable(true)
                 .center()
@@ -841,8 +841,8 @@ fn create_tray_menu(app: &AppHandle) -> Menu<tauri::Wry> {
     )
     .unwrap();
     let settings =
-        MenuItem::with_id(app, "settings", "Einstellungen...", true, None::<String>).unwrap();
-    let quit = MenuItem::with_id(app, "quit", "Beenden", true, None::<String>).unwrap();
+        MenuItem::with_id(app, "settings", "Settings...", true, None::<String>).unwrap();
+    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<String>).unwrap();
 
     Menu::with_items(
         app,

@@ -54,7 +54,7 @@
   } from "./lib/reader/tabIO.js";
   import {
     filterPaletteNotes,
-    openVaultNote as getOpenVaultNoteIntent,
+    getOpenVaultNoteIntent,
   } from "./lib/reader/paletteLogic.js";
 
   let tabs = [];

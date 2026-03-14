@@ -1,189 +1,151 @@
-# Collector — Obsidian Quick Capture for macOS
-License: MIT
+# Collector - Obsidian Quick Capture for macOS
 
-I build a macOS  app for quick text and image capture into Obsidian. Without opening the software!
+Collector is a macOS menu bar app for fast text and image capture into Obsidian. It lets you save notes, screenshots, and pasted content into your vault without opening the full Obsidian app first.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![Platform](https://img.shields.io/badge/platform-macOS%2011%2B-lightgrey)
 ![Stack](https://img.shields.io/badge/stack-Tauri%20%2B%20Rust%20%2B%20Svelte-orange)
 
----
-
 ## Features
 
-- **Edge Detection**  
-  Move your mouse to the screen edge to instantly open the capture window
+- Edge activation: move the cursor to a screen edge to open the capture window instantly
+- Global shortcut: configurable system-wide hotkey, default `Cmd+Shift+N`
+- Quick capture: append to the Daily Note or save a new note directly into your vault
+- Drag and drop images: drop screenshots or images into the capture window and compress them automatically
+- Menu bar app: runs quietly in the background and stays one shortcut away
 
-- **Global Shortcut**  
-  Configurable system-wide hotkey (default: `⌘⇧N`)
+## Reader Panel in v1.1
 
-- **Drag & Drop**  
-  Drop screenshots or images directly into the capture window (Images are automatically compressed)
+- Tab-based reader: keep the Daily Note open, pin notes from settings, and open extra notes on demand
+- Hybrid Markdown editing: rendered reading view with raw Markdown editing on the active line
+- Image rendering: inline support for `![[image.png]]` and standard Markdown image links
+- Wikilink navigation: open `[[Note Links]]` in the current tab or a new tab with `Cmd+Click`
+- Open in Obsidian: jump from the Reader straight into the current note in Obsidian
+- Command palette: open any vault note with `Cmd+P` or `Cmd+K`
+- Wikilink autocomplete: inline `[[` completion while typing
+- Inline search: find and step through matches in the current note with `Cmd+F`
+- Content filters: optionally hide frontmatter, Dataview blocks, inline fields, HTML, and Obsidian comments
+- Reader image import: drop or paste images directly into the Reader using the same compression settings as the capture window
 
-- **Direct Obsidian Integration**  
-  Writes straight into your Daily Note or creates a new note — Obsidian doesn't need to be open, it stays in the background
+## Settings
 
-- **Background App**  
-  Runs quietly in the menu bar
-
-## Implemented in 1.1
-
-### 📖 Reader Panel
-A new left-side panel for quickly accessing your Obsidian notes — 
-without opening the app.
-- **Tab-based navigation** — Daily Note is always available, 
-  pin any `.md` file from your vault
-- **Hybrid Markdown Editor** — all content renders as formatted text; 
-  the active line shows raw Markdown for editing
-- **Image preview** — `![[image.jpg]]` and `![alt](url)` render inline
-- **Wikilink navigation** — click any `[[Link]]` to open the note in a 
-  new or the same tab; Cmd+Click always opens a new tab
-- **Open in Obsidian** — one click to open the current note in Obsidian
-- **Command Palette** (Cmd+P / Cmd+K) — search and open any vault note 
-- **`[[` Autocomplete** — inline dropdown when typing wikilinks
-- **Inline Search** (Cmd+F) — highlight and step through matches in the 
-  current note
-- **Content filtering** — optionally hide YAML frontmatter,
-  Dataview/code blocks, and Obsidian comments `%% ... %%`
-
-### ⚙️ Settings
-- Separate size settings for Note Window and Reader Window
-- Custom colors for accent, internal links, and external links
-- **Activation controls** — configure edge detection reaction time, 
-  require modifier keys (⌘ / ⌥ / ⇧ / ⌃), and exclude specific apps 
-  from triggering the panels
-
-## Planned for 1.2
-- Multi-Vault Support
-- Dark/Light Mode auto-switching
-- Multiple Templates for different note types
-
----
+- Separate window sizing for the capture window and Reader window
+- Custom colors for accents, internal links, and external links
+- Adjustable glass effect, transparency, blur, and brightness
+- Edge activation controls including cooldown, modifier keys, and excluded apps
+- Configurable note paths, templates, image folder, and compression limit
 
 ## Requirements
 
-- macOS **11.0 (Big Sur)** or newer
-- **Apple Silicon (M1/M2/M3/M4)**  (Intel Mac is work in progress!)
+- macOS 11.0 (Big Sur) or newer
+- Apple Silicon Mac
 - Obsidian installed
 
----
-
-![Collector UI](public/screenshot/collector.jpg)
-
----
+![Collector Screenshot](public/screenshot/collector.jpg)
 
 ## Installation
 
 ### Download
 
-**[Direct Download](https://github.com/juliandeans/Collector/releases/latest/download/Collector_aarch64.app.tar.gz)** | [View All Releases](https://github.com/juliandeans/Collector/releases)
+**[Direct Download](https://github.com/juliandeans/Collector/releases/latest/download/Collector_aarch64.app.tar.gz)**  
+[View All Releases](https://github.com/juliandeans/Collector/releases)
 
-1. Go to **GitHub → Releases**
-2. Download the latest `.dmg` file  
-   - `aarch64` → Apple Silicon (M1/M2/M3/M4)
+1. Open the GitHub Releases page
+2. Download the latest `.dmg` or archive for Apple Silicon
+3. Open the installer and move Collector into `Applications`
 
-### Install
+![Collector Preview](public/screenshot/preview.gif)
 
-1. Open the `.dmg`
-2. Drag **Collector** into the **Applications** folder
-3. Launch the app
+## macOS Security on First Launch
 
----
+Because the app is currently not code-signed or notarized, macOS may block it the first time. That is expected for an open-source desktop app.
 
-![Collector UI](public/screenshot/preview.gif)
+To open the app:
 
----
+1. Recommended: right-click the app and choose `Open`
+2. Alternative: go to `System Settings > Privacy & Security` and click `Open Anyway`
+3. Terminal fallback:
 
-## ⚠️ macOS Security (First Launch)
-
-Because this app is not code-signed or notarized (no Apple Developer account),
-macOS will initially block it. This is normal for open-source tools.
-
-**To open the app:**
-
-1. **Recommended**: Right-click → **Collector** → Click **Open** → Confirm
-2. **Alternative**: System Settings → Privacy & Security → Click **Open Anyway**
-3. **Terminal** (last resort):
 ```bash
-   xattr -dr com.apple.quarantine /Applications/Collector.app
+xattr -dr com.apple.quarantine /Applications/Collector.app
 ```
 
-You only need to do this **once**. After that, the app opens normally.
+You only need to do this once.
 
 ## Permissions
-Accessibility (required)
+
 Collector needs Accessibility access for global shortcuts.
 
-Open System Settings
-
-Go to Privacy & Security → Accessibility
-
-Unlock the settings
-
-Enable Collector
-
-Restart the app
+1. Open `System Settings`
+2. Go to `Privacy & Security > Accessibility`
+3. Unlock the settings
+4. Enable Collector
+5. Restart the app
 
 ## Configuration
-Open Menu Bar Icon → Settings…
 
-### Core Settings
-Path Variables
-You can use these variables in paths and filenames:
+Open the menu bar icon and choose `Settings...`.
 
-YYYY — year
+### Path Variables
 
-MM — month
+These placeholders can be used in paths and file names:
 
-DD — day
-
-HH — hour
-
-mm — minute
-
-ss — second
+- `YYYY` - year
+- `MM` - month
+- `DD` - day
+- `HH` - hour
+- `mm` - minute
+- `ss` - second
 
 ### Capture Screenshots
-Take a screenshot (Cmd+Shift+4). Drag the floating thumbnail to the screen edge. The capture window opens automatically. Image is compressed and inserted in your Vault.
 
-### Standard Keyboard Shortcuts
-Shortcut	Action
-Cmd + Enter -	Save to Daily Note
-Shift + Cmd + Enter - Create a new note 
-Esc	- Close without saving
+Take a screenshot with `Cmd+Shift+4` and drag the floating thumbnail to the configured screen edge. Collector opens, compresses the image, and inserts it into your vault.
+
+### Default Shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| `Cmd+Enter` | Save to Daily Note |
+| `Shift+Cmd+Enter` | Save as a new note |
+| `Esc` | Close without saving |
+| `Cmd+F` | Search inside the Reader |
+| `Cmd+P` / `Cmd+K` | Open the Reader command palette |
 
 ## Troubleshooting
+
 ### Vault not found
-Vault name must exactly match Obsidian
-Vault must contain an obsidian folder
-Ensure Collector has read/write access
+
+- Make sure the vault name exactly matches the one in Obsidian
+- Make sure the vault contains an `.obsidian` folder
+- Make sure Collector has read and write access
 
 ### Global shortcut does not work
-Check Accessibility permission
-Restart Collector
-Try a different shortcut (may be in use)
+
+- Check Accessibility permission
+- Restart Collector
+- Try a different shortcut if the current one is already in use
 
 ### Images are not saved
-Check image folder path in settings
-Ensure write permissions
-Folder is created automatically if missing
 
-### Daily Note not created
-Path format must be valid
-Use right-click → Open
-Check System Settings → Privacy & Security
+- Check the image folder path in settings
+- Make sure the vault is writable
+- The target folder is created automatically if it does not exist
 
-## 🛠️ Development
+### Daily Note is not created
 
-Want to contribute? Here's how to get started.
+- Make sure the configured path format is valid
+- Check vault permissions in `System Settings > Privacy & Security`
+
+## Development
 
 ### Requirements
 
-- **Node.js** 18+
-- **Rust** 1.70+
-- **Xcode Command Line Tools**
+- Node.js 18+
+- Rust 1.70+
+- Xcode Command Line Tools
 
 ### Setup
+
 ```bash
 git clone https://github.com/YOUR-USERNAME/Collector.git
 cd Collector
@@ -191,40 +153,32 @@ npm install
 ```
 
 ### Development Mode
+
 ```bash
 npm run tauri dev
 ```
 
 ### Production Build
+
 ```bash
 npm run tauri build
-# Output: src-tauri/target/release/bundle/
 ```
 
-### Generate Icons
-```bash
-npm run tauri icon path/to/icon.png
-```
+The macOS app bundle is created in `src-tauri/target/release/bundle/`.
 
 ### Project Structure
-```
+
+```text
 collector/
-├── src/              # Svelte frontend
-├── src-tauri/        # Rust backend (Tauri)
-├── package.json
-└── vite.config.js
+|-- src/              # Svelte frontend
+|-- src-tauri/        # Rust backend and Tauri setup
+|-- public/           # Static assets
+|-- package.json
+`-- vite.config.js
 ```
-
-
 
 ## Legal
 
 Collector is licensed under the MIT License.
 
-"Obsidian" is a trademark of Dynalist Inc. This project is not affiliated with, 
-endorsed by, or sponsored by Dynalist Inc.
-
-## Tech stack
-Tauri
-Rust
-Svelte
+Obsidian is a trademark of Dynalist Inc. This project is not affiliated with, endorsed by, or sponsored by Dynalist Inc.

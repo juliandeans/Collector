@@ -541,7 +541,7 @@
     dragCounter = 0;
 
     if (!e.dataTransfer) {
-      showStatus("Error: dataTransfer not available", "error");
+      showStatus("Failed to import images: dataTransfer unavailable", "error");
       return;
     }
 
@@ -549,14 +549,14 @@
     const files = Array.from(e.dataTransfer.files || []);
 
     if (files.length === 0) {
-      showStatus("No files found", "error");
+      showStatus("Failed to import images: no files found", "error");
       return;
     }
 
     const promises = files.map(async (file, index) => {
       const ext = file.name.split(".").pop()?.toLowerCase();
       if (!["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
-        showStatus("Nicht unterstützt: " + file.name, "error");
+        showStatus("Unsupported image: " + file.name, "error");
         return null;
       }
 
@@ -585,7 +585,7 @@
           markdownLink = normalizeImageResult(result).markdown;
         } else {
           if (!isTauri) {
-            showStatus("Please use in Tauri app", "error");
+            showStatus("Failed to import images outside the Tauri app", "error");
             return null;
           }
 
@@ -638,7 +638,7 @@
         };
       } catch (e) {
         console.error("Error processing file:", e);
-        showStatus("Error: " + e.toString(), "error");
+        showStatus("Failed to import image: " + e.toString(), "error");
         return null;
       }
     });
@@ -740,7 +740,7 @@
     dragCounter = 0;
 
     if (!paths || paths.length === 0) {
-      showStatus("No files found", "error");
+      showStatus("Failed to import images: no files found", "error");
       return;
     }
 
@@ -750,7 +750,7 @@
     });
 
     if (imagePaths.length === 0) {
-      showStatus("No supported image files found", "error");
+      showStatus("Failed to import images: no supported image files found", "error");
       return;
     }
 
@@ -778,7 +778,7 @@
         };
       } catch (e) {
         console.error("Error processing file:", e);
-        showStatus("Error: " + e.toString(), "error");
+        showStatus("Failed to import image: " + e.toString(), "error");
         return null;
       }
     });
@@ -871,7 +871,7 @@
             <button
               class="remove-btn"
               on:click={() => removeImage(image.id)}
-              title="Entfernen"
+              title="Remove"
             >
               ×
             </button>

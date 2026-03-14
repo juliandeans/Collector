@@ -107,7 +107,7 @@ fn generate_filename_from_template(template: &str) -> String {
 
 pub fn append_to_daily_note(captured_text: &str, settings: &Settings) -> Result<(), String> {
     if captured_text.trim().is_empty() {
-        return Err("Nichts zum Anhängen".to_string());
+        return Err("Nothing to append".to_string());
     }
 
     let daily_path_template = build_daily_note_path(settings);
