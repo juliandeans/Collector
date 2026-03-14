@@ -67,7 +67,9 @@ pub struct Settings {
     pub screenshot_path: String,
 
     pub edge_side: String,
+    #[serde(default = "default_window_width")]
     pub window_width: u32,
+    #[serde(default = "default_window_height")]
     pub window_height: u32,
     #[serde(default = "default_reader_width")]
     pub reader_width: u32,
@@ -197,6 +199,14 @@ fn default_save_as_note_shortcut() -> String {
     "Cmd+Shift+Enter".to_string()
 }
 
+fn default_window_width() -> u32 {
+    350
+}
+
+fn default_window_height() -> u32 {
+    600
+}
+
 fn default_reader_shortcut() -> String {
     "Cmd+Shift+R".to_string()
 }
@@ -214,27 +224,27 @@ fn default_image_width() -> String {
 }
 
 fn default_window_transparency() -> u32 {
-    55
+    10
 }
 
 fn default_window_blur() -> u32 {
-    80
+    55
 }
 
 fn default_window_saturation() -> u32 {
-    200
+    85
 }
 
 fn default_window_brightness() -> i32 {
-    0
+    -85
 }
 
 fn default_reader_width() -> u32 {
-    380
+    400
 }
 
 fn default_reader_height() -> u32 {
-    700
+    800
 }
 
 fn default_text_color() -> String {
@@ -287,14 +297,14 @@ impl Default for Settings {
             vault_path: default_vault_path(),
             screenshot_path: default_screenshot_path(),
             edge_side: "right".to_string(),
-            window_width: 330,
-            window_height: 600,
+            window_width: default_window_width(),
+            window_height: default_window_height(),
             reader_width: default_reader_width(),
             reader_height: default_reader_height(),
             border_radius: 12,
-            background_color: "#1e1e2e".to_string(),
+            background_color: "#ffffff".to_string(),
             font_family: "-apple-system, BlinkMacSystemFont, SF Pro Display".to_string(),
-            font_size: 15,
+            font_size: 14,
             daily_note_folder: default_daily_note_folder(),
             daily_note_format: default_daily_note_format(),
             daily_note_path: String::new(),
