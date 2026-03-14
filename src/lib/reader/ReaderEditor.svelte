@@ -473,20 +473,65 @@
     });
   }
 
+  function insertPlainTextAtSelection(text) {
+    if (!editorRef) return false;
+
+    const normalizedText = normalizeNewlines(text ?? "");
+    if (!normalizedText) return false;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      editorRef.append(document.createTextNode(normalizedText));
+      placeCursorAtEnd(editorRef);
+      return true;
+    }
+
+    const range = selection.getRangeAt(0);
+    if (!editorRef.contains(range.commonAncestorContainer)) {
+      editorRef.append(document.createTextNode(normalizedText));
+      placeCursorAtEnd(editorRef);
+      return true;
+    }
+
+    range.deleteContents();
+    const textNode = document.createTextNode(normalizedText);
+    range.insertNode(textNode);
+
+    const afterRange = document.createRange();
+    afterRange.setStart(textNode, textNode.textContent?.length ?? 0);
+    afterRange.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(afterRange);
+
+    return true;
+  }
+
   function handleEditorPaste(event) {
     const items = Array.from(event.clipboardData?.items || []);
     const imageItems = items.filter(
       (item) => item.kind === "file" && item.type.startsWith("image/"),
     );
 
-    if (imageItems.length === 0) return;
+    if (imageItems.length > 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      dispatch("importImages", {
+        type: "paste",
+        items: imageItems,
+      });
+      return;
+    }
+
+    const plainText = event.clipboardData?.getData("text/plain") ?? "";
+    if (!plainText) return;
 
     event.preventDefault();
     event.stopPropagation();
-    dispatch("importImages", {
-      type: "paste",
-      items: imageItems,
-    });
+
+    if (!insertPlainTextAtSelection(plainText)) return;
+
+    dispatch("change");
+    checkAutocomplete();
   }
 
   onMount(() => {
