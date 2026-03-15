@@ -57,10 +57,10 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 3. Open the installer and move Collector into `Applications`
 
 ## Note Window
-![Collector Screenshot](public/screenshot/notewindow.jpg)
+<img src="public/screenshot/notewindow.jpg" width="400" alt="Reader Window" />
 
 ## Reader Window
-![Collector Screenshot](public/screenshot/readerwindow.png)
+<img src="public/screenshot/readerwindow.png" width="400" alt="Reader Window" />
 
 ## macOS Security on First Launch
 
