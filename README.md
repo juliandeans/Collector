@@ -60,7 +60,7 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 ![Collector Screenshot](public/screenshot/notewindow.jpg)
 
 ## Reader Window
-![Collector Screenshot](public/screenshot/readerwindow.jpg)
+![Collector Screenshot](public/screenshot/readerwindow.png)
 
 ## macOS Security on First Launch
 
