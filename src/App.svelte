@@ -85,12 +85,18 @@
 
   function normalizeImageResult(result) {
     if (typeof result === "string") {
-      return { markdown: result, saved_path: null, filename: null };
+      return {
+        markdown: result,
+        saved_path: null,
+        filename: null,
+        preview_data_url: "",
+      };
     }
     return {
       markdown: result?.markdown ?? "",
       saved_path: result?.saved_path ?? null,
       filename: result?.filename ?? null,
+      preview_data_url: result?.preview_data_url ?? "",
     };
   }
 
@@ -627,7 +633,8 @@
           }
         }
 
-        const previewUrl = URL.createObjectURL(file);
+        const previewUrl =
+          normalizedResult?.preview_data_url || URL.createObjectURL(file);
 
         return {
           id: Date.now() + Math.random() + index,
@@ -761,16 +768,15 @@
         });
         const normalizedResult = normalizeImageResult(result);
 
-        const normalizedPath = normalizeFilePath(
-          normalizedResult.saved_path || filePath,
-        );
-        const previewUrl = await loadPreview(normalizedPath);
+        const previewUrl = normalizedResult.preview_data_url || null;
 
         return {
           id: Date.now() + Math.random() + index,
           filename:
             normalizedResult.filename ||
-            normalizedPath.split("/").pop() ||
+            normalizeFilePath(normalizedResult.saved_path || filePath)
+              .split("/")
+              .pop() ||
             `image${index}`,
           markdown: normalizedResult.markdown,
           preview: previewUrl,

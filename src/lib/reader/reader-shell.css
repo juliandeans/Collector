@@ -193,7 +193,7 @@ body {
 
 .autocomplete-path {
   overflow: hidden;
-  color: var(--text-secondary);
+  color: var(--reader-text-secondary);
   font-size: 10px;
   white-space: nowrap;
   text-overflow: ellipsis;

@@ -233,6 +233,16 @@ export function preprocessContent(
     text = stripHtmlTags(text, hiddenBlockMap);
   }
 
+  if (appSettings.reader_hide_callouts) {
+    text = text.replace(
+      /^(\s*>\s*)\[!([\w]+)\]\s*(.*)$/gim,
+      (_, prefix, type, title) => {
+        const normalizedTitle = title.trim() || capitalize(type.toLowerCase());
+        return `${prefix}${normalizedTitle}`;
+      },
+    );
+  }
+
   return text.replace(/^\n+/, "");
 }
 

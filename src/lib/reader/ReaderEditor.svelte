@@ -656,14 +656,14 @@
     font-weight: 600;
     line-height: 1.45;
     letter-spacing: 0.02em;
-    color: var(--text-secondary);
+    color: var(--reader-text-secondary);
   }
 
   .editor-body :global(blockquote) {
     margin: 2px 0;
     padding-left: 12px;
     border-left: 3px solid var(--accent-color, #8b5cf6);
-    color: var(--text-secondary);
+    color: var(--reader-text-secondary);
   }
 
   .editor-body :global(.callout) {
@@ -729,7 +729,7 @@
   .editor-body :global(p.list-item)::before {
     content: "•";
     margin-right: 8px;
-    color: var(--text-secondary);
+    color: var(--reader-text-secondary);
   }
 
   .editor-body :global(.md-checkbox) {

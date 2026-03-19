@@ -128,6 +128,8 @@ pub struct Settings {
     pub reader_hide_inline_fields: bool,
     #[serde(default = "default_true")]
     pub reader_hide_html: bool,
+    #[serde(default = "default_true")]
+    pub reader_hide_callouts: bool,
     #[serde(default = "default_note_filename_template")]
     pub note_filename_template: String,
     #[serde(default = "default_note_template")]
@@ -332,6 +334,7 @@ impl Default for Settings {
             reader_hide_obsidian_comments: default_true(),
             reader_hide_inline_fields: default_true(),
             reader_hide_html: default_true(),
+            reader_hide_callouts: default_true(),
             note_filename_template: default_note_filename_template(),
             note_template: default_note_template(),
             window_transparency: default_window_transparency(),

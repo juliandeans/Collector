@@ -143,7 +143,7 @@ fn resolve_vault_write_path(settings: &Settings, requested_path: &str) -> Result
     Ok(canonical_parent.join(filename))
 }
 
-fn build_image_data_url(path: &Path) -> Result<String, String> {
+pub(crate) fn build_image_data_url(path: &Path) -> Result<String, String> {
     let bytes = fs::read(path).map_err(|e| format!("Failed to read image: {}", e))?;
     let mime = match path
         .extension()

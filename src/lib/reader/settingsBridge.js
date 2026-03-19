@@ -6,6 +6,7 @@ const READER_FILTER_KEYS = [
   "reader_hide_obsidian_comments",
   "reader_hide_inline_fields",
   "reader_hide_html",
+  "reader_hide_callouts",
 ];
 
 export function computeBrightnessFilter(brightness = 0) {
@@ -26,6 +27,10 @@ export function applyColorSettings(settings = {}) {
   if (typeof document === "undefined") return;
 
   const root = document.documentElement;
+  root.style.setProperty(
+    "--reader-text-secondary",
+    "color-mix(in srgb, var(--app-text-color) 60%, transparent)",
+  );
   root.style.setProperty("--accent-color", settings.accent_color ?? "#8b5cf6");
   root.style.setProperty(
     "--internal-link-color",
@@ -75,6 +80,8 @@ export function applySettings(currentSettings = {}, settings = {}) {
       settings.reader_hide_inline_fields ??
       currentSettings.reader_hide_inline_fields,
     reader_hide_html: settings.reader_hide_html ?? currentSettings.reader_hide_html,
+    reader_hide_callouts:
+      settings.reader_hide_callouts ?? currentSettings.reader_hide_callouts,
   };
 }
 
@@ -85,6 +92,7 @@ export function getReaderFilterSettings(settings = {}) {
     reader_hide_obsidian_comments: settings.reader_hide_obsidian_comments,
     reader_hide_inline_fields: settings.reader_hide_inline_fields,
     reader_hide_html: settings.reader_hide_html,
+    reader_hide_callouts: settings.reader_hide_callouts,
   };
 }
 

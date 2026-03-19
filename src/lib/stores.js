@@ -46,6 +46,7 @@ export const defaultSettings = {
   reader_hide_obsidian_comments: true,
   reader_hide_inline_fields: true,
   reader_hide_html: true,
+  reader_hide_callouts: true,
   note_filename_template: 'note-YYYY-MM-DD-HHmmss',
   note_template: '---\ncreated: <% tp.date.now("YYYY-MM-DD hh:mm") %>\nmodified: \ndaily: "[[<% tp.date.now("YYYY-MM-DD") %>]]"\ntags: inbox\ntype: inbox\n---',
 };

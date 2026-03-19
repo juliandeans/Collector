@@ -89,6 +89,7 @@
     reader_hide_obsidian_comments: true,
     reader_hide_inline_fields: true,
     reader_hide_html: true,
+    reader_hide_callouts: true,
   };
   let statusMessage = "";
   let statusType = "";
@@ -504,6 +505,7 @@
     });
 
     if (!editorComponent) return;
+    await tick();
     await editorComponent.renderContent(raw);
   }
 
