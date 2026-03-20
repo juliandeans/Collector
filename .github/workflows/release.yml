@@ -37,6 +37,17 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'Collector v__VERSION__'
-          releaseBody: 'See the assets to download and install this version.'
-          releaseDraft: true
+          releaseBody: |
+            ### Fixes
+            - Daily note folder paths now support date placeholders (e.g. Journal/YYYY/MM)
+            - Screenshot previews now display correctly in the capture window
+            - Blank preview box no longer appears when image preview fails
+            - Reader text color now applies consistently to all elements including headings and callouts
+            - Drag overlay in the Reader no longer gets stuck
+
+            ### New
+            - Note filename template is now configurable in Settings
+            - Option to hide callouts in the Reader
+            - Dual monitor support: edge detection and window positioning now work correctly across all monitors
+          releaseDraft: false
           prerelease: false
