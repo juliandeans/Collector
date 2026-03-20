@@ -85,24 +85,19 @@
 
   function normalizeImageResult(result) {
     if (typeof result === "string") {
-      return { markdown: result, saved_path: null, filename: null };
+      return {
+        markdown: result,
+        saved_path: null,
+        filename: null,
+        preview_data_url: "",
+      };
     }
     return {
       markdown: result?.markdown ?? "",
       saved_path: result?.saved_path ?? null,
       filename: result?.filename ?? null,
+      preview_data_url: result?.preview_data_url ?? "",
     };
-  }
-
-  async function loadPreview(path) {
-    if (!path) return null;
-
-    try {
-      return await invoke("load_image_data_url", { path });
-    } catch (error) {
-      console.warn("Could not load image preview:", path, error);
-      return null;
-    }
   }
 
   function handleDragDropEvent(event) {
@@ -627,7 +622,8 @@
           }
         }
 
-        const previewUrl = URL.createObjectURL(file);
+        const previewUrl =
+          normalizedResult?.preview_data_url || URL.createObjectURL(file);
 
         return {
           id: Date.now() + Math.random() + index,
@@ -761,16 +757,15 @@
         });
         const normalizedResult = normalizeImageResult(result);
 
-        const normalizedPath = normalizeFilePath(
-          normalizedResult.saved_path || filePath,
-        );
-        const previewUrl = await loadPreview(normalizedPath);
+        const previewUrl = normalizedResult.preview_data_url || null;
 
         return {
           id: Date.now() + Math.random() + index,
           filename:
             normalizedResult.filename ||
-            normalizedPath.split("/").pop() ||
+            normalizeFilePath(normalizedResult.saved_path || filePath)
+              .split("/")
+              .pop() ||
             `image${index}`,
           markdown: normalizedResult.markdown,
           preview: previewUrl,
@@ -850,7 +845,7 @@
       handleDragEnter(e);
     }}
   >
-    {#if uploadedImages.length > 0}
+    {#if uploadedImages.some((img) => img.preview)}
       <div
         class="image-gallery"
         role="presentation"
@@ -865,7 +860,7 @@
           handleDragEnter(e);
         }}
       >
-        {#each uploadedImages as image (image.id)}
+        {#each uploadedImages.filter((img) => img.preview) as image (image.id)}
           <div class="image-preview">
             <img src={image.preview} alt={image.filename} />
             <button

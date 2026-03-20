@@ -34,7 +34,7 @@ pub fn build_daily_note_path(settings: &Settings) -> String {
         .replace("MM", &now.format("%m").to_string())
         .replace("DD", &now.format("%d").to_string());
 
-    let mut path = settings.daily_note_folder.clone();
+    let mut path = parse_daily_note_path(&settings.daily_note_folder);
 
     if !path.is_empty() && !path.ends_with('/') {
         path.push('/');

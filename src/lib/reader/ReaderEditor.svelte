@@ -316,7 +316,7 @@
 
     const requestId = ++renderRequestId;
     isRenderingContent = true;
-    editorRef.innerHTML = markdownToHtml(processed);
+    editorRef.innerHTML = markdownToHtml(processed, appSettings);
     isRenderingContent = false;
 
     const loadedAnyMissingImages = await warmImagesInText(processed);
@@ -457,22 +457,6 @@
     }
   }
 
-  function handleEditorDrop(event) {
-    if (!event.dataTransfer) return;
-
-    const items = Array.from(event.dataTransfer.items || []);
-    const files = Array.from(event.dataTransfer.files || []);
-    if (files.length === 0) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    dispatch("importImages", {
-      type: "drop",
-      items,
-      files,
-    });
-  }
-
   function insertPlainTextAtSelection(text) {
     if (!editorRef) return false;
 
@@ -507,21 +491,6 @@
   }
 
   function handleEditorPaste(event) {
-    const items = Array.from(event.clipboardData?.items || []);
-    const imageItems = items.filter(
-      (item) => item.kind === "file" && item.type.startsWith("image/"),
-    );
-
-    if (imageItems.length > 0) {
-      event.preventDefault();
-      event.stopPropagation();
-      dispatch("importImages", {
-        type: "paste",
-        items: imageItems,
-      });
-      return;
-    }
-
     const plainText = event.clipboardData?.getData("text/plain") ?? "";
     if (!plainText) return;
 
@@ -558,7 +527,6 @@
     data-placeholder="Start writing..."
     on:input={handleInput}
     on:keydown={handleKeydown}
-    on:drop={handleEditorDrop}
     on:paste={handleEditorPaste}
     on:mousedown={handleEditorMouseDown}
     on:blur={handleEditorBlur}
@@ -656,14 +624,14 @@
     font-weight: 600;
     line-height: 1.45;
     letter-spacing: 0.02em;
-    color: var(--text-secondary);
+    color: var(--reader-text-secondary);
   }
 
   .editor-body :global(blockquote) {
     margin: 2px 0;
     padding-left: 12px;
     border-left: 3px solid var(--accent-color, #8b5cf6);
-    color: var(--text-secondary);
+    color: var(--reader-text-secondary);
   }
 
   .editor-body :global(.callout) {
@@ -729,7 +697,7 @@
   .editor-body :global(p.list-item)::before {
     content: "•";
     margin-right: 8px;
-    color: var(--text-secondary);
+    color: var(--reader-text-secondary);
   }
 
   .editor-body :global(.md-checkbox) {
@@ -771,12 +739,13 @@
   }
 
   .editor-body :global(.codeblock-pill) {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     width: fit-content;
-    gap: 6px;
-    margin: 4px 0 4px auto;
-    padding: 4px 8px;
+    min-height: 20px;
+    gap: 5px;
+    margin: 2px 0;
+    padding: 2px 6px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.06);
     border: 0.5px solid rgba(255, 255, 255, 0.1);

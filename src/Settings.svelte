@@ -745,6 +745,16 @@
               <small>Relative path in vault for new notes</small>
             </div>
             <div class="field">
+              <label for="note_filename_template">Note Filename Template</label>
+              <input
+                type="text"
+                id="note_filename_template"
+                bind:value={settings.note_filename_template}
+                placeholder="note-YYYY-MM-DD-HHmmss"
+              />
+              <small>Supported tokens: YYYY, MM, DD, HH, mm, ss</small>
+            </div>
+            <div class="field">
               <label for="note_template">Template Text</label>
               <button
                 class="secondary"
@@ -939,6 +949,16 @@
                 Hide HTML Blocks
               </label>
               <small>Hides raw &lt;div&gt;, &lt;span&gt; and other HTML tags</small>
+            </div>
+
+            <div class="field">
+              <label class="checkbox">
+                <input
+                  type="checkbox"
+                  bind:checked={settings.reader_hide_callouts}
+                />
+                Hide Callouts
+              </label>
             </div>
           </section>
         {:else if activePanel === "activation"}

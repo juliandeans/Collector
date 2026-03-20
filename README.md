@@ -29,6 +29,18 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 - Content filters: optionally hide frontmatter, Dataview blocks, inline fields, HTML, and Obsidian comments
 - Reader image import: drop or paste images directly into the Reader using the same compression settings as the capture window
 
+### Additions and Fixes in 1.1.1
+**Fixes**
+- Daily note folder paths now support date placeholders (e.g. Journal/YYYY/MM)
+- Screenshot previews now display correctly in the capture window
+- Reader text color now applies consistently to all elements including headings and callouts
+- Drag overlay in the Reader no longer gets stuck
+
+**New**
+- Note filename template is now configurable in Settings
+- Option to hide callouts in the Reader
+- Dual monitor support: edge detection and window positioning now work correctly across all monitors
+
 ## Settings
 
 - Separate window sizing for the capture window and Reader window

@@ -7,6 +7,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::build_image_data_url;
 use crate::log_safety::{redact_path, summarize_bytes};
 use crate::settings::Settings;
 
@@ -28,6 +29,7 @@ pub struct ProcessedImage {
     pub markdown: String,
     pub saved_path: String,
     pub filename: String,
+    pub preview_data_url: String,
 }
 
 /// Save and compress an image
@@ -205,10 +207,12 @@ pub fn process_dropped_file(
     // Generate Obsidian wikilink
     // Format: ![[filename.jpg]]
     let markdown_link = build_markdown_link(&saved.filename, settings);
+    let preview_data_url = build_image_data_url(&saved.full_path).unwrap_or_default();
     Ok(ProcessedImage {
         markdown: markdown_link,
         saved_path: saved.full_path.to_string_lossy().to_string(),
         filename: saved.filename,
+        preview_data_url,
     })
 }
 
@@ -241,10 +245,12 @@ pub fn process_dropped_file_from_bytes(
     let saved = saved?;
 
     let markdown_link = build_markdown_link(&saved.filename, settings);
+    let preview_data_url = build_image_data_url(&saved.full_path).unwrap_or_default();
     Ok(ProcessedImage {
         markdown: markdown_link,
         saved_path: saved.full_path.to_string_lossy().to_string(),
         filename: saved.filename,
+        preview_data_url,
     })
 }
 
