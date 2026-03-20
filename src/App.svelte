@@ -100,17 +100,6 @@
     };
   }
 
-  async function loadPreview(path) {
-    if (!path) return null;
-
-    try {
-      return await invoke("load_image_data_url", { path });
-    } catch (error) {
-      console.warn("Could not load image preview:", path, error);
-      return null;
-    }
-  }
-
   function handleDragDropEvent(event) {
     const payload = event?.payload;
     if (!payload) return;
@@ -856,7 +845,7 @@
       handleDragEnter(e);
     }}
   >
-    {#if uploadedImages.length > 0}
+    {#if uploadedImages.some((img) => img.preview)}
       <div
         class="image-gallery"
         role="presentation"
@@ -871,7 +860,7 @@
           handleDragEnter(e);
         }}
       >
-        {#each uploadedImages as image (image.id)}
+        {#each uploadedImages.filter((img) => img.preview) as image (image.id)}
           <div class="image-preview">
             <img src={image.preview} alt={image.filename} />
             <button

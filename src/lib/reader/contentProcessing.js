@@ -233,16 +233,6 @@ export function preprocessContent(
     text = stripHtmlTags(text, hiddenBlockMap);
   }
 
-  if (appSettings.reader_hide_callouts) {
-    text = text.replace(
-      /^(\s*>\s*)\[!([\w]+)\]\s*(.*)$/gim,
-      (_, prefix, type, title) => {
-        const normalizedTitle = title.trim() || capitalize(type.toLowerCase());
-        return `${prefix}${normalizedTitle}`;
-      },
-    );
-  }
-
   return text.replace(/^\n+/, "");
 }
 
@@ -519,7 +509,7 @@ function calloutColorClass(type) {
   return map[type] ?? "blue";
 }
 
-function processCallout(lines = []) {
+function processCallout(lines = [], appSettings = {}) {
   const firstLine = lines[0] ?? "";
   const calloutMatch = firstLine.match(/^>\s*\[!([\w]+)\]\s*(.*)/i);
   if (!calloutMatch) return null;
@@ -542,9 +532,14 @@ function processCallout(lines = []) {
   const content = contentLines.length
     ? contentLines.map((line) => inlineMarkdown(line)).join("<br>")
     : "";
+  const raw = lines.join("\n");
+
+  if (appSettings.reader_hide_callouts) {
+    return `<blockquote class="hidden-callout" data-raw="${escAttr(raw)}">${content}</blockquote>`;
+  }
+
   const icon = calloutIcon(type);
   const colorClass = calloutColorClass(type);
-  const raw = lines.join("\n");
 
   return `<div class="callout callout-${colorClass}" data-raw="${escAttr(raw)}"><div class="callout-title"><span class="callout-icon">${icon}</span><span class="callout-label">${escHtml(title)}</span></div>${content ? `<div class="callout-content">${content}</div>` : ""}</div>`;
 }
@@ -594,7 +589,7 @@ export function markdownLineToHtml(line) {
   return `<p>${inlineMarkdown(line)}</p>`;
 }
 
-export function markdownToHtml(text = "") {
+export function markdownToHtml(text = "", appSettings = {}) {
   if (!text.trim()) return "";
 
   const lines = normalizeNewlines(text).split("\n");
@@ -611,7 +606,7 @@ export function markdownToHtml(text = "") {
         index += 1;
       }
 
-      const callout = processCallout(group);
+      const callout = processCallout(group, appSettings);
       if (callout) {
         htmlParts.push(callout);
       } else {

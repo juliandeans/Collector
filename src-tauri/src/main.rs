@@ -774,7 +774,8 @@ fn position_window_logical(
     window: &tauri::WebviewWindow,
     settings: &Settings,
 ) -> Result<(), String> {
-    let monitor = edge_detect::get_screen_bounds();
+    let app = window.app_handle();
+    let monitor = edge_detect::get_screen_bounds(&app);
 
     let width = settings.window_width as f64;
     let height = settings.window_height as f64;
@@ -801,7 +802,8 @@ fn position_reader_window_logical(
     window: &tauri::WebviewWindow,
     settings: &Settings,
 ) -> Result<(), String> {
-    let monitor = edge_detect::get_screen_bounds();
+    let app = window.app_handle();
+    let monitor = edge_detect::get_screen_bounds(&app);
     let width = settings.reader_width as f64;
     let height = settings.reader_height as f64;
     let y = monitor.y as f64 + (monitor.height as f64 - height) / 2.0;

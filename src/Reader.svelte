@@ -16,11 +16,6 @@
   } from "./lib/reader/contentProcessing.js";
   import { getAutocompleteResults } from "./lib/reader/autocomplete.js";
   import { composeContentFromMarkdown } from "./lib/reader/editorSerialization.js";
-  import {
-    createImportPlaceholder,
-    processDroppedFiles,
-    processDroppedPaths,
-  } from "./lib/reader/imageImport.js";
   import { setupListeners } from "./lib/reader/lifecycleSetup.js";
   import {
     ensureVaultNotes,
@@ -105,9 +100,6 @@
   let searchMatches = [];
   let searchIndex = 0;
   let searchInputRef;
-  let isDragging = false;
-  let dragCounter = 0;
-  let isImportingImages = false;
   let tabContextMenu = {
     open: false,
     x: 0,
@@ -131,13 +123,6 @@
     selectedPaletteIndex = Math.max(filteredVaultNotes.length - 1, 0);
   }
   $: brightnessFilter = computeBrightnessFilter(appSettings.window_brightness);
-
-  function isFileDrag(event) {
-    const types = event.dataTransfer?.types;
-    if (types && Array.from(types).includes("Files")) return true;
-    const items = event.dataTransfer?.items;
-    return !!items && items.length > 0;
-  }
 
   function normalizeError(error) {
     return typeof error === "string"
@@ -243,226 +228,6 @@
     await tick();
     searchInputRef?.focus();
     searchInputRef?.select();
-  }
-
-  function insertImportedMarkdown(
-    markdownLinks = [],
-    { syncEditor = true } = {},
-  ) {
-    const editorRef = editorComponent?.getEditorElement?.();
-    if (!editorRef || markdownLinks.length === 0) return;
-
-    editorRef.focus();
-
-    const content = markdownLinks
-      .filter((entry) => entry?.trim())
-      .map((entry) => `\n${entry}\n`)
-      .join("\n");
-
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) {
-      editorRef.append(document.createTextNode(content));
-      if (syncEditor) {
-        handleEditorChange();
-      }
-      return;
-    }
-
-    const range = selection.getRangeAt(0);
-    if (!editorRef.contains(range.commonAncestorContainer)) {
-      editorRef.append(document.createTextNode(content));
-      if (syncEditor) {
-        handleEditorChange();
-      }
-      return;
-    }
-
-    range.deleteContents();
-    const textNode = document.createTextNode(content);
-    range.insertNode(textNode);
-
-    const afterRange = document.createRange();
-    afterRange.setStartAfter(textNode);
-    afterRange.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(afterRange);
-
-    if (syncEditor) {
-      handleEditorChange();
-    }
-  }
-
-  async function finalizeImportedImages(replacements) {
-    const markdown = getCurrentMarkdown();
-    let nextContent = composeContentFromMarkdown(markdown, {
-      strippedFrontmatter,
-      hiddenBlockMap,
-      codeblockMap,
-    });
-
-    replacements.forEach(({ placeholder, markdown }) => {
-      nextContent = nextContent.replace(placeholder, markdown);
-    });
-
-    rawContent = normalizeNewlines(nextContent);
-    updateActiveTabContent(rawContent);
-    imagePathCache.clear();
-    await renderContentToEditor(rawContent);
-    scheduleSave(rawContent);
-  }
-
-  function buildImportReplacements(results, jobs) {
-    return results.map((result, index) => {
-      if (result.status === "fulfilled") {
-        return {
-          placeholder: jobs[index].placeholder,
-          markdown: result.value,
-        };
-      }
-
-      showStatus(normalizeError(result.reason), "error", 2200);
-      return { placeholder: jobs[index].placeholder, markdown: "" };
-    });
-  }
-
-  async function resolveImportJobs(jobs, importer) {
-    insertImportedMarkdown(
-      jobs.map((job) => job.placeholder),
-      { syncEditor: false },
-    );
-
-    const results = await Promise.allSettled(jobs.map(importer));
-    await finalizeImportedImages(buildImportReplacements(results, jobs));
-  }
-
-  async function handleImportedImages(detail) {
-    if (detail?.type === "drop") {
-      isDragging = false;
-      dragCounter = 0;
-      const items = Array.from(detail.items || []);
-      const files = Array.from(detail.files || []);
-      if (files.length === 0) return;
-
-      try {
-        isImportingImages = true;
-
-        const jobs = files.map((file, index) => {
-          const item = items[index];
-          const itemFile =
-            item?.kind === "file" ? (item.getAsFile?.() ?? null) : null;
-          const fallbackPath =
-            file.path ||
-            file.webkitRelativePath ||
-            itemFile?.path ||
-            itemFile?.webkitRelativePath ||
-            null;
-          const placeholder = createImportPlaceholder(file.name || fallbackPath);
-
-          return {
-            file,
-            fallbackPath,
-            placeholder,
-          };
-        });
-
-        await resolveImportJobs(jobs, async (job) => {
-          if (job.fallbackPath) {
-            const [result] = await processDroppedPaths(
-              [job.fallbackPath],
-              appSettings,
-            );
-            return result?.markdown ?? "";
-          }
-
-          const [result] = await processDroppedFiles([job.file], appSettings);
-          return result?.markdown ?? "";
-        });
-      } catch (error) {
-        showStatus(normalizeError(error), "error", 2200);
-      } finally {
-        isImportingImages = false;
-      }
-      return;
-    }
-
-    if (detail?.type === "paste") {
-      const imageItems = Array.from(detail.items || []);
-      if (imageItems.length === 0) return;
-
-      try {
-        isImportingImages = true;
-
-        const jobs = imageItems
-          .map((item) => item.getAsFile?.())
-          .filter(Boolean)
-          .map((file) => ({
-            file,
-            placeholder: createImportPlaceholder(file.name),
-          }));
-
-        await resolveImportJobs(jobs, async (job) => {
-          const [result] = await processDroppedFiles([job.file], appSettings);
-          return result?.markdown ?? "";
-        });
-      } catch (error) {
-        showStatus(normalizeError(error), "error", 2200);
-      } finally {
-        isImportingImages = false;
-      }
-    }
-  }
-
-  async function handleEditorDrop(event) {
-    if (!event.dataTransfer) return;
-
-    const items = Array.from(event.dataTransfer.items || []);
-    const files = Array.from(event.dataTransfer.files || []);
-    if (files.length === 0) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    isDragging = false;
-    dragCounter = 0;
-    await handleImportedImages({
-      type: "drop",
-      items,
-      files,
-    });
-  }
-
-  function handleDragEnter(event) {
-    if (!isFileDrag(event)) return;
-    event.preventDefault();
-    dragCounter += 1;
-    if (dragCounter === 1) {
-      isDragging = true;
-    }
-  }
-
-  function handleDragLeave(event) {
-    if (!isFileDrag(event)) return;
-    event.preventDefault();
-
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX;
-    const y = event.clientY;
-    const isLeaving =
-      x < rect.left || x > rect.right || y < rect.top || y > rect.bottom;
-
-    if (!isLeaving) return;
-
-    dragCounter = Math.max(dragCounter - 1, 0);
-    if (dragCounter <= 0) {
-      dragCounter = 0;
-      isDragging = false;
-    }
-  }
-
-  function handleDragOver(event) {
-    if (!isFileDrag(event)) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-    isDragging = true;
   }
 
   function replaceTab(index, updates) {
@@ -817,8 +582,6 @@
     editorComponent?.finalizeBlock?.();
     closeAutocomplete();
     closeSearch();
-    isDragging = false;
-    dragCounter = 0;
     await flushPendingSave(false);
 
     try {
@@ -982,8 +745,6 @@
   async function handleShowReader() {
     saveScrollPosition();
     editorComponent?.finalizeBlock?.();
-    isDragging = false;
-    dragCounter = 0;
     await flushPendingSave(false);
     if (tabs[activeTabIndex]) {
       await syncTabWithDisk(activeTabIndex);
@@ -1104,7 +865,6 @@
 <div
   class="reader-container"
   class:palette-open={showPalette}
-  class:dragging={isDragging}
   style="
     --app-background: {appSettings.background_color};
     --app-font-family: {appSettings.font_family};
@@ -1116,17 +876,12 @@
     --app-text-color: {appSettings.text_color};
     --app-brightness-filter: {brightnessFilter};
   "
-  on:dragenter={handleDragEnter}
-  on:dragleave={handleDragLeave}
-  on:dragover={handleDragOver}
-  on:drop={handleEditorDrop}
   role="application"
 >
   <ReaderTopBar
     {tabs}
     {activeTabIndex}
     {isSaving}
-    {isImportingImages}
     {showSavedIndicator}
     canGoBack={tabs[activeTabIndex]?.history?.length > 0}
     canOpenInObsidian={Boolean(tabs[activeTabIndex]?.path)}
@@ -1181,17 +936,12 @@
     on:navigateWikilink={(event) =>
       handleNavigateToWikilink(event.detail.target, event.detail.newTab)}
     on:openExternalLink={(event) => openExternalUrl(event.detail)}
-    on:importImages={(event) => handleImportedImages(event.detail)}
     on:autocompleteChange={handleEditorAutocompleteChange}
     on:autocompleteIndexChange={(event) => {
       autocompleteIndex = event.detail;
     }}
     on:scroll={saveScrollPosition}
   />
-
-  {#if isDragging}
-    <div class="drop-overlay"></div>
-  {/if}
 
   <CommandPalette
     open={showPalette}

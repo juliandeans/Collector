@@ -39,15 +39,6 @@ body {
   -webkit-transform: translateZ(0);
 }
 
-.reader-container.dragging {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(255, 255, 255, 0.7);
-  border-width: 2px;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.08),
-    0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
 .accent-line,
 .reader-topbar,
 .search-bar,
@@ -57,21 +48,6 @@ body {
     filter 0.18s ease,
     opacity 0.18s ease,
     transform 0.18s ease;
-}
-
-.drop-overlay {
-  position: absolute;
-  inset: 2px;
-  background: none;
-  border: 2px dashed rgba(255, 255, 255, 0.7);
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  pointer-events: none;
-  z-index: 30;
 }
 
 .reader-container.palette-open .accent-line,

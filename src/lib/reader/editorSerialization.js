@@ -84,6 +84,10 @@ export function elementToMarkdownLine(el) {
     return el.dataset.raw ?? "";
   }
 
+  if (el.classList?.contains("hidden-callout")) {
+    return el.dataset.raw ?? "";
+  }
+
   const tag = el.tagName?.toLowerCase();
   const inner = el.innerText ?? el.textContent ?? "";
 
