@@ -774,16 +774,16 @@ fn position_window_logical(
     window: &tauri::WebviewWindow,
     settings: &Settings,
 ) -> Result<(), String> {
-    let (screen_width, screen_height) = edge_detect::get_screen_bounds();
+    let monitor = edge_detect::get_screen_bounds();
 
     let width = settings.window_width as f64;
     let height = settings.window_height as f64;
 
-    let y = (screen_height as f64 - height) / 2.0;
+    let y = monitor.y as f64 + (monitor.height as f64 - height) / 2.0;
 
     let x = match settings.edge_side.as_str() {
-        "left" => 0.0,
-        "right" | _ => screen_width as f64 - width,
+        "left" => monitor.x as f64,
+        "right" | _ => monitor.x as f64 + monitor.width as f64 - width,
     };
 
     window
@@ -801,17 +801,17 @@ fn position_reader_window_logical(
     window: &tauri::WebviewWindow,
     settings: &Settings,
 ) -> Result<(), String> {
-    let (_, screen_height) = edge_detect::get_screen_bounds();
+    let monitor = edge_detect::get_screen_bounds();
     let width = settings.reader_width as f64;
     let height = settings.reader_height as f64;
-    let y = ((screen_height as f64 - height) / 2.0).max(0.0);
+    let y = monitor.y as f64 + (monitor.height as f64 - height) / 2.0;
 
     window
         .set_size(LogicalSize::new(width, height))
         .map_err(|e| e.to_string())?;
 
     window
-        .set_position(LogicalPosition::new(0.0, y))
+        .set_position(LogicalPosition::new(monitor.x as f64, y))
         .map_err(|e| e.to_string())?;
 
     Ok(())

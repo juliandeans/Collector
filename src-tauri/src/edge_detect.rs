@@ -37,6 +37,14 @@ struct ScreenBounds {
     height: i32,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct MonitorBounds {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
 impl EdgeDetector {
     /// Create a new EdgeDetector
     pub fn new(settings: Settings) -> Self {
@@ -127,7 +135,14 @@ impl EdgeDetector {
             tokio::time::sleep(poll_interval).await;
 
             let mouse_pos = get_mouse_position();
-            let screen = get_primary_screen_bounds();
+            let monitors = get_all_monitor_bounds();
+            let current_monitor = get_monitor_for_cursor(mouse_pos, &monitors);
+            let screen = current_monitor
+                .map(|m| ScreenBounds {
+                    width: m.width,
+                    height: m.height,
+                })
+                .unwrap_or_else(get_primary_screen_bounds);
 
             let settings = self.settings.read().await.clone();
             if !settings.edge_detection_enabled && !settings.reader_edge_enabled {
@@ -138,8 +153,17 @@ impl EdgeDetector {
 
             let trigger_delay = Duration::from_millis(settings.edge_reaction_time_ms);
             let edge_zone = EDGE_TRIGGER_ZONE_PX;
-            let at_left_edge = mouse_pos.0 <= edge_zone;
-            let at_right_edge = mouse_pos.0 >= screen.width - edge_zone;
+            let (at_left_edge, at_right_edge) = if let Some(m) = current_monitor {
+                (
+                    mouse_pos.0 <= m.x + edge_zone,
+                    mouse_pos.0 >= m.x + m.width - edge_zone,
+                )
+            } else {
+                (
+                    mouse_pos.0 <= edge_zone,
+                    mouse_pos.0 >= screen.width - edge_zone,
+                )
+            };
 
             let can_show_reader = settings.reader_edge_enabled
                 && at_left_edge
@@ -275,6 +299,14 @@ fn get_mouse_position() -> (i32, i32) {
 
 /// Get primary screen bounds using macOS Core Graphics
 fn get_primary_screen_bounds() -> ScreenBounds {
+    let bounds = get_primary_monitor_bounds();
+    ScreenBounds {
+        width: bounds.width,
+        height: bounds.height,
+    }
+}
+
+fn get_primary_monitor_bounds() -> MonitorBounds {
     #[cfg(target_os = "macos")]
     {
         use core_graphics::display::CGDisplay;
@@ -282,7 +314,9 @@ fn get_primary_screen_bounds() -> ScreenBounds {
         let main_display = CGDisplay::main();
         let bounds = main_display.bounds();
 
-        ScreenBounds {
+        MonitorBounds {
+            x: bounds.origin.x as i32,
+            y: bounds.origin.y as i32,
             width: bounds.size.width as i32,
             height: bounds.size.height as i32,
         }
@@ -290,15 +324,60 @@ fn get_primary_screen_bounds() -> ScreenBounds {
 
     #[cfg(not(target_os = "macos"))]
     {
-        ScreenBounds {
+        MonitorBounds {
+            x: 0,
+            y: 0,
             width: FALLBACK_SCREEN_WIDTH_PX,
             height: FALLBACK_SCREEN_HEIGHT_PX,
         }
     }
 }
 
+pub fn get_all_monitor_bounds() -> Vec<MonitorBounds> {
+    #[cfg(target_os = "macos")]
+    {
+        use core_graphics::display::CGDisplay;
+
+        if let Ok(displays) = CGDisplay::active_displays() {
+            let monitors: Vec<MonitorBounds> = displays
+                .into_iter()
+                .map(|id| {
+                    let bounds = CGDisplay::new(id).bounds();
+                    MonitorBounds {
+                        x: bounds.origin.x as i32,
+                        y: bounds.origin.y as i32,
+                        width: bounds.size.width as i32,
+                        height: bounds.size.height as i32,
+                    }
+                })
+                .collect();
+
+            if !monitors.is_empty() {
+                return monitors;
+            }
+        }
+    }
+
+    vec![get_primary_monitor_bounds()]
+}
+
+pub fn get_monitor_for_cursor<'a>(
+    cursor: (i32, i32),
+    monitors: &'a [MonitorBounds],
+) -> Option<&'a MonitorBounds> {
+    monitors.iter().find(|monitor| {
+        cursor.0 >= monitor.x
+            && cursor.0 < monitor.x + monitor.width
+            && cursor.1 >= monitor.y
+            && cursor.1 < monitor.y + monitor.height
+    })
+}
+
 /// Public function to get screen bounds (for use in other modules)
-pub fn get_screen_bounds() -> (i32, i32) {
-    let bounds = get_primary_screen_bounds();
-    (bounds.width, bounds.height)
+pub fn get_screen_bounds() -> MonitorBounds {
+    let cursor = get_mouse_position();
+    let monitors = get_all_monitor_bounds();
+    get_monitor_for_cursor(cursor, &monitors)
+        .copied()
+        .unwrap_or_else(get_primary_monitor_bounds)
 }
