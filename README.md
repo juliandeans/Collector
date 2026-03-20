@@ -38,7 +38,7 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 
 **New**
 - Note filename template is now configurable in Settings
-- Option to hide callouts in the Reader
+- Option to hide callouts in the Reader 
 - Dual monitor support: edge detection and window positioning now work correctly across all monitors
 
 ## Settings
