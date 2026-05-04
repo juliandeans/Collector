@@ -886,7 +886,6 @@
                 >+ Add Note</button
               >
             </div>
-
           </section>
 
           <section>
@@ -948,7 +947,9 @@
                 />
                 Hide HTML Blocks
               </label>
-              <small>Hides raw &lt;div&gt;, &lt;span&gt; and other HTML tags</small>
+              <small
+                >Hides raw &lt;div&gt;, &lt;span&gt; and other HTML tags</small
+              >
             </div>
 
             <div class="field">

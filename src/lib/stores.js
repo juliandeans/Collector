@@ -1,4 +1,7 @@
-import { writable, derived } from 'svelte/store';
+import {
+  writable,
+  derived
+} from 'svelte/store';
 
 export const defaultSettings = {
   vault_name: 'Vault',
@@ -20,7 +23,7 @@ export const defaultSettings = {
   entry_header: '#### HH:mm',
   global_shortcut: 'Cmd+Shift+N',
   global_shortcut_closes_window: false,
-  
+
   compression_max_kb: 200,
   edge_detection_enabled: true,
   edge_reaction_time_ms: 50,

@@ -252,9 +252,8 @@
         });
 
         const currentWindow = await getCurrentWindow();
-        unlistenDragDrop = await currentWindow.onDragDropEvent(
-          handleDragDropEvent,
-        );
+        unlistenDragDrop =
+          await currentWindow.onDragDropEvent(handleDragDropEvent);
 
         try {
           const settings = await invoke("load_settings");
@@ -662,7 +661,10 @@
           normalizedResult = normalizeImageResult(result);
         } else {
           if (!isTauri) {
-            showStatus("Failed to import images outside the Tauri app", "error");
+            showStatus(
+              "Failed to import images outside the Tauri app",
+              "error",
+            );
             return null;
           }
 
@@ -828,7 +830,10 @@
     });
 
     if (imagePaths.length === 0) {
-      showStatus("Failed to import images: no supported image files found", "error");
+      showStatus(
+        "Failed to import images: no supported image files found",
+        "error",
+      );
       return;
     }
 
