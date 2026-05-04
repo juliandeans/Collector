@@ -315,7 +315,7 @@
   function showStatus(message, type = "success") {
     statusMessage = message;
     statusType = type;
-    // Hide the transient error toast after its display period.
+    // Hide the transient status toast after its display period.
     setTimeout(() => (statusMessage = ""), 2000);
   }
 
@@ -1308,6 +1308,7 @@
     transform: translateX(-50%);
     padding: 8px 16px;
     background: rgba(52, 199, 89, 0.12);
+    -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
     border: 0.5px solid rgba(52, 199, 89, 0.3);
     border-radius: 8px;

@@ -4,10 +4,7 @@
   /* Window dimensions - from settings */
   --window-width: 330px;
   --window-height: 600px;
-  
-  /* Border radius - macOS style */
-  --border-radius: 14px;
-  
+
   /* Colors - Light theme */
   --background-color: rgba(255, 255, 255, 0.75);
   --text-color: #1d1d1f;
@@ -22,22 +19,22 @@
   /* System colors */
   --success-color: #34c759;
   --error-color: #ff3b30;
-  
+
   /* Shadows - minimal */
-  --shadow-sm: 0 2px 8px rgba(179, 64, 64, 0.04);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.1);
-  
+
   /* Typography - SF Pro */
   --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', sans-serif;
   --font-size: 15px;
   --font-size-sm: 11px;
-  
+
   /* Blur values */
   --blur-strong: blur(60px);
   --blur-medium: blur(40px);
   --blur-light: blur(20px);
-  
+
   /* Animation */
   --transition-fast: 0.15s cubic-bezier(0.4, 0.0, 0.2, 1);
   --transition-base: 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
@@ -55,10 +52,10 @@ html, body {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  
+
   /* CRITICAL: Transparent background for frosted glass effect */
   background: transparent;
-  
+
   /* macOS font rendering */
   font-family: var(--font-family);
   font-size: var(--font-size);
@@ -108,269 +105,7 @@ html, body {
   background: rgba(0, 0, 0, 0.2);
 }
 
-/* Utility classes */
-.no-select {
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-/* Animation utilities */
-.fade-in {
-  animation: fadeIn var(--transition-base) ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.slide-in {
-  animation: slideIn var(--transition-base) ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Frosted glass utility */
-.glass {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(60px) saturate(180%);
-  -webkit-backdrop-filter: blur(60px) saturate(180%);
-  border: 0.5px solid rgba(0, 0, 0, 0.08);
-  box-shadow: var(--shadow-md);
-}
-
-/* macOS vibrancy effect helper */
-.vibrancy-light {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-}
-
-.vibrancy-medium {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(60px);
-  -webkit-backdrop-filter: blur(60px);
-}
-
-.vibrancy-strong {
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(80px) saturate(200%);
-  -webkit-backdrop-filter: blur(80px) saturate(200%);
-}
-
-/* ── Shared Panel Shell ─────────────────────────────── */
-
-.panel-shell {
-  width: 100%;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--border-radius);
-  overflow: hidden;
-  position: relative;
-}
-
-.panel-backdrop {
-  position: absolute;
-  inset: 0;
-  border-radius: var(--border-radius);
-  backdrop-filter: var(--blur-strong) saturate(var(--window-saturation, 200%));
-  -webkit-backdrop-filter: var(--blur-strong)
-    saturate(var(--window-saturation, 200%));
-  z-index: 0;
-  pointer-events: none;
-}
-
-.panel-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-/* ── Drag Region / Tab Bar ──────────────────────────── */
-
-.panel-tabbar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 8px 0;
-  min-height: 40px;
-  flex-shrink: 0;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
 [data-tauri-drag-region] {
   -webkit-app-region: drag;
   app-region: drag;
-}
-
-.panel-tab {
-  padding: 4px 10px 6px;
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: 6px 6px 0 0;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast);
-  white-space: nowrap;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  -webkit-app-region: no-drag;
-}
-
-.panel-tab:hover {
-  color: var(--text-color);
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.panel-tab.active {
-  color: var(--accent-color);
-  box-shadow: inset 0 -2px 0 var(--accent-color);
-}
-
-.panel-tab-close {
-  margin-left: 4px;
-  opacity: 0;
-  font-size: 10px;
-  line-height: 1;
-  border: none;
-  background: none;
-  cursor: pointer;
-  color: var(--text-secondary);
-  padding: 0 2px;
-}
-
-.panel-tab:hover .panel-tab-close {
-  opacity: 0.6;
-}
-
-.panel-tab-close:hover {
-  opacity: 1 !important;
-  color: var(--error-color);
-}
-
-/* ── Hybrid Editor ──────────────────────────────────── */
-
-.editor-area {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px 16px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.editor-line {
-  min-height: 1.5em;
-  padding: 1px 4px;
-  border-radius: 4px;
-  cursor: text;
-  line-height: 1.6;
-  word-break: break-word;
-  transition: background var(--transition-fast);
-}
-
-.editor-line:hover {
-  background: rgba(0, 0, 0, 0.03);
-}
-
-.editor-line.focused {
-  background: rgba(139, 92, 246, 0.06);
-}
-
-.editor-line input {
-  width: 100%;
-  border: none;
-  background: transparent;
-  font: inherit;
-  color: inherit;
-  outline: none;
-  padding: 0;
-}
-
-.editor-line h1 {
-  font-size: 1.5em;
-  font-weight: 700;
-  margin: 4px 0;
-}
-
-.editor-line h2 {
-  font-size: 1.25em;
-  font-weight: 600;
-  margin: 3px 0;
-}
-
-.editor-line h3 {
-  font-size: 1.1em;
-  font-weight: 600;
-  margin: 2px 0;
-}
-
-.editor-line code {
-  background: rgba(0, 0, 0, 0.08);
-  border-radius: 3px;
-  padding: 1px 4px;
-  font-family: "SF Mono", monospace;
-  font-size: 0.88em;
-}
-
-.editor-line strong {
-  font-weight: 600;
-}
-
-.editor-line em {
-  font-style: italic;
-}
-
-.editor-line a {
-  color: var(--accent-color);
-  text-decoration: none;
-}
-
-.editor-line a:hover {
-  text-decoration: underline;
-}
-
-.editor-checkbox {
-  margin-right: 6px;
-  accent-color: var(--accent-color);
-  cursor: pointer;
-}
-
-/* ── Saved Indicator ────────────────────────────────── */
-
-.saved-indicator {
-  position: absolute;
-  bottom: 12px;
-  right: 14px;
-  font-size: 11px;
-  color: var(--success-color);
-  opacity: 0;
-  transition: opacity 0.3s;
-  pointer-events: none;
-}
-
-.saved-indicator.visible {
-  opacity: 1;
 }

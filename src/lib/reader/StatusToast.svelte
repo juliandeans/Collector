@@ -3,7 +3,7 @@
   export let type = "";
 </script>
 
-{#if message && type === "error"}
+{#if message}
   <div class="status-toast" class:error={type === "error"}>
     {message}
   </div>
@@ -17,6 +17,7 @@
     transform: translateX(-50%);
     padding: 8px 16px;
     background: rgba(52, 199, 89, 0.12);
+    -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
     border: 0.5px solid rgba(52, 199, 89, 0.3);
     border-radius: 8px;

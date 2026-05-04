@@ -111,14 +111,4 @@
   .tab-context-item:active {
     transform: translateY(1px);
   }
-
-  @keyframes shimmer {
-    0% {
-      background-position: 200% 0;
-    }
-
-    100% {
-      background-position: -200% 0;
-    }
-  }
 </style>

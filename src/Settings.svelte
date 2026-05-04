@@ -768,7 +768,7 @@
                   bind:value={settings.note_template}
                   placeholder="---&#10;created: <% tp.date.now(&quot;YYYY-MM-DD hh:mm&quot;) %>&#10;modified: &#10;daily: &quot;[[<% tp.date.now(&quot;YYYY-MM-DD&quot;) %>]]&quot;&#10;tags: inbox&#10;type: inbox&#10;---"
                   rows="8"
-                  style="margin-top: 8px;"
+                  class="template-editor"
                 />
                 <small
                   >This text will be inserted at the beginning of each new note
@@ -1004,7 +1004,7 @@
 
             <div class="field">
               <div class="field-label">Required Modifier Keys</div>
-              <small style="margin-bottom: 8px; display: block;">
+              <small class="modifier-help">
                 Hold these keys while touching the edge to open the panel. Leave
                 all unchecked to open without any modifier.
               </small>
@@ -1615,13 +1615,21 @@
     line-height: 1.45;
   }
 
-  .radio,
   .checkbox {
     display: flex;
     align-items: center;
     gap: 6px;
     cursor: pointer;
     font-weight: normal;
+  }
+
+  .template-editor {
+    margin-top: 8px;
+  }
+
+  .modifier-help {
+    display: block;
+    margin-bottom: 8px;
   }
 
   footer {

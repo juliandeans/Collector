@@ -263,14 +263,4 @@
     background: rgba(0, 0, 0, 0.12);
     border-radius: 3px;
   }
-
-  @keyframes shimmer {
-    0% {
-      background-position: 200% 0;
-    }
-
-    100% {
-      background-position: -200% 0;
-    }
-  }
 </style>

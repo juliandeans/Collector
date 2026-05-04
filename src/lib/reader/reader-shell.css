@@ -65,6 +65,16 @@ body {
     transform 0.2s;
 }
 
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 .callout-blue {
   background: rgba(59, 130, 246, 0.1);
   border-color: rgba(59, 130, 246, 0.6);
