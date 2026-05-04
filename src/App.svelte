@@ -3,6 +3,8 @@
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy, tick } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import AppendToPicker from "./lib/reader/AppendToPicker.svelte";
+  import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
 
   let textareaRef;
   let content = "";
@@ -10,6 +12,11 @@
   let isLoading = false;
   let statusMessage = "";
   let statusType = "";
+  let showAppendPicker = false;
+  let appendPickerQuery = "";
+  let appendPickerNotes = [];
+  let appendPickerSelectedIndex = 0;
+  let appendPickerInputRef;
   let uploadedImages = [];
   let unlistenShow;
   let unlistenSettingsChanged;
@@ -35,6 +42,7 @@
     external_link_color: "#60a5fa",
     save_to_daily_shortcut: "Cmd+Enter",
     save_as_note_shortcut: "Cmd+Shift+Enter",
+    append_to_note_shortcut: "Cmd+Option+Enter",
   };
 
   $: brightnessFilter = (() => {
@@ -182,6 +190,9 @@
           isDragging = false;
           dragCounter = 0;
           isLoading = false;
+          showAppendPicker = false;
+          appendPickerQuery = "";
+          appendPickerSelectedIndex = 0;
           // Required: after the native Tauri show event, macOS needs a short delay
           // before the textarea reliably accepts focus.
           setTimeout(() => textareaRef?.focus(), 50);
@@ -233,6 +244,9 @@
             save_as_note_shortcut:
               newSettings.save_as_note_shortcut ??
               appSettings.save_as_note_shortcut,
+            append_to_note_shortcut:
+              newSettings.append_to_note_shortcut ??
+              appSettings.append_to_note_shortcut,
           };
           applyColorSettings(appSettings);
         });
@@ -261,6 +275,8 @@
               settings.save_to_daily_shortcut ?? "Cmd+Enter",
             save_as_note_shortcut:
               settings.save_as_note_shortcut ?? "Cmd+Shift+Enter",
+            append_to_note_shortcut:
+              settings.append_to_note_shortcut ?? "Cmd+Option+Enter",
           };
           applyColorSettings(appSettings);
         } catch (e) {
@@ -298,11 +314,29 @@
   });
 
   function showStatus(message, type = "success") {
-    if (type !== "error") return;
     statusMessage = message;
     statusType = type;
     // Hide the transient error toast after its display period.
     setTimeout(() => (statusMessage = ""), 2000);
+  }
+
+  async function openAppendPicker() {
+    if (!content.trim()) return;
+
+    if (appendPickerNotes.length === 0) {
+      try {
+        appendPickerNotes = await invoke("list_vault_notes");
+      } catch (e) {
+        showStatus("✗ Could not load vault notes", "error");
+        return;
+      }
+    }
+
+    showAppendPicker = true;
+    appendPickerQuery = "";
+    appendPickerSelectedIndex = 0;
+    await tick();
+    appendPickerInputRef?.focus();
   }
 
   async function handleAppendToDaily() {
@@ -408,6 +442,48 @@
     }
   }
 
+  async function handleAppendToNote(note) {
+    showAppendPicker = false;
+    appendPickerQuery = "";
+    appendPickerSelectedIndex = 0;
+
+    if (!note || !content.trim() || isLoading) return;
+
+    isLoading = true;
+
+    try {
+      await invoke("append_to_note", {
+        path: note.path,
+        text: content.trim(),
+      });
+
+      showStatus("✓ Appended", "success");
+
+      uploadedImages.forEach((img) => {
+        if (img.preview && img.preview.startsWith("blob:")) {
+          URL.revokeObjectURL(img.preview);
+        }
+      });
+
+      content = "";
+      uploadedImages = [];
+      isDragging = false;
+      dragCounter = 0;
+      isLoading = false;
+
+      setTimeout(async () => {
+        try {
+          await invoke("hide_capture");
+        } catch (e) {
+          console.error("Hide error:", e);
+        }
+      }, 200);
+    } catch (e) {
+      showStatus("✗ " + e.toString(), "error");
+      isLoading = false;
+    }
+  }
+
   function matchesShortcut(event, shortcutString) {
     if (!shortcutString) return false;
 
@@ -450,10 +526,16 @@
     return modifiersMatch && keyMatches;
   }
 
-  function handleKeydown(e) {
+  async function handleKeydown(e) {
     if (e.metaKey && e.key === ",") {
       e.preventDefault();
       openSettings();
+      return;
+    }
+
+    if (matchesShortcut(e, appSettings.append_to_note_shortcut)) {
+      e.preventDefault();
+      await openAppendPicker();
       return;
     }
 
@@ -924,6 +1006,25 @@
       {statusMessage}
     </div>
   {/if}
+
+  <AppendToPicker
+    open={showAppendPicker}
+    query={appendPickerQuery}
+    notes={filterPaletteNotes(appendPickerNotes, appendPickerQuery)}
+    selectedIndex={appendPickerSelectedIndex}
+    bind:inputRef={appendPickerInputRef}
+    on:queryChange={(e) => {
+      appendPickerQuery = e.detail.target.value;
+      appendPickerSelectedIndex = 0;
+    }}
+    on:selectNote={(e) => handleAppendToNote(e.detail)}
+    on:selectIndex={(e) => {
+      appendPickerSelectedIndex = e.detail;
+    }}
+    on:close={() => {
+      showAppendPicker = false;
+    }}
+  />
 
   {#if isLoading}
     <div class="loading-indicator"></div>

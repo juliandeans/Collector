@@ -38,6 +38,7 @@ export const defaultSettings = {
   pinned_notes: [],
   save_to_daily_shortcut: 'Cmd+Enter',
   save_as_note_shortcut: 'Cmd+Shift+Enter',
+  append_to_note_shortcut: 'Cmd+Option+Enter',
   reader_shortcut: 'Cmd+Shift+R',
   reader_shortcut_closes_window: false,
   reader_edge_enabled: true,

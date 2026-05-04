@@ -204,6 +204,14 @@ pub fn append_to_daily_note(
     Ok(())
 }
 
+pub fn append_to_note(
+    captured_text: &str,
+    file_path: &Path,
+    settings: &Settings,
+) -> Result<(), String> {
+    append_to_daily_note(captured_text, file_path, settings)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

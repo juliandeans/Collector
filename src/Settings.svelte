@@ -1178,6 +1178,20 @@
                 >Click in the field and press the desired key combination</small
               >
             </div>
+            <div class="field">
+              <label for="append_to_note_shortcut">Append to Note</label>
+              <input
+                type="text"
+                id="append_to_note_shortcut"
+                bind:value={settings.append_to_note_shortcut}
+                placeholder="Cmd+Option+Enter"
+                on:keydown={(e) =>
+                  handleShortcutKeyDown(e, "append_to_note_shortcut")}
+              />
+              <small
+                >Click in the field and press the desired key combination</small
+              >
+            </div>
           </section>
         {/if}
       </div>

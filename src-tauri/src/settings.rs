@@ -110,6 +110,8 @@ pub struct Settings {
     pub save_to_daily_shortcut: String,
     #[serde(default = "default_save_as_note_shortcut")]
     pub save_as_note_shortcut: String,
+    #[serde(default = "default_append_to_note_shortcut")]
+    pub append_to_note_shortcut: String,
     #[serde(default, deserialize_with = "deserialize_pinned_notes")]
     pub pinned_notes: Vec<PinnedNote>,
     #[serde(default = "default_reader_shortcut")]
@@ -199,6 +201,10 @@ fn default_save_to_daily_shortcut() -> String {
 
 fn default_save_as_note_shortcut() -> String {
     "Cmd+Shift+Enter".to_string()
+}
+
+fn default_append_to_note_shortcut() -> String {
+    "Cmd+Option+Enter".to_string()
 }
 
 fn default_window_width() -> u32 {
@@ -325,6 +331,7 @@ impl Default for Settings {
             notes_folder: default_notes_folder(),
             save_to_daily_shortcut: default_save_to_daily_shortcut(),
             save_as_note_shortcut: default_save_as_note_shortcut(),
+            append_to_note_shortcut: default_append_to_note_shortcut(),
             pinned_notes: Vec::new(),
             reader_shortcut: default_reader_shortcut(),
             reader_shortcut_closes_window: default_false(),

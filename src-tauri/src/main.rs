@@ -364,6 +364,21 @@ async fn append_to_daily_note(
 }
 
 #[tauri::command]
+async fn append_to_note(
+    path: String,
+    text: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let settings = state.settings.read().await.clone();
+    settings.validate()?;
+    let resolved = resolve_vault_write_path(&settings, &path)?;
+
+    capture::append_to_note(&text, &resolved, &settings)?;
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn read_note_file(path: String, state: tauri::State<'_, AppState>) -> Result<String, String> {
     let settings = state.settings.read().await.clone();
     let resolved = resolve_vault_read_path(&settings, &path)?;
@@ -1070,6 +1085,7 @@ fn main() {
             save_settings,
             save_as_note,
             append_to_daily_note,
+            append_to_note,
             read_note_file,
             write_note_file,
             open_external_url,
