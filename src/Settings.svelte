@@ -1246,6 +1246,16 @@
               >
             </div>
             <div class="field">
+              <div class="field-label">Accessibility Permission</div>
+              <p class="section-description">
+                Required for "Copy Text to Collector". Enable Collector in
+                <strong
+                  >System Settings → Privacy & Security → Accessibility</strong
+                >,
+                then restart the app.
+              </p>
+            </div>
+            <div class="field">
               <label for="reader_shortcut">Open Reader</label>
               <input
                 type="text"

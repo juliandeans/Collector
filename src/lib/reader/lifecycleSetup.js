@@ -22,7 +22,7 @@ export function setupListeners(callbacks = {}) {
 
     if (matchesShortcut(event, "k")) {
       event.preventDefault();
-      await callbacks.onOpenPalette?.();
+      callbacks.onOpenPalette?.();
       return;
     }
 
@@ -38,7 +38,7 @@ export function setupListeners(callbacks = {}) {
 
     if (matchesShortcut(event, "p")) {
       event.preventDefault();
-      await callbacks.onOpenPalette?.();
+      callbacks.onOpenPalette?.();
       return;
     }
 

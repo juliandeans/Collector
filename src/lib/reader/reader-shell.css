@@ -43,9 +43,9 @@ body {
 .editor-scroll,
 .status-toast {
   transition:
-    filter 0.18s ease,
-    opacity 0.18s ease,
-    transform 0.18s ease;
+    filter 0.12s ease,
+    opacity 0.12s ease,
+    transform 0.12s ease;
 }
 
 .reader-container.palette-open .accent-line,
@@ -53,14 +53,14 @@ body {
 .reader-container.palette-open .search-bar,
 .reader-container.palette-open .editor-scroll,
 .reader-container.palette-open .status-toast {
-  filter: blur(4px) brightness(0.85);
+  filter: blur(3px) brightness(0.88);
   opacity: 0.7;
-  transform: scale(0.996);
+  transform: scale(0.997);
   pointer-events: none;
   transition:
-    filter 0.2s,
-    opacity 0.2s,
-    transform 0.2s;
+    filter 0.12s,
+    opacity 0.12s,
+    transform 0.12s;
 }
 
 @keyframes shimmer {

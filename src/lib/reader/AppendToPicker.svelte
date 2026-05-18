@@ -24,11 +24,13 @@
         on:close={() => dispatch("close")}
     />
 
-    {#if open}
-        <div class="append-to-picker-header" aria-hidden="true">
-            Append to...
-        </div>
-    {/if}
+    <div
+        class="append-to-picker-header"
+        class:append-to-picker-header-visible={open}
+        aria-hidden="true"
+    >
+        Append to...
+    </div>
 </div>
 
 <style>
@@ -50,8 +52,15 @@
         font-size: 11px;
         font-weight: 700;
         letter-spacing: 0.1em;
+        opacity: 0;
         pointer-events: none;
         text-transform: uppercase;
+        visibility: hidden;
+    }
+
+    .append-to-picker-header.append-to-picker-header-visible {
+        opacity: 1;
+        visibility: visible;
     }
 
     :global(.append-to-picker-shell .palette) {

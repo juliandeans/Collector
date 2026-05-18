@@ -719,21 +719,20 @@
     await loadTab(activeTabIndex, true);
   }
 
-  async function openPalette() {
+  function openPalette() {
     showPalette = true;
     paletteQuery = "";
     selectedPaletteIndex = 0;
-    await tick();
     paletteInputRef?.focus();
 
-    if (vaultNotes.length > 0) {
-      return;
-    }
-
-    try {
-      vaultNotes = await ensureVaultNotes(vaultNotes);
-    } catch (error) {
-      showStatus(normalizeError(error), "error", 2200);
+    if (vaultNotes.length === 0) {
+      ensureVaultNotes(vaultNotes)
+        .then((notes) => {
+          vaultNotes = notes;
+        })
+        .catch((error) => {
+          showStatus(normalizeError(error), "error", 2200);
+        });
     }
   }
 
@@ -825,7 +824,13 @@
   onMount(async () => {
     try {
       await buildInitialTabs();
-      vaultNotes = await ensureVaultNotes(vaultNotes);
+      ensureVaultNotes(vaultNotes)
+        .then((notes) => {
+          vaultNotes = notes;
+        })
+        .catch((error) => {
+          showStatus(normalizeError(error), "error", 2400);
+        });
 
       unlistenShowReader = await listen("show_reader", handleShowReader);
 

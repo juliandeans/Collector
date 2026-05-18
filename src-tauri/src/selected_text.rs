@@ -8,7 +8,7 @@
 ///
 /// Notes:
 /// - Requires Accessibility permission for the app to send synthetic key events.
-/// - If nothing is selected, many apps keep clipboard unchanged; we return whatever was copied.
+/// - If nothing is selected, many apps keep clipboard unchanged; we treat that as no capture.
 #[cfg(target_os = "macos")]
 pub fn capture_selected_text() -> Option<String> {
     log::info!("capture_selected_text: Starting...");
@@ -47,6 +47,13 @@ pub fn capture_selected_text() -> Option<String> {
     if let Some(prev) = previous.as_deref() {
         log::info!("capture_selected_text: Restoring previous clipboard");
         write_clipboard_string(prev);
+    }
+
+    if captured.as_deref() == previous.as_deref() {
+        log::warn!(
+            "capture_selected_text: clipboard unchanged — nothing selected or copy failed"
+        );
+        return None;
     }
 
     log::info!("capture_selected_text: Returning captured text");
@@ -169,26 +176,19 @@ fn synthesize_copy() -> bool {
 /// Check if the app has Accessibility permissions on macOS
 #[cfg(target_os = "macos")]
 fn check_accessibility_permissions() -> bool {
-    use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
-
-    // Try to create an event source - this will fail if we don't have permissions
-    let src = match CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-        Ok(s) => s,
-        Err(_) => {
-            log::error!("Failed to create event source - no accessibility permissions");
-            return false;
-        }
-    };
-
-    // Try to create a simple event - this is the real test
-    match core_graphics::event::CGEvent::new(src) {
-        Ok(_) => true,
-        Err(e) => {
-            log::error!(
-                "Failed to create CGEvent: {:?} - likely missing accessibility permissions",
-                e
-            );
-            false
-        }
+    extern "C" {
+        fn AXIsProcessTrusted() -> bool;
     }
+
+    log::info!("capture_selected_text: checking Accessibility permission state");
+    let trusted = unsafe { AXIsProcessTrusted() };
+    if trusted {
+        log::info!("capture_selected_text: Accessibility permission granted");
+    } else {
+        log::error!(
+            "capture_selected_text: Accessibility permission not granted. Grant access in System Settings > Privacy & Security > Accessibility, enable Collector, then restart the app."
+        );
+    }
+
+    trusted
 }

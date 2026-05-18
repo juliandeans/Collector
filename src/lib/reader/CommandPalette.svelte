@@ -74,68 +74,80 @@
   }
 </script>
 
-{#if open}
-  <div
+<div
+  class="palette-wrapper"
+  class:palette-visible={open}
+  aria-hidden={!open}
+>
+  <button
+    type="button"
     class="palette-backdrop"
-    role="button"
-    tabindex="0"
-    on:click|self={() => dispatch("close")}
-    on:keydown={(event) => {
-      if (["Escape", "Enter", " "].includes(event.key)) {
-        event.preventDefault();
-        dispatch("close");
-      }
-    }}
-  >
-    <div class="palette" role="dialog" aria-modal="true">
-      <input
-        bind:this={inputRef}
-        value={query}
-        class="palette-input"
-        placeholder="Search vault notes..."
-        spellcheck="false"
-        on:input={handleInput}
-        on:keydown={handleKeydown}
-      />
+    aria-label="Close palette"
+    tabindex="-1"
+    on:mousedown={() => dispatch("close")}
+  />
 
-      <div class="palette-results" bind:this={resultsRef}>
-        {#if notes.length === 0}
-          <div class="palette-empty">No matching notes</div>
-        {:else}
-          {#each notes as note, index (note.path)}
-            <button
-              class="palette-item"
-              class:selected={index === selectedIndex}
-              type="button"
-              on:mouseenter={() => dispatch("selectIndex", index)}
-              on:click={() => dispatch("openNote", note)}
-            >
-              <span class="palette-name">{note.name}</span>
-              <span class="palette-path">{note.relative_path}</span>
-            </button>
-          {/each}
-        {/if}
-      </div>
+  <div class="palette" role="dialog" aria-modal="true">
+    <input
+      bind:this={inputRef}
+      value={query}
+      class="palette-input"
+      placeholder="Search vault notes..."
+      spellcheck="false"
+      on:input={handleInput}
+      on:keydown={handleKeydown}
+    />
+
+    <div class="palette-results" bind:this={resultsRef}>
+      {#if notes.length === 0}
+        <div class="palette-empty">No matching notes</div>
+      {:else}
+        {#each notes as note, index (note.path)}
+          <button
+            class="palette-item"
+            class:selected={index === selectedIndex}
+            type="button"
+            on:mouseenter={() => dispatch("selectIndex", index)}
+            on:click={() => dispatch("openNote", note)}
+          >
+            <span class="palette-name">{note.name}</span>
+            <span class="palette-path">{note.relative_path}</span>
+          </button>
+        {/each}
+      {/if}
     </div>
   </div>
-{/if}
+</div>
 
 <style>
+  .palette-wrapper {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .palette-wrapper.palette-visible {
+    pointer-events: auto;
+    opacity: 1;
+  }
+
   .palette-backdrop {
     position: absolute;
     inset: 0;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 52px 14px 14px;
-    z-index: 120;
+    border: 0;
     background: transparent;
-    pointer-events: auto;
+    padding: 0;
+    appearance: none;
+    z-index: 120;
   }
 
   .palette {
-    position: relative;
-    width: 100%;
+    position: absolute;
+    top: 52px;
+    left: 50%;
+    width: min(calc(100% - 28px), 520px);
     max-width: 520px;
     max-height: min(70vh, 520px);
     display: flex;
@@ -163,9 +175,9 @@
     box-shadow:
       0 18px 48px rgba(0, 0, 0, 0.24),
       0 6px 18px rgba(0, 0, 0, 0.14);
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-    z-index: 1;
+    transform: translateX(-50%) translateZ(0);
+    -webkit-transform: translateX(-50%) translateZ(0);
+    z-index: 121;
   }
 
   .palette::before {

@@ -70,6 +70,38 @@ pub fn build_note_relative_path(settings: &Settings) -> String {
     }
 }
 
+pub fn build_note_relative_path_from_title(title: &str, settings: &Settings) -> String {
+    let sanitized = sanitize_note_title(title);
+    let filename = if sanitized.is_empty() {
+        generate_filename_from_template(&settings.note_filename_template)
+    } else if sanitized.ends_with(".md") {
+        sanitized
+    } else {
+        format!("{}.md", sanitized)
+    };
+
+    let notes_folder = settings.notes_folder.trim_end_matches('/');
+    if notes_folder.is_empty() {
+        filename
+    } else {
+        format!("{}/{}", notes_folder, filename)
+    }
+}
+
+fn sanitize_note_title(title: &str) -> String {
+    title
+        .chars()
+        .filter(|c| {
+            !matches!(
+                c,
+                '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | '\0'
+            )
+        })
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
 pub fn save_note_at_path(
     content: &str,
     file_path: &Path,
@@ -271,5 +303,40 @@ mod tests {
         let path = build_daily_note_path(&settings);
         assert!(path.ends_with(".md"));
         assert!(!path.starts_with("/"));
+    }
+
+    #[test]
+    fn test_build_note_relative_path_from_title() {
+        let settings = Settings {
+            notes_folder: "Notes".to_string(),
+            ..Default::default()
+        };
+
+        let path = build_note_relative_path_from_title("My Title", &settings);
+        assert_eq!(path, "Notes/My Title.md");
+    }
+
+    #[test]
+    fn test_build_note_relative_path_from_title_sanitizes_invalid_chars() {
+        let settings = Settings {
+            notes_folder: "Notes".to_string(),
+            ..Default::default()
+        };
+
+        let path = build_note_relative_path_from_title(r#"My:/\*?"<>| Title"#, &settings);
+        assert_eq!(path, "Notes/My Title.md");
+    }
+
+    #[test]
+    fn test_build_note_relative_path_from_title_falls_back_when_empty() {
+        let settings = Settings {
+            notes_folder: "".to_string(),
+            note_filename_template: "note-YYYY-MM-DD-HHmmss".to_string(),
+            ..Default::default()
+        };
+
+        let path = build_note_relative_path_from_title("///", &settings);
+        assert!(path.ends_with(".md"));
+        assert_ne!(path, ".md");
     }
 }

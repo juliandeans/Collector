@@ -207,6 +207,14 @@
           setTimeout(() => textareaRef?.focus(), 50);
         });
 
+        await listen("capture_text_failed", (event) => {
+          const msg =
+            typeof event.payload === "string"
+              ? event.payload
+              : "Nothing to capture";
+          showStatus("✗ " + msg, "error");
+        });
+
         await listen("save_as_note", () => {
           handleSaveAsNote();
         });
@@ -281,6 +289,15 @@
         } catch (e) {
           console.error("Failed to load initial settings:", e);
         }
+
+        // Preload vault notes so the append picker can open immediately.
+        invoke("list_vault_notes")
+          .then((notes) => {
+            appendPickerNotes = notes;
+          })
+          .catch(() => {
+            // Non-fatal: the picker can still lazy-load later.
+          });
       } catch (e) {
         console.error("Failed to listen to events:", e);
       }
@@ -319,23 +336,23 @@
     setTimeout(() => (statusMessage = ""), 2000);
   }
 
-  async function openAppendPicker() {
+  function openAppendPicker() {
     if (!content.trim()) return;
-
-    if (appendPickerNotes.length === 0) {
-      try {
-        appendPickerNotes = await invoke("list_vault_notes");
-      } catch (e) {
-        showStatus("✗ Could not load vault notes", "error");
-        return;
-      }
-    }
 
     showAppendPicker = true;
     appendPickerQuery = "";
     appendPickerSelectedIndex = 0;
-    await tick();
     appendPickerInputRef?.focus();
+
+    if (appendPickerNotes.length === 0) {
+      invoke("list_vault_notes")
+        .then((notes) => {
+          appendPickerNotes = notes;
+        })
+        .catch(() => {
+          showStatus("✗ Could not load vault notes", "error");
+        });
+    }
   }
 
   async function handleAppendToDaily() {
@@ -408,8 +425,25 @@
     isLoading = true;
 
     try {
+      const trimmed = content.trim();
+      const lines = trimmed.split("\n");
+      const firstLine = lines[0].trimEnd();
+
+      let title = null;
+      let body = trimmed;
+
+      if (firstLine.match(/^#\s+.+/)) {
+        title = firstLine.replace(/^#+\s+/, "").trim();
+        const rest = lines.slice(1);
+        while (rest.length > 0 && rest[0].trim() === "") {
+          rest.shift();
+        }
+        body = rest.join("\n").trim();
+      }
+
       const result = await invoke("save_as_note", {
-        content: content.trim(),
+        content: body,
+        title: title,
       });
       showStatus("✓ " + result, "success");
 
@@ -534,7 +568,7 @@
 
     if (matchesShortcut(e, appSettings.append_to_note_shortcut)) {
       e.preventDefault();
-      await openAppendPicker();
+      openAppendPicker();
       return;
     }
 

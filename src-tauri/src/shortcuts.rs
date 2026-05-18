@@ -6,7 +6,7 @@ use tokio::sync::Mutex;
 use crate::log_safety::summarize_text_len;
 use crate::settings::Settings;
 
-const CAPTURE_TEXT_INSERT_DELAY_MS: u64 = 30;
+const CAPTURE_TEXT_INSERT_DELAY_MS: u64 = 200;
 
 pub struct ShortcutManager {
     current_shortcut: Arc<Mutex<Option<String>>>,
@@ -141,6 +141,13 @@ impl ShortcutManager {
 
                         if selected.trim().is_empty() {
                             log::warn!("No text was captured");
+                            warn_if_failed(
+                                app_handle2.emit(
+                                    "capture_text_failed",
+                                    "Accessibility permission required. Go to System Settings → Privacy & Security → Accessibility and enable Collector.",
+                                ),
+                                "Failed to emit capture_text_failed",
+                            );
                             return;
                         }
 

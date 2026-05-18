@@ -320,12 +320,18 @@ async fn save_settings(
 #[tauri::command]
 async fn save_as_note(
     content: String,
+    title: Option<String>,
     app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
     let settings = state.settings.read().await.clone();
     settings.validate()?;
-    let relative_path = capture::build_note_relative_path(&settings);
+
+    let relative_path = match title.as_deref().filter(|t| !t.trim().is_empty()) {
+        Some(t) => capture::build_note_relative_path_from_title(t, &settings),
+        None => capture::build_note_relative_path(&settings),
+    };
+
     let resolved = resolve_vault_write_path(&settings, &relative_path)?;
     let filename = resolved
         .file_name()
