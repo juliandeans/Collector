@@ -39,8 +39,7 @@ pub fn save_image(source_path: &Path, settings: &Settings) -> Result<SavedImage,
 
     let filename = generate_filename(&settings.image_filename);
 
-    // NEU: Nutze screenshot_path direkt
-    let output_dir = PathBuf::from(&settings.screenshot_path);
+    let output_dir = resolve_screenshot_output_dir(settings);
 
     fs::create_dir_all(&output_dir)
         .map_err(|e| format!("Failed to create screenshot directory: {}", e))?;
@@ -68,6 +67,15 @@ pub fn save_image(source_path: &Path, settings: &Settings) -> Result<SavedImage,
         filename,
         size_bytes,
     })
+}
+
+fn resolve_screenshot_output_dir(settings: &Settings) -> PathBuf {
+    let screenshot_path = PathBuf::from(&settings.screenshot_path);
+    if screenshot_path.is_absolute() {
+        screenshot_path
+    } else {
+        PathBuf::from(&settings.vault_path).join(screenshot_path)
+    }
 }
 
 /// Compress image to target size and save

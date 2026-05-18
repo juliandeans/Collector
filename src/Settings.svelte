@@ -141,10 +141,23 @@
         const selected = await open({
             directory: true,
             multiple: false,
-            defaultPath: settings.screenshot_path || undefined,
+            defaultPath:
+                resolveVaultSettingPath(settings.screenshot_path) ||
+                settings.vault_path ||
+                undefined,
         });
         if (selected) {
-            settings.screenshot_path = selected;
+            const relative = toRelativeVaultDirectoryPath(selected);
+            if (!relative) {
+                showStatus(
+                    "Image folder must be inside the current vault",
+                    "error",
+                );
+                return;
+            }
+
+            settings.screenshot_path = relative;
+            settings = { ...settings };
         }
     }
 
@@ -238,6 +251,55 @@
         }
 
         return "";
+    }
+
+    function toRelativeVaultDirectoryPath(path = "") {
+        const normalizedPath = normalizeComparablePath(path.trim());
+        const normalizedVaultPath = normalizeComparablePath(
+            settings.vault_path ?? "",
+        );
+
+        if (!normalizedPath || !normalizedVaultPath) {
+            return "";
+        }
+
+        if (normalizedPath === normalizedVaultPath) {
+            return ".";
+        }
+
+        if (normalizedPath.startsWith(`${normalizedVaultPath}/`)) {
+            return normalizedPath.slice(normalizedVaultPath.length + 1);
+        }
+
+        return "";
+    }
+
+    function resolveVaultSettingPath(path = "") {
+        const rawPath = path.trim();
+        const normalizedVaultPath = normalizeComparablePath(
+            settings.vault_path ?? "",
+        );
+
+        if (!rawPath) {
+            return normalizedVaultPath || "";
+        }
+
+        if (
+            rawPath.startsWith("/") ||
+            /^[A-Za-z]:[\\/]/.test(rawPath)
+        ) {
+            return rawPath;
+        }
+
+        if (!normalizedVaultPath) {
+            return rawPath;
+        }
+
+        if (rawPath === ".") {
+            return normalizedVaultPath;
+        }
+
+        return `${normalizedVaultPath}/${normalizeComparablePath(rawPath)}`;
     }
 
     function modifierLabel(mod) {
@@ -600,8 +662,7 @@
                                         type="text"
                                         id="screenshot_path"
                                         bind:value={settings.screenshot_path}
-                                        placeholder="/Users/username/Vault/Images/Screenshots"
-                                        readonly
+                                        placeholder="Grafiken/Screenshots"
                                     />
                                     <button
                                         class="secondary"
@@ -610,7 +671,8 @@
                                     >
                                 </div>
                                 <small
-                                    >Folder for images (will be created
+                                    >Relative path in the vault for saved
+                                    images (folder will be created
                                     automatically)</small
                                 >
                             </div>

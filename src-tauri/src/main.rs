@@ -217,6 +217,7 @@ async fn save_settings(
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
     new_settings.normalize_pinned_note_paths();
+    new_settings.normalize_screenshot_path();
     new_settings.validate().map_err(|e| {
         log::error!("Settings validation failed: {}", e);
         e

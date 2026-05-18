@@ -198,13 +198,7 @@ fn default_vault_path() -> String {
 }
 
 fn default_screenshot_path() -> String {
-    dirs::home_dir()
-        .map(|h| {
-            h.join("Vault/Grafiken/Screenshots")
-                .to_string_lossy()
-                .to_string()
-        })
-        .unwrap_or_else(|| "/Users/Vault/Grafiken/Screenshots".to_string())
+    "Grafiken/Screenshots".to_string()
 }
 
 fn default_notes_folder() -> String {
@@ -377,6 +371,46 @@ fn normalize_pinned_note_path(path: &str, vault_path: &str) -> String {
     trimmed.replace('\\', "/")
 }
 
+fn normalize_screenshot_dir_path(path: &str, vault_path: &str) -> String {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    if trimmed == "." {
+        return ".".to_string();
+    }
+
+    let candidate = PathBuf::from(trimmed);
+    if !candidate.is_absolute() {
+        let normalized = normalize_relative_vault_path(trimmed);
+        return if normalized.is_empty() && trimmed == "." {
+            ".".to_string()
+        } else {
+            normalized
+        };
+    }
+
+    let vault_root = fs::canonicalize(vault_path).unwrap_or_else(|_| PathBuf::from(vault_path));
+    if let Ok(relative) = candidate.strip_prefix(&vault_root) {
+        let relative_str = relative.to_string_lossy();
+        let normalized = normalize_relative_vault_path(&relative_str);
+        return if normalized.is_empty() {
+            ".".to_string()
+        } else {
+            normalized
+        };
+    }
+
+    if let Some(relative) =
+        relative_path_from_matching_vault_dir(trimmed, &vault_root.to_string_lossy())
+    {
+        return relative;
+    }
+
+    trimmed.replace('\\', "/")
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -395,7 +429,7 @@ impl Default for Settings {
             daily_note_folder: default_daily_note_folder(),
             daily_note_format: default_daily_note_format(),
             daily_note_path: String::new(),
-            image_folder: "assets/screenshots".to_string(),
+            image_folder: default_screenshot_path(),
             image_filename: "screenshot-YYYY-MM-DD-HHmmss".to_string(),
             default_image_width: default_image_width(),
             entry_header: "#### HH:mm".to_string(),
@@ -457,6 +491,23 @@ impl Settings {
         changed
     }
 
+    pub(crate) fn normalize_screenshot_path(&mut self) -> bool {
+        let normalized = normalize_screenshot_dir_path(&self.screenshot_path, &self.vault_path);
+        let mut changed = false;
+
+        if self.screenshot_path != normalized {
+            self.screenshot_path = normalized.clone();
+            changed = true;
+        }
+
+        if self.image_folder != self.screenshot_path {
+            self.image_folder = self.screenshot_path.clone();
+            changed = true;
+        }
+
+        changed
+    }
+
     pub fn config_path() -> Result<PathBuf, String> {
         let config_dir =
             dirs::config_dir().ok_or_else(|| "Could not find config directory".to_string())?;
@@ -470,6 +521,11 @@ impl Settings {
         if config_path.exists() {
             let content = fs::read_to_string(&config_path)
                 .map_err(|e| format!("Failed to read config file: {}", e))?;
+            let raw_settings = serde_json::from_str::<serde_json::Value>(&content).ok();
+            let has_screenshot_path = raw_settings
+                .as_ref()
+                .and_then(|value| value.get("screenshot_path"))
+                .is_some();
 
             let mut settings =
                 serde_json::from_str(&content).or_else(|e| -> Result<Settings, String> {
@@ -485,6 +541,11 @@ impl Settings {
                 })?;
 
             let mut needs_save = false;
+
+            if !has_screenshot_path && !settings.image_folder.trim().is_empty() {
+                settings.screenshot_path = settings.image_folder.trim().to_string();
+                needs_save = true;
+            }
 
             // Migration: convert old daily_note_path to new fields.
             if !settings.daily_note_path.is_empty() && settings.daily_note_folder.is_empty() {
@@ -513,6 +574,11 @@ impl Settings {
 
             if settings.normalize_pinned_note_paths() {
                 log::info!("Migrated pinned note paths to vault-relative form");
+                needs_save = true;
+            }
+
+            if settings.normalize_screenshot_path() {
+                log::info!("Migrated screenshot path to vault-relative form");
                 needs_save = true;
             }
 
@@ -645,6 +711,10 @@ impl Settings {
 
         if !is_safe_filename_template(&self.image_filename) {
             return Err("image_filename must be a filename without path separators".to_string());
+        }
+
+        if !self.screenshot_path.is_empty() && !is_safe_relative_path(&self.screenshot_path) {
+            return Err("screenshot_path must stay inside the vault".to_string());
         }
 
         if !self.screenshot_path.is_empty() {
@@ -874,6 +944,41 @@ mod tests {
                 label: String::new(),
                 icon: String::new(),
             }],
+            ..Default::default()
+        };
+
+        assert!(settings.validate().is_err());
+    }
+
+    #[test]
+    fn migrates_absolute_screenshot_path_inside_current_vault() {
+        let mut settings = Settings {
+            vault_path: "/tmp/Vault".to_string(),
+            screenshot_path: "/tmp/Vault/Grafiken/Screenshots".to_string(),
+            ..Default::default()
+        };
+
+        assert!(settings.normalize_screenshot_path());
+        assert_eq!(settings.screenshot_path, "Grafiken/Screenshots");
+        assert_eq!(settings.image_folder, "Grafiken/Screenshots");
+    }
+
+    #[test]
+    fn migrates_absolute_screenshot_path_by_vault_dir_name() {
+        let mut settings = Settings {
+            vault_path: "/new/location/Vault".to_string(),
+            screenshot_path: "/old/location/Vault/Grafiken/Screenshots".to_string(),
+            ..Default::default()
+        };
+
+        assert!(settings.normalize_screenshot_path());
+        assert_eq!(settings.screenshot_path, "Grafiken/Screenshots");
+    }
+
+    #[test]
+    fn rejects_absolute_screenshot_path_on_validate() {
+        let settings = Settings {
+            screenshot_path: "/tmp/Vault/Grafiken/Screenshots".to_string(),
             ..Default::default()
         };
 
