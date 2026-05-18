@@ -53,8 +53,8 @@ body {
 .reader-container.palette-open .search-bar,
 .reader-container.palette-open .editor-scroll,
 .reader-container.palette-open .status-toast {
-  filter: blur(3px) brightness(0.88);
-  opacity: 0.7;
+  filter: blur(4px) brightness(0.62);
+  opacity: 0.56;
   transform: scale(0.997);
   pointer-events: none;
   transition:

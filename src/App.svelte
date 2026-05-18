@@ -16,6 +16,10 @@
   let appendPickerQuery = "";
   let appendPickerNotes = [];
   let appendPickerSelectedIndex = 0;
+  let appendPickerStep = 1;
+  let appendPickerSelectedNote = null;
+  let appendPickerHeadings = [];
+  let appendPickerHeadingIndex = 0;
   let appendPickerInputRef;
   let uploadedImages = [];
   let unlistenShow;
@@ -40,6 +44,7 @@
     accent_color: "#8b5cf6",
     internal_link_color: "#a78bfa",
     external_link_color: "#60a5fa",
+    entry_header: "#### HH:mm",
     save_to_daily_shortcut: "Cmd+Enter",
     save_as_note_shortcut: "Cmd+Shift+Enter",
     append_to_note_shortcut: "Cmd+Option+Enter",
@@ -106,6 +111,92 @@
       filename: result?.filename ?? null,
       preview_data_url: result?.preview_data_url ?? "",
     };
+  }
+
+  function parseHeadings(content) {
+    const lines = content.split("\n");
+    const headings = [];
+
+    lines.forEach((line, index) => {
+      const match = line.match(/^(#{1,6})\s+(.+)/);
+      if (!match) return;
+
+      headings.push({
+        level: match[1].length,
+        text: match[2].trim(),
+        display: line.trim(),
+        lineIndex: index,
+      });
+    });
+
+    return headings;
+  }
+
+  function formatEntryHeader(template = "#### HH:mm") {
+    const now = new Date();
+    const replacements = {
+      YYYY: String(now.getFullYear()),
+      MM: String(now.getMonth() + 1).padStart(2, "0"),
+      DD: String(now.getDate()).padStart(2, "0"),
+      HH: String(now.getHours()).padStart(2, "0"),
+      mm: String(now.getMinutes()).padStart(2, "0"),
+      ss: String(now.getSeconds()).padStart(2, "0"),
+    };
+
+    return String(template ?? "")
+      .replace(/YYYY/g, replacements.YYYY)
+      .replace(/MM/g, replacements.MM)
+      .replace(/DD/g, replacements.DD)
+      .replace(/HH/g, replacements.HH)
+      .replace(/mm/g, replacements.mm)
+      .replace(/ss/g, replacements.ss);
+  }
+
+  async function insertAfterHeading(notePath, heading, text) {
+    const fileContent = await invoke("read_note_file", { path: notePath });
+    const lines = fileContent.split("\n");
+
+    let insertAt = lines.length;
+    for (let i = heading.lineIndex + 1; i < lines.length; i += 1) {
+      const match = lines[i].match(/^(#{1,6})\s/);
+      if (match && match[1].length <= heading.level) {
+        insertAt = i;
+        break;
+      }
+    }
+
+    const entryLines = [
+      formatEntryHeader(appSettings.entry_header ?? "#### HH:mm"),
+      ...text.split("\n"),
+      "",
+    ];
+    const separator =
+      insertAt > 0 && lines[insertAt - 1]?.trim() !== "" ? [""] : [];
+
+    lines.splice(insertAt, 0, ...separator, ...entryLines);
+
+    await invoke("write_note_file", {
+      path: notePath,
+      content: lines.join("\n"),
+    });
+  }
+
+  function closeAppendPicker() {
+    showAppendPicker = false;
+    appendPickerStep = 1;
+    appendPickerSelectedNote = null;
+    appendPickerHeadings = [];
+    appendPickerQuery = "";
+    appendPickerSelectedIndex = 0;
+    appendPickerHeadingIndex = 0;
+    textareaRef?.focus();
+  }
+
+  function returnAppendPickerToStep1() {
+    appendPickerStep = 1;
+    appendPickerSelectedNote = null;
+    appendPickerHeadings = [];
+    appendPickerHeadingIndex = 0;
   }
 
   function handleDragDropEvent(event) {
@@ -190,9 +281,7 @@
           isDragging = false;
           dragCounter = 0;
           isLoading = false;
-          showAppendPicker = false;
-          appendPickerQuery = "";
-          appendPickerSelectedIndex = 0;
+          closeAppendPicker();
           // Required: after the native Tauri show event, macOS needs a short delay
           // before the textarea reliably accepts focus.
           setTimeout(() => textareaRef?.focus(), 50);
@@ -246,6 +335,7 @@
             external_link_color:
               newSettings.external_link_color ??
               appSettings.external_link_color,
+            entry_header: newSettings.entry_header ?? appSettings.entry_header,
             save_to_daily_shortcut:
               newSettings.save_to_daily_shortcut ??
               appSettings.save_to_daily_shortcut,
@@ -278,6 +368,7 @@
             accent_color: settings.accent_color ?? "#8b5cf6",
             internal_link_color: settings.internal_link_color ?? "#a78bfa",
             external_link_color: settings.external_link_color ?? "#60a5fa",
+            entry_header: settings.entry_header ?? "#### HH:mm",
             save_to_daily_shortcut:
               settings.save_to_daily_shortcut ?? "Cmd+Enter",
             save_as_note_shortcut:
@@ -340,8 +431,12 @@
     if (!content.trim()) return;
 
     showAppendPicker = true;
+    appendPickerStep = 1;
+    appendPickerSelectedNote = null;
+    appendPickerHeadings = [];
     appendPickerQuery = "";
     appendPickerSelectedIndex = 0;
+    appendPickerHeadingIndex = 0;
     appendPickerInputRef?.focus();
 
     if (appendPickerNotes.length === 0) {
@@ -475,20 +570,36 @@
     }
   }
 
-  async function handleAppendToNote(note) {
-    showAppendPicker = false;
-    appendPickerQuery = "";
-    appendPickerSelectedIndex = 0;
+  async function handleNoteSelected(note) {
+    appendPickerSelectedNote = note;
+    appendPickerStep = 2;
+    appendPickerHeadingIndex = 0;
+    appendPickerHeadings = [];
+
+    try {
+      const fileContent = await invoke("read_note_file", { path: note.path });
+      appendPickerHeadings = parseHeadings(fileContent);
+    } catch (e) {
+      await handleAppendToNote(note, null);
+    }
+  }
+
+  async function handleAppendToNote(note, heading = null) {
+    closeAppendPicker();
 
     if (!note || !content.trim() || isLoading) return;
 
     isLoading = true;
 
     try {
-      await invoke("append_to_note", {
-        path: note.path,
-        text: content.trim(),
-      });
+      if (!heading) {
+        await invoke("append_to_note", {
+          path: note.path,
+          text: content.trim(),
+        });
+      } else {
+        await insertAfterHeading(note.path, heading, content.trim());
+      }
 
       showStatus("✓ Appended", "success");
 
@@ -933,6 +1044,7 @@
 <div
   class="capture-container"
   class:dragging={isDragging}
+  class:append-picker-open={showAppendPicker}
   style="
     --app-background: {appSettings.background_color};
     --app-font-family: {appSettings.font_family};
@@ -1048,21 +1160,31 @@
 
   <AppendToPicker
     open={showAppendPicker}
+    step={appendPickerStep}
     query={appendPickerQuery}
     notes={filterPaletteNotes(appendPickerNotes, appendPickerQuery)}
     selectedIndex={appendPickerSelectedIndex}
+    selectedNote={appendPickerSelectedNote}
+    headings={appendPickerHeadings}
+    headingIndex={appendPickerHeadingIndex}
     bind:inputRef={appendPickerInputRef}
     on:queryChange={(e) => {
       appendPickerQuery = e.detail.target.value;
       appendPickerSelectedIndex = 0;
     }}
-    on:selectNote={(e) => handleAppendToNote(e.detail)}
+    on:selectNote={(e) => handleNoteSelected(e.detail)}
+    on:selectHeading={(e) =>
+      handleAppendToNote(appendPickerSelectedNote, e.detail)}
     on:selectIndex={(e) => {
       appendPickerSelectedIndex = e.detail;
     }}
-    on:close={() => {
-      showAppendPicker = false;
+    on:headingIndexChange={(e) => {
+      appendPickerHeadingIndex = e.detail;
     }}
+    on:backToStep1={() => {
+      returnAppendPickerToStep1();
+    }}
+    on:close={closeAppendPicker}
   />
 
   {#if isLoading}
@@ -1133,6 +1255,26 @@
     );
     background-size: 200% 100%;
     animation: shimmer 3s linear infinite;
+  }
+
+  .accent-line,
+  .content-wrapper,
+  .status-toast,
+  .resize-handle {
+    transition:
+      filter 0.12s ease,
+      opacity 0.12s ease,
+      transform 0.12s ease;
+  }
+
+  .capture-container.append-picker-open .accent-line,
+  .capture-container.append-picker-open .content-wrapper,
+  .capture-container.append-picker-open .status-toast,
+  .capture-container.append-picker-open .resize-handle {
+    filter: blur(4px) brightness(0.62);
+    opacity: 0.56;
+    transform: scale(0.997);
+    pointer-events: none;
   }
 
   @keyframes shimmer {

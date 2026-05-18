@@ -16,18 +16,24 @@
     const activeItem = resultsRef.querySelector(".palette-item.selected");
     if (!activeItem) return;
 
+    const styles = getComputedStyle(resultsRef);
+    const paddingTop = parseFloat(styles.paddingTop) || 0;
+    const paddingBottom = parseFloat(styles.paddingBottom) || 0;
     const itemTop = activeItem.offsetTop;
     const itemBottom = itemTop + activeItem.offsetHeight;
     const viewTop = resultsRef.scrollTop;
     const viewBottom = viewTop + resultsRef.clientHeight;
 
     if (itemTop < viewTop) {
-      resultsRef.scrollTop = itemTop;
+      resultsRef.scrollTop = Math.max(itemTop - paddingTop, 0);
       return;
     }
 
     if (itemBottom > viewBottom) {
-      resultsRef.scrollTop = itemBottom - resultsRef.clientHeight;
+      resultsRef.scrollTop = Math.max(
+        itemBottom - resultsRef.clientHeight + paddingBottom,
+        0,
+      );
     }
   }
 
@@ -137,7 +143,7 @@
     position: absolute;
     inset: 0;
     border: 0;
-    background: transparent;
+    background: rgba(8, 10, 14, 0.22);
     padding: 0;
     appearance: none;
     z-index: 120;
