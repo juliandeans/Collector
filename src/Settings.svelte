@@ -630,10 +630,9 @@
                                     bind:value={settings.entry_header}
                                     placeholder="#### HH:mm"
                                 />
-                                <small
-                                    >Markdown header for each entry (HH:mm for
-                                    time)</small
-                                >
+                                <small>
+                                    Supported: HH (24h), hh / h (12h), mm, ss, a / A (am/pm) · e.g. #### HH:mm or #### h:mm a
+                                </small>
                             </div>
                         </section>
                     </div>
@@ -1034,7 +1033,7 @@
                                     placeholder="note-YYYY-MM-DD-HHmmss"
                                 />
                                 <small
-                                    >Supported tokens: YYYY, MM, DD, HH, mm, ss</small
+                                    >Supported: YYYY, MM, DD, HH (24h), hh / h (12h), mm, ss, A / a (am/pm)</small
                                 >
                             </div>
                         </section>

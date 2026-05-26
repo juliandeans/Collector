@@ -15,6 +15,8 @@
     const dispatch = createEventDispatcher();
     let headingListRef;
 
+    let suppressMouseEnter = false;
+
     function ensureSelectedHeadingVisible() {
         if (!headingListRef || !open || step !== 2) return;
 
@@ -32,15 +34,19 @@
         const viewBottom = viewTop + headingListRef.clientHeight;
 
         if (itemTop < viewTop) {
+            suppressMouseEnter = true;
             headingListRef.scrollTop = Math.max(itemTop - paddingTop, 0);
+            requestAnimationFrame(() => { suppressMouseEnter = false; });
             return;
         }
 
         if (itemBottom > viewBottom) {
+            suppressMouseEnter = true;
             headingListRef.scrollTop = Math.max(
                 itemBottom - headingListRef.clientHeight + paddingBottom,
                 0,
             );
+            requestAnimationFrame(() => { suppressMouseEnter = false; });
         }
     }
 
@@ -97,7 +103,7 @@
         headingIndex;
         headings.length;
         void tick().then(() => {
-            focusActiveStep();
+            headingListRef?.focus({ preventScroll: true });
             ensureSelectedHeadingVisible();
         });
     }
@@ -158,7 +164,7 @@
                     type="button"
                     class="heading-picker-item heading-picker-end-item"
                     class:selected={headingIndex === 0}
-                    on:mouseenter={() => dispatch("headingIndexChange", 0)}
+                    on:mouseenter={() => { if (!suppressMouseEnter) dispatch("headingIndexChange", 0); }}
                     on:click={() => dispatch("selectHeading", null)}
                 >
                     <span class="heading-picker-label">Append at end</span>
@@ -172,8 +178,7 @@
                         type="button"
                         class="heading-picker-item"
                         class:selected={headingIndex === index + 1}
-                        on:mouseenter={() =>
-                            dispatch("headingIndexChange", index + 1)}
+                        on:mouseenter={() => { if (!suppressMouseEnter) dispatch("headingIndexChange", index + 1); }}
                         on:click={() => dispatch("selectHeading", heading)}
                     >
                         <span class="heading-picker-label">{heading.display}</span>

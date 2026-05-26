@@ -10,54 +10,17 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 
 - Edge activation: move the cursor to a screen edge to open the capture window instantly
 - Global shortcut: configurable system-wide hotkey, default `Cmd+Shift+N`
-- Quick capture: append to the Daily Note or save a new note directly into your vault
-- Drag and drop images: drop screenshots or images into the capture window and compress them automatically
+- Quick capture: append to the Daily Note, any other note or save a new note directly into your vault
+- Image capture — drop or paste screenshots into the capture window with automatic compression
+- Reader Panel — tab-based reading view with your Daily Note, pinned notes, and on-demand tabs
+- Wikilink navigation — follow [[links]] inside the Reader, open in new tab with Cmd+Click
+- Inline search — find and step through matches in the current note with Cmd+F
+- Command palette — open any vault note with Cmd+P or Cmd+K
+- Content filters — hide frontmatter, Dataview blocks, inline fields, callouts, HTML, and comments
 - Menu bar app: runs quietly in the background and stays one shortcut away
 
 <img src="public/screenshot/preview.gif" width="600" alt="Reader Window" />
 
-## Reader Panel in v1.1
-
-- Tab-based reader: keep the Daily Note open, pin notes from settings, and open extra notes on demand
-- Hybrid Markdown editing: rendered reading view with raw Markdown editing on the active line
-- Image rendering: inline support for `![[image.png]]` and standard Markdown image links
-- Wikilink navigation: open `[[Note Links]]` in the current tab or a new tab with `Cmd+Click`
-- Open in Obsidian: jump from the Reader straight into the current note in Obsidian
-- Command palette: open any vault note with `Cmd+P` or `Cmd+K`
-- Wikilink autocomplete: inline `[[` completion while typing
-- Inline search: find and step through matches in the current note with `Cmd+F`
-- Content filters: optionally hide frontmatter, Dataview blocks, inline fields, HTML, and Obsidian comments
-- Reader image import: drop or paste images directly into the Reader using the same compression settings as the capture window
-
-### Additions and Fixes in 1.1.2
-**Fixes**
-- Pinned Reader notes are now stored as vault-relative paths, so they keep working after moving the vault
-- The image folder is now also stored as a vault-relative path and existing absolute paths are migrated automatically where possible
-- `Copy Text to Collector` no longer inserts stale clipboard content when nothing is selected
-- `Copy Text to Collector` now shows proper feedback when Accessibility permission is missing
-- Command Palette and Append Picker open faster and the list scrolling bug at the top of the selection is fixed
-- The Save button in Settings is visible again
-- Open delay inputs in Settings now keep the `ms` label aligned correctly
-
-**New**
-- Separate open delay controls for the Note Window and Reader Window
-- Global shortcuts for the Note Window and Reader Window can now optionally close the window as well, either with the same shortcut or with a separate one
-- Saving as a new note now uses a leading `# Heading` as the note title and filename
-- `Append to Note` is now a two-step flow: choose the note first, then append at the end or insert after a heading
-- Settings were redesigned into clearer cards and grouped more consistently
-- Activation settings were simplified by removing the old global reaction time slider from the UI
-
-### Additions and Fixes in 1.1.1
-**Fixes**
-- Daily note folder paths now support date placeholders (e.g. Journal/YYYY/MM)
-- Screenshot previews now display correctly in the capture window
-- Reader text color now applies consistently to all elements including headings and callouts
-- Drag overlay in the Reader no longer gets stuck
-
-**New**
-- Note filename template is now configurable in Settings
-- Option to hide callouts in the Reader 
-- Dual monitor support: edge detection and window positioning now work correctly across all monitors
 
 ## Settings
 
@@ -73,7 +36,8 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 - Apple Silicon Mac
 - Obsidian installed
 
-
+## Changelog
+See CHANGELOG.md for the full version history.
 
 ## Installation
 

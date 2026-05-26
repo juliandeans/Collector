@@ -10,21 +10,47 @@
  */
 export function formatTimestamp(date = new Date(), format = 'HH:mm') {
   const pad = (n) => n.toString().padStart(2, '0');
-  
-  const replacements = {
-    'YYYY': date.getFullYear().toString(),
-    'MM': pad(date.getMonth() + 1),
-    'DD': pad(date.getDate()),
-    'HH': pad(date.getHours()),
-    'mm': pad(date.getMinutes()),
-    'ss': pad(date.getSeconds()),
-  };
-  
-  let result = format;
-  for (const [key, value] of Object.entries(replacements)) {
-    result = result.replace(new RegExp(key, 'g'), value);
+
+  // 12h Werte
+  let hour = date.getHours();
+  let hour12 = hour % 12;
+  if (hour12 === 0) hour12 = 12;
+  const hour12pad = hour12.toString().padStart(2, '0');
+  const ampmLower = hour < 12 ? 'am' : 'pm';
+  const ampmUpper = ampmLower.toUpperCase();
+
+  // Token → Wert Zuordnung (längere Token zuerst für korrektes Matching)
+  const tokens = [
+    ['YYYY', date.getFullYear().toString()],
+    ['MM', pad(date.getMonth() + 1)],
+    ['DD', pad(date.getDate())],
+    ['HH', pad(hour)],
+    ['hh', hour12pad],
+    ['mm', pad(date.getMinutes())],
+    ['ss', pad(date.getSeconds())],
+    ['h', hour12.toString()],
+    ['a', ampmLower],
+    ['A', ampmUpper],
+  ];
+
+  // Single-Pass: alle Token-Positionen im Original-Format finden,
+  // dann rückwärts ersetzen, damit sich Indices nicht verschieben.
+  // So werden eingesetzte Werte (z.B. "pm" enthält 'a') nie erneut ersetzt.
+  const tokenPattern = /YYYY|MM|DD|HH|hh|mm|ss|h|a|A/g;
+  const matches = [];
+  let m;
+  while ((m = tokenPattern.exec(format)) !== null) {
+    const tok = m[0];
+    const entry = tokens.find(([t]) => t === tok);
+    if (entry) matches.push({ index: m.index, token: tok, value: entry[1] });
   }
-  
+
+  // Rückwärts ersetzen
+  let result = format;
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const { index, token, value } = matches[i];
+    result = result.slice(0, index) + value + result.slice(index + token.length);
+  }
   return result;
 }
 

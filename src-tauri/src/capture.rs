@@ -16,13 +16,47 @@ pub struct CaptureResult {
 fn generate_header(template: &str) -> String {
     let now = Local::now();
 
-    template
-        .replace("YYYY", &now.format("%Y").to_string())
-        .replace("MM", &now.format("%m").to_string())
-        .replace("DD", &now.format("%d").to_string())
-        .replace("HH", &now.format("%H").to_string())
-        .replace("mm", &now.format("%M").to_string())
-        .replace("ss", &now.format("%S").to_string())
+    // 12h-Zeitwerte vorbereiten
+    let hour_12 = now.format("%I").to_string();
+    let hour_12_nopad = if hour_12.starts_with('0') {
+        hour_12[1..].to_string()
+    } else {
+        hour_12.clone()
+    };
+    let ampm_lower = now.format("%P").to_string();
+    let ampm_upper = now.format("%p").to_string();
+
+    // Token → Wert Zuordnung.
+    // Längere Token zuerst, damit z.B. "hh" vor "h" matched.
+    let tokens: &[(&str, String)] = &[
+        ("YYYY", now.format("%Y").to_string()),
+        ("MM", now.format("%m").to_string()),
+        ("DD", now.format("%d").to_string()),
+        ("HH", now.format("%H").to_string()),
+        ("hh", hour_12),
+        ("mm", now.format("%M").to_string()),
+        ("ss", now.format("%S").to_string()),
+        ("h", hour_12_nopad),
+        ("a", ampm_lower),
+        ("A", ampm_upper),
+    ];
+
+    // Single-Pass: jedes Token wird nur im Original-Template erkannt,
+    // sodass eingesetzte Werte (z.B. "pm" enthält 'a') nie erneut ersetzt werden.
+    let mut result = String::with_capacity(template.len() * 2);
+    let mut remaining = template;
+    while !remaining.is_empty() {
+        if let Some((tok, val)) = tokens.iter().find(|(tok, _)| remaining.starts_with(tok)) {
+            result.push_str(val);
+            remaining = &remaining[tok.len()..];
+        } else {
+            // Safety: wir nehmen ein UTF-8-Zeichen, nicht nur ein Byte.
+            let ch = remaining.chars().next().unwrap();
+            result.push(ch);
+            remaining = &remaining[ch.len_utf8()..];
+        }
+    }
+    result
 }
 
 pub fn build_daily_note_path(settings: &Settings) -> String {
@@ -133,14 +167,51 @@ pub fn save_note_at_path(
 fn generate_filename_from_template(template: &str) -> String {
     let now = Local::now();
 
-    let mut filename = template
-        .replace("YYYY", &now.format("%Y").to_string())
-        .replace("MM", &now.format("%m").to_string())
-        .replace("DD", &now.format("%d").to_string())
-        .replace("HH", &now.format("%H").to_string())
-        .replace("mm", &now.format("%M").to_string())
-        .replace("ss", &now.format("%S").to_string());
+    // 12h-Zeitwerte vorbereiten
+    let hour_12 = now.format("%I").to_string();
+    let hour_12_nopad = if hour_12.starts_with('0') {
+        hour_12[1..].to_string()
+    } else {
+        hour_12.clone()
+    };
+    let ampm_lower = now.format("%P").to_string();
+    let ampm_upper = now.format("%p").to_string();
 
+    // Token → Wert Zuordnung.
+    // Längere Token zuerst, damit z.B. "hh" vor "h" matched.
+    // WICHTIG: Die Token-Namen selbst enthalten keine problematischen Zeichen,
+    // aber Nutzer sollten Doppelpunkte in Filename-Templates vermeiden
+    // (macOS erlaubt keine Doppelpunkte in Dateinamen).
+    let tokens: &[(&str, String)] = &[
+        ("YYYY", now.format("%Y").to_string()),
+        ("MM", now.format("%m").to_string()),
+        ("DD", now.format("%d").to_string()),
+        ("HH", now.format("%H").to_string()),
+        ("hh", hour_12),
+        ("mm", now.format("%M").to_string()),
+        ("ss", now.format("%S").to_string()),
+        ("h", hour_12_nopad),
+        ("a", ampm_lower),
+        ("A", ampm_upper),
+    ];
+
+    // Single-Pass: jedes Token wird nur im Original-Template erkannt,
+    // sodass eingesetzte Werte (z.B. "pm" enthält 'a') nie erneut ersetzt werden.
+    let mut result = String::with_capacity(template.len() * 2);
+    let mut remaining = template;
+    while !remaining.is_empty() {
+        if let Some((tok, val)) = tokens.iter().find(|(tok, _)| remaining.starts_with(tok)) {
+            result.push_str(val);
+            remaining = &remaining[tok.len()..];
+        } else {
+            // Safety: wir nehmen ein UTF-8-Zeichen, nicht nur ein Byte.
+            let ch = remaining.chars().next().unwrap();
+            result.push(ch);
+            remaining = &remaining[ch.len_utf8()..];
+        }
+    }
+
+    let mut filename = result;
     if !filename.ends_with(".md") {
         filename.push_str(".md");
     }
@@ -253,6 +324,51 @@ mod tests {
         let header = generate_header("#### HH:mm");
         assert!(header.starts_with("#### "));
         assert!(header.contains(":"));
+    }
+
+    #[test]
+    fn test_generate_header_12h_tokens() {
+        // hh: 12h mit führender Null (z.B. "03")
+        let h = generate_header("hh");
+        assert!(h.len() == 2 && h.chars().all(|c| c.is_ascii_digit()));
+
+        // h: 12h ohne führende Null (z.B. "3" oder "12")
+        let h = generate_header("h");
+        assert!(!h.is_empty() && h.chars().all(|c| c.is_ascii_digit()));
+
+        // a: lowercase am/pm
+        let a = generate_header("a");
+        assert!(a == "am" || a == "pm");
+
+        // A: uppercase AM/PM
+        let a = generate_header("A");
+        assert!(a == "AM" || a == "PM");
+
+        // Wichtig: Single-Pass testet, dass 'a' in "am"/"pm" nicht
+        // nochmal ersetzt wird und 'A' in "AM"/"PM" nicht nochmal
+        let combo = generate_header("h:mm a");
+        // Darf kein "pmpm", "amam", "pmPM", "amAM" enthalten
+        assert!(!combo.contains("pmpm"));
+        assert!(!combo.contains("amam"));
+        assert!(!combo.contains("pmPM"));
+        assert!(!combo.contains("amAM"));
+        // Muss am Ende "am" oder "pm" enden (nicht mehr)
+        assert!(combo.ends_with("am") || combo.ends_with("pm"));
+
+        let combo_upper = generate_header("h:mm A");
+        assert!(combo_upper.ends_with("AM") || combo_upper.ends_with("PM"));
+        assert!(!combo_upper.contains("pmPM"));
+        assert!(!combo_upper.contains("amAM"));
+    }
+
+    #[test]
+    fn test_generate_header_hh_before_h() {
+        // "hh" muss als Einheit erkannt werden, nicht als zwei "h"
+        let hh = generate_header("hh");
+        assert_eq!(hh.len(), 2);
+        // Wert muss zwischen "01" und "12" liegen
+        let val: u32 = hh.parse().unwrap();
+        assert!((1..=12).contains(&val));
     }
 
     #[test]
