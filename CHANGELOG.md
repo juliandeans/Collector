@@ -16,8 +16,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Open delay inputs in Settings keep the ms label aligned correctly
 
 ### Added
-- Command Palette — open any note in your vault with Cmd+P or Cmd+K directly from the capture window
-- Append to Note — two-step flow: choose any note in your vault, then append at the end or insert after a specific heading
+- *Command Palette* — open any note in your vault with Cmd+P or Cmd+K directly from the capture window
+- *Append to Note* — two-step flow: choose any note in your vault, then append at the end or insert after a specific heading
 - Separate open delay controls for the Note Window and Reader Window
 - Global shortcuts for the Note Window and Reader Window can now optionally close the window — with the same shortcut or a separate one
 - Saving as a new note uses a leading # Heading as the note title and filename
