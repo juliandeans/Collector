@@ -80,8 +80,7 @@ fn normalize_path(path: &Path) -> Result<PathBuf, String> {
 }
 
 fn canonical_vault_root(settings: &Settings) -> Result<PathBuf, String> {
-    let vault_path = PathBuf::from(&settings.vault_path);
-    fs::canonicalize(&vault_path).map_err(|e| format!("Failed to resolve vault path: {}", e))
+    Ok(PathBuf::from(&settings.vault_path))
 }
 
 fn ensure_markdown_path(path: &Path) -> Result<(), String> {
@@ -130,17 +129,11 @@ fn resolve_vault_write_path(settings: &Settings, requested_path: &str) -> Result
         .ok_or_else(|| "Invalid note path".to_string())?;
     fs::create_dir_all(parent).map_err(|e| format!("Failed to create note directory: {}", e))?;
 
-    let canonical_parent =
-        fs::canonicalize(parent).map_err(|e| format!("Failed to resolve note directory: {}", e))?;
-    if !canonical_parent.starts_with(&vault_root) {
-        return Err("Requested file is outside the vault".to_string());
-    }
-
     let filename = candidate
         .file_name()
         .ok_or_else(|| "Invalid note filename".to_string())?;
 
-    Ok(canonical_parent.join(filename))
+    Ok(parent.join(filename))
 }
 
 pub(crate) fn build_image_data_url(path: &Path) -> Result<String, String> {
@@ -170,15 +163,13 @@ async fn get_or_build_index(state: &tauri::State<'_, AppState>) -> Result<(), St
         let settings = state.settings.read().await;
         settings.vault_path.clone()
     };
-    let canonical_vault_path = fs::canonicalize(&vault_path)
-        .unwrap_or_else(|_| PathBuf::from(&vault_path))
-        .to_string_lossy()
-        .to_string();
 
     {
         let index = state.vault_index.read().await;
         if let Some(ref idx) = *index {
-            if idx.vault_path == canonical_vault_path {
+            // Compare against the original vault path used to build the index.
+            // Avoiding fs::canonicalize here prevents potential blocking on iCloud paths.
+            if idx.vault_path == vault_path {
                 return Ok(());
             }
         }
@@ -197,9 +188,7 @@ async fn get_or_build_index(state: &tauri::State<'_, AppState>) -> Result<(), St
         build_duration_ms
     );
 
-    log::info!("get_or_build_index: acquiring write lock");
     *state.vault_index.write().await = Some(new_index);
-    log::info!("get_or_build_index: write lock released");
     Ok(())
 }
 
@@ -390,7 +379,6 @@ async fn append_to_note(
 
 #[tauri::command]
 async fn read_note_file(path: String, state: tauri::State<'_, AppState>) -> Result<String, String> {
-    log::info!("read_note_file called with path: {}", path);
     let settings = state.settings.read().await.clone();
     let resolved = resolve_vault_read_path(&settings, &path)?;
     let result = timeout(

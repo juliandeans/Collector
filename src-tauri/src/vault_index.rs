@@ -10,7 +10,10 @@ pub struct VaultIndex {
     images_by_rel_path: HashMap<String, PathBuf>,
     notes_by_name: HashMap<String, PathBuf>,
     notes_by_rel_path: HashMap<String, PathBuf>,
+    /// The original vault path passed to build(), used for cache invalidation checks.
     pub vault_path: String,
+    /// The canonicalized vault path, used for path operations and stripping prefixes.
+    canonical_vault_path: String,
     pub built_at: Instant,
     pub file_count: usize,
 }
@@ -33,7 +36,8 @@ impl VaultIndex {
             images_by_rel_path: HashMap::new(),
             notes_by_name: HashMap::new(),
             notes_by_rel_path: HashMap::new(),
-            vault_path: vault_root.to_string_lossy().to_string(),
+            vault_path: vault_path.to_string(),
+            canonical_vault_path: vault_root.to_string_lossy().to_string(),
             built_at: Instant::now(),
             file_count: 0,
         };
@@ -70,7 +74,7 @@ impl VaultIndex {
     }
 
     pub fn all_notes(&self) -> Vec<NoteEntry> {
-        let vault_root = Path::new(&self.vault_path);
+        let vault_root = Path::new(&self.canonical_vault_path);
         let mut seen = HashSet::new();
         let mut notes = self
             .notes_by_rel_path

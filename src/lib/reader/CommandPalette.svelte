@@ -16,24 +16,18 @@
     const activeItem = resultsRef.querySelector(".palette-item.selected");
     if (!activeItem) return;
 
-    const styles = getComputedStyle(resultsRef);
-    const paddingTop = parseFloat(styles.paddingTop) || 0;
-    const paddingBottom = parseFloat(styles.paddingBottom) || 0;
     const itemTop = activeItem.offsetTop;
     const itemBottom = itemTop + activeItem.offsetHeight;
     const viewTop = resultsRef.scrollTop;
     const viewBottom = viewTop + resultsRef.clientHeight;
 
     if (itemTop < viewTop) {
-      resultsRef.scrollTop = Math.max(itemTop - paddingTop, 0);
+      resultsRef.scrollTop = itemTop;
       return;
     }
 
     if (itemBottom > viewBottom) {
-      resultsRef.scrollTop = Math.max(
-        itemBottom - resultsRef.clientHeight + paddingBottom,
-        0,
-      );
+      resultsRef.scrollTop = itemBottom - resultsRef.clientHeight;
     }
   }
 
@@ -225,11 +219,12 @@
     flex: 1;
     max-height: 420px;
     overflow-y: auto;
-    padding: 10px 8px 8px;
+    padding: 0;
   }
 
   .palette-item {
     border: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     background: transparent;
     color: inherit;
     font: inherit;
@@ -237,19 +232,20 @@
     flex-direction: column;
     gap: 2px;
     width: 100%;
-    padding: 10px 12px;
-    border-radius: 12px;
+    padding: 12px 16px;
+    border-radius: 0;
     cursor: pointer;
     text-align: left;
     transition: background var(--transition-fast);
   }
 
-  .palette-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+  .palette-item:last-child {
+    border-bottom: 0;
   }
 
+  .palette-item:hover,
   .palette-item.selected {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.06);
   }
 
   .palette-name {
@@ -264,7 +260,7 @@
   }
 
   .palette-empty {
-    padding: 18px 12px;
+    padding: 18px 16px;
     color: rgba(255, 255, 255, 0.58);
     text-align: center;
   }

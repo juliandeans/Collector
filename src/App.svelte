@@ -152,6 +152,10 @@
             .replace(/ss/g, replacements.ss);
     }
 
+    function getVaultNotePath(note = {}) {
+        return note?.relative_path || note?.path || "";
+    }
+
     async function insertAfterHeading(notePath, heading, text) {
         const fileContent = await invoke("read_note_file", { path: notePath });
         const lines = fileContent.split("\n");
@@ -593,55 +597,57 @@
     }
 
     async function handleNoteSelected(note) {
+        // Store the selected note immediately for reference
         appendPickerSelectedNote = note;
-        appendPickerStep = 2;
-        appendPickerHeadingIndex = 0;
-        appendPickerHeadings = [];
 
-        // Warte länger bevor invoke
-        await tick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
-
-        console.log("[debug] calling read_note_file now");
-
-        try {
-            await tick();
-            console.log("[debug] tick done");
-            console.log("[debug] calling read_note_file with path:", note.path);
-            const fileContent = await invoke("read_note_file", {
-                path: note.path,
-            });
-            console.log("[debug] file content length:", fileContent?.length);
-            appendPickerHeadings = parseHeadings(fileContent);
-            console.log(
-                "[debug] headings parsed:",
-                appendPickerHeadings.length,
-            );
-        } catch (e) {
-            console.error(
-                "[debug] read_note_file error:",
-                e,
-                JSON.stringify(e),
-            );
+        const notePath = getVaultNotePath(note);
+        if (!notePath) {
+            // No valid path - transition to step 2 with empty headings
             appendPickerHeadings = [];
+            appendPickerHeadingIndex = 0;
+            appendPickerStep = 2;
+            return;
         }
+
+        // Load headings BEFORE transitioning to step 2.
+        // This prevents a race condition where the IPC call and UI transition
+        // happen simultaneously, which can freeze WKWebView on macOS.
+        let loadedHeadings = [];
+        try {
+            const fileContent = await invoke("read_note_file", {
+                path: notePath,
+            });
+            // Check if user closed picker or selected a different note while loading
+            if (getVaultNotePath(appendPickerSelectedNote) !== notePath) return;
+            loadedHeadings = parseHeadings(fileContent);
+        } catch (e) {
+            // If loading fails, proceed with empty headings
+            if (getVaultNotePath(appendPickerSelectedNote) !== notePath) return;
+            loadedHeadings = [];
+        }
+
+        // Now that headings are loaded, transition to step 2
+        appendPickerHeadings = loadedHeadings;
+        appendPickerHeadingIndex = 0;
+        appendPickerStep = 2;
     }
 
     async function handleAppendToNote(note, heading = null) {
         closeAppendPicker();
 
-        if (!note || !content.trim() || isLoading) return;
+        const notePath = getVaultNotePath(note);
+        if (!notePath || !content.trim() || isLoading) return;
 
         isLoading = true;
 
         try {
             if (!heading) {
                 await invoke("append_to_note", {
-                    path: note.path,
+                    path: notePath,
                     text: content.trim(),
                 });
             } else {
-                await insertAfterHeading(note.path, heading, content.trim());
+                await insertAfterHeading(notePath, heading, content.trim());
             }
 
             showStatus("✓ Appended", "success");
