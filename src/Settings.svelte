@@ -345,13 +345,14 @@
     }
 
     :global(.settings-panel > section h2) {
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        color: #6b7280;
-        margin: 0 0 16px 0;
+        color: #9ca3af;
+        margin: 0 0 4px 0;
         padding-top: 12px;
+        padding-bottom: 0px;
     }
 
     :global(.panel-intro) {
@@ -383,23 +384,24 @@
         margin-bottom: 0;
     }
 
-    :global(.field label) {
+    :global(.field label),
+    :global(.field .field-label) {
         display: block;
+        font-size: 13px;
         font-weight: 500;
-        margin-bottom: 4px;
-    }
-
-    .field-label {
-        display: block;
-        font-weight: 500;
-        margin-bottom: 4px;
+        color: #111827;
+        margin-bottom: 5px;
+        padding-top: 12px;
     }
 
     :global(.field small) {
         display: block;
-        color: #888;
         font-size: 11px;
+        font-weight: 400;
+        color: #9ca3af;
         margin-top: 4px;
+        padding-left: 14px;
+        padding-bottom: 4px;
     }
 
     :global(input[type="text"]),
@@ -409,7 +411,7 @@
         width: 100%;
         padding: 9px 12px;
         border: 1.5px solid rgba(0, 0, 0, 0.1);
-        border-radius: 8px;
+        border-radius: 6px;
         font-size: 13px;
         background: white;
         transition: all 0.2s ease;
@@ -509,8 +511,9 @@
     }
 
     :global(button.secondary) {
-        background: #e5e5e5;
-        color: #333;
+        background: rgba(0, 0, 0, 0.07);
+        color: #111827;
+        border: none;
     }
 
     :global(button.secondary:hover) {

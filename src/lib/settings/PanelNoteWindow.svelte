@@ -10,10 +10,6 @@
 <div class="settings-panel">
     <section>
         <h2>Window Size</h2>
-        <p class="section-description">
-            Control the default size of the floating note window.
-        </p>
-
         <div class="field-row">
             <div class="field">
                 <label for="window_width">Width (px)</label>
@@ -40,11 +36,6 @@
 
     <section>
         <h2>New Note Defaults</h2>
-        <p class="section-description">
-            Define where new notes are created and how their filenames are
-            generated.
-        </p>
-
         <div class="field">
             <label for="notes_folder">Notes Folder</label>
             <input
@@ -72,11 +63,6 @@
 
     <section>
         <h2>Template</h2>
-        <p class="section-description">
-            Optional boilerplate inserted at the beginning of each newly created
-            note.
-        </p>
-
         <div class="field">
             <label for="note_template">Template Text</label>
             <button

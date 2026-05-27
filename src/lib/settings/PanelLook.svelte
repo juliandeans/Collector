@@ -12,11 +12,6 @@
 <div class="settings-panel">
     <section>
         <h2>Window Surface</h2>
-        <p class="section-description">
-            Shape the glass surface and background treatment for both floating
-            windows.
-        </p>
-
         <div class="field">
             <label for="border_radius">Corner Radius: {settings.border_radius}px</label>
             <input
@@ -98,11 +93,6 @@
 
     <section>
         <h2>Accent & Links</h2>
-        <p class="section-description">
-            Choose the highlight color and how links are rendered in both
-            windows.
-        </p>
-
         <div class="field">
             <label for="accent_color">Accent Color</label>
             <div class="color-input">
@@ -153,10 +143,6 @@
 
     <section>
         <h2>Typography</h2>
-        <p class="section-description">
-            Set the font family, size and default text color for both windows.
-        </p>
-
         <div class="field">
             <label for="font_family">Font Family</label>
             <select id="font_family" bind:value={settings.font_family}>

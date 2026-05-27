@@ -82,10 +82,6 @@
 <div class="settings-panel">
     <section>
         <h2>Storage</h2>
-        <p class="section-description">
-            Set the destination folder and filename pattern for captured images.
-        </p>
-
         <div class="field">
             <label for="screenshot_path">Image Folder</label>
             <div class="path-picker">
@@ -118,10 +114,6 @@
 
     <section>
         <h2>Embed Defaults</h2>
-        <p class="section-description">
-            Tune compression and the default display width for new image links.
-        </p>
-
         <div class="field">
             <label for="compression_max_kb">Max. Image Size (KB)</label>
             <input

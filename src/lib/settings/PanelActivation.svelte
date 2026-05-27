@@ -73,11 +73,6 @@
 <div class="settings-panel">
     <section>
         <h2>Edge Detection</h2>
-        <p class="section-description">
-            Enable or disable screen-edge activation for the note and reader
-            windows.
-        </p>
-
         <div class="field">
             <label class="checkbox">
                 <input
@@ -92,11 +87,6 @@
 
     <section>
         <h2>Open Delays</h2>
-        <p class="section-description">
-            Set separate edge-trigger delays for each window. If disabled, the
-            standard trigger timing is used.
-        </p>
-
         <div class="delay-grid">
             <div class="delay-card">
                 <div class="delay-card-title">Note Window</div>
@@ -170,11 +160,6 @@
 
     <section>
         <h2>Modifier Keys</h2>
-        <p class="section-description">
-            Hold these keys while touching the edge to open a panel. Leave all
-            unchecked to open without any modifier.
-        </p>
-
         <div class="field">
             <div class="modifier-grid">
                 {#each ["cmd", "option", "shift", "ctrl"] as mod}
@@ -203,10 +188,6 @@
 
     <section>
         <h2>Excluded Apps</h2>
-        <p class="section-description">
-            Edge detection is paused when these apps are in focus.
-        </p>
-
         <div class="field">
             {#if (settings.edge_excluded_apps ?? []).length > 0}
                 <ul class="exclusion-list">

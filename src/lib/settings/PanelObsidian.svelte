@@ -40,11 +40,6 @@
 <div class="settings-panel">
     <section>
         <h2>Vault</h2>
-        <p class="section-description">
-            Choose the Obsidian vault Collector works against and refresh the
-            index when files change outside the app.
-        </p>
-
         <div class="field">
             <label for="vault_name">Vault Name</label>
             <input
@@ -92,11 +87,6 @@
 
     <section>
         <h2>Daily Notes</h2>
-        <p class="section-description">
-            Define where daily notes live and how their filenames are
-            generated.
-        </p>
-
         <div class="field">
             <label for="daily_note_folder">Daily Note Path</label>
             <input
@@ -123,10 +113,6 @@
 
     <section>
         <h2>Entry Header</h2>
-        <p class="section-description">
-            This Markdown heading is inserted before each saved capture.
-        </p>
-
         <div class="field">
             <label for="entry_header">Entry Header</label>
             <input

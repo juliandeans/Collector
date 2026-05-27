@@ -62,11 +62,6 @@
 <div class="settings-panel">
     <section>
         <h2>Note Window</h2>
-        <p class="section-description">
-            Global shortcut for opening the capture window, with optional
-            closing via the same or a separate shortcut.
-        </p>
-
         <div class="field">
             <label for="global_shortcut">Open Note Window</label>
             <input
@@ -106,11 +101,6 @@
 
     <section>
         <h2>Reader Window</h2>
-        <p class="section-description">
-            Global shortcut for opening the reader, with an optional close
-            shortcut.
-        </p>
-
         <div class="field">
             <label for="reader_shortcut">Open Reader Window</label>
             <input
@@ -150,11 +140,6 @@
 
     <section>
         <h2>Copy Text to Collector</h2>
-        <p class="section-description">
-            Copies the current selection from the active app into the capture
-            window.
-        </p>
-
         <div class="field">
             <label for="capture_text_shortcut">Shortcut</label>
             <input
@@ -180,10 +165,6 @@
 
     <section>
         <h2>Save Actions</h2>
-        <p class="section-description">
-            Shortcuts for saving the current capture into your vault.
-        </p>
-
         <div class="field">
             <label for="save_to_daily_shortcut">Save to Daily Note</label>
             <input

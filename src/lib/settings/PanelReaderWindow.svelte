@@ -99,10 +99,6 @@
 <div class="settings-panel">
     <section>
         <h2>Window Size</h2>
-        <p class="section-description">
-            Control the default size of the floating reader window.
-        </p>
-
         <div class="field-row">
             <div class="field">
                 <label for="reader_width">Width (px)</label>
@@ -129,12 +125,6 @@
 
     <section>
         <h2>Pinned Notes</h2>
-        <p class="section-description">
-            These notes appear as tabs in the left reader panel. The Daily Note
-            is always included automatically and paths are stored relative to
-            the current vault.
-        </p>
-
         {#if normalizePinnedNotes(settings.pinned_notes).length > 0}
             <div class="note-list">
                 {#each normalizePinnedNotes(settings.pinned_notes) as note}
@@ -210,11 +200,6 @@
 
     <section>
         <h2>Content Filters</h2>
-        <p class="section-description">
-            Choose which elements are hidden in the reader. They are never
-            deleted, only hidden from view.
-        </p>
-
         <div class="field">
             <label class="checkbox">
                 <input
