@@ -2,7 +2,7 @@
 
 Collector is a macOS menu bar app for fast text and image capture into Obsidian. It lets you save notes, screenshots, and pasted content into your vault without opening the full Obsidian app first.
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.2.1-blue)
 ![Platform](https://img.shields.io/badge/platform-macOS%2011%2B-lightgrey)
 ![Stack](https://img.shields.io/badge/stack-Tauri%20%2B%20Rust%20%2B%20Svelte-orange)
 
