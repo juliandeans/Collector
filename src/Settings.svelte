@@ -430,12 +430,7 @@
     :global(select:focus),
     :global(textarea:focus) {
         outline: none;
-        box-shadow: inset 0px 0px 6px 1px rgba(15, 23, 42, 0.06);
-        background: linear-gradient(
-            170deg,
-            rgba(139, 92, 246, 0.05) 20%,
-            rgba(255, 255, 255, 0.04) 80%
-        );
+        background: rgba(0, 0, 0, 0.01);
     }
 
     :global(.section-description) {

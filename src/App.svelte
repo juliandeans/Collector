@@ -1,1051 +1,1117 @@
 <script>
-  import { invoke } from "@tauri-apps/api/core";
-  import { listen } from "@tauri-apps/api/event";
-  import { onMount, onDestroy, tick } from "svelte";
-  import { getCurrentWindow } from "@tauri-apps/api/window";
-  import AppendToPicker from "./lib/reader/AppendToPicker.svelte";
-  import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
+    import { invoke } from "@tauri-apps/api/core";
+    import { listen } from "@tauri-apps/api/event";
+    import { onMount, onDestroy, tick } from "svelte";
+    import { getCurrentWindow } from "@tauri-apps/api/window";
+    import AppendToPicker from "./lib/reader/AppendToPicker.svelte";
+    import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
 
-  let textareaRef;
-  let content = "";
-  let isDragging = false;
-  let isLoading = false;
-  let statusMessage = "";
-  let statusType = "";
-  let showAppendPicker = false;
-  let appendPickerQuery = "";
-  let appendPickerNotes = [];
-  let appendPickerSelectedIndex = 0;
-  let appendPickerStep = 1;
-  let appendPickerSelectedNote = null;
-  let appendPickerHeadings = [];
-  let appendPickerHeadingIndex = 0;
-  let appendPickerInputRef;
-  let uploadedImages = [];
-  let unlistenShow;
-  let unlistenSettingsChanged;
-  let unlistenDragDrop;
-  let isTauri = false;
-  let globalDragEnter;
-  let globalDragOver;
-  let globalDragLeave;
-  let globalDrop;
+    let textareaRef;
+    let content = "";
+    let isDragging = false;
+    let isLoading = false;
+    let statusMessage = "";
+    let statusType = "";
+    let showAppendPicker = false;
+    let appendPickerQuery = "";
+    let appendPickerNotes = [];
+    let appendPickerSelectedIndex = 0;
+    let appendPickerStep = 1;
+    let appendPickerSelectedNote = null;
+    let appendPickerHeadings = [];
+    let appendPickerHeadingIndex = 0;
+    let appendPickerInputRef;
+    let uploadedImages = [];
+    let unlistenShow;
+    let unlistenSettingsChanged;
+    let unlistenDragDrop;
+    let isTauri = false;
+    let globalDragEnter;
+    let globalDragOver;
+    let globalDragLeave;
+    let globalDrop;
 
-  let appSettings = {
-    background_color: "#1e1e2e",
-    font_family: "-apple-system, BlinkMacSystemFont, SF Pro Display",
-    font_size: 15,
-    border_radius: 12,
-    window_transparency: 55,
-    window_blur: 80,
-    window_saturation: 200,
-    window_brightness: 0,
-    text_color: "#ffffff",
-    accent_color: "#8b5cf6",
-    internal_link_color: "#a78bfa",
-    external_link_color: "#60a5fa",
-    entry_header: "#### HH:mm",
-    save_to_daily_shortcut: "Cmd+Enter",
-    save_as_note_shortcut: "Cmd+Shift+Enter",
-    append_to_note_shortcut: "Cmd+Option+Enter",
-  };
-
-  $: brightnessFilter = (() => {
-    const b = appSettings.window_brightness;
-    if (b === 0) return "";
-
-    if (b > 0) {
-      const brightnessValue = 1 + (b / 100) * 0.6;
-      const contrastValue = 1 - (b / 100) * 0.25;
-      return ` brightness(${brightnessValue}) contrast(${contrastValue})`;
-    } else {
-      const brightnessValue = 1 + (b / 100) * 0.7;
-      const contrastValue = 1 + (-b / 100) * 0.3;
-      return ` brightness(${brightnessValue}) contrast(${contrastValue})`;
-    }
-  })();
-
-  function isFileDrag(e) {
-    const types = e.dataTransfer?.types;
-    if (types && Array.from(types).includes("Files")) return true;
-    const items = e.dataTransfer?.items;
-    return !!items && items.length > 0;
-  }
-
-  function applyColorSettings(settings = appSettings) {
-    const root = document.documentElement;
-    root.style.setProperty(
-      "--accent-color",
-      settings.accent_color ?? "#8b5cf6",
-    );
-    root.style.setProperty(
-      "--internal-link-color",
-      settings.internal_link_color ?? "#a78bfa",
-    );
-    root.style.setProperty(
-      "--external-link-color",
-      settings.external_link_color ?? "#60a5fa",
-    );
-  }
-
-  function normalizeFilePath(path) {
-    if (!path) return "";
-    if (path.startsWith("file://")) {
-      return decodeURIComponent(path.replace("file://", ""));
-    }
-    return path;
-  }
-
-  function normalizeImageResult(result) {
-    if (typeof result === "string") {
-      return {
-        markdown: result,
-        saved_path: null,
-        filename: null,
-        preview_data_url: "",
-      };
-    }
-    return {
-      markdown: result?.markdown ?? "",
-      saved_path: result?.saved_path ?? null,
-      filename: result?.filename ?? null,
-      preview_data_url: result?.preview_data_url ?? "",
+    let appSettings = {
+        background_color: "#1e1e2e",
+        font_family: "-apple-system, BlinkMacSystemFont, SF Pro Display",
+        font_size: 15,
+        border_radius: 12,
+        window_transparency: 55,
+        window_blur: 80,
+        window_saturation: 200,
+        window_brightness: 0,
+        text_color: "#ffffff",
+        accent_color: "#8b5cf6",
+        internal_link_color: "#a78bfa",
+        external_link_color: "#60a5fa",
+        entry_header: "#### HH:mm",
+        save_to_daily_shortcut: "Cmd+Enter",
+        save_as_note_shortcut: "Cmd+Shift+Enter",
+        append_to_note_shortcut: "Cmd+Option+Enter",
     };
-  }
 
-  function parseHeadings(content) {
-    const lines = content.split("\n");
-    const headings = [];
+    $: brightnessFilter = (() => {
+        const b = appSettings.window_brightness;
+        if (b === 0) return "";
 
-    lines.forEach((line, index) => {
-      const match = line.match(/^(#{1,6})\s+(.+)/);
-      if (!match) return;
+        if (b > 0) {
+            const brightnessValue = 1 + (b / 100) * 0.6;
+            const contrastValue = 1 - (b / 100) * 0.25;
+            return ` brightness(${brightnessValue}) contrast(${contrastValue})`;
+        } else {
+            const brightnessValue = 1 + (b / 100) * 0.7;
+            const contrastValue = 1 + (-b / 100) * 0.3;
+            return ` brightness(${brightnessValue}) contrast(${contrastValue})`;
+        }
+    })();
 
-      headings.push({
-        level: match[1].length,
-        text: match[2].trim(),
-        display: line.trim(),
-        lineIndex: index,
-      });
+    function isFileDrag(e) {
+        const types = e.dataTransfer?.types;
+        if (types && Array.from(types).includes("Files")) return true;
+        const items = e.dataTransfer?.items;
+        return !!items && items.length > 0;
+    }
+
+    function applyColorSettings(settings = appSettings) {
+        const root = document.documentElement;
+        root.style.setProperty(
+            "--accent-color",
+            settings.accent_color ?? "#8b5cf6",
+        );
+        root.style.setProperty(
+            "--internal-link-color",
+            settings.internal_link_color ?? "#a78bfa",
+        );
+        root.style.setProperty(
+            "--external-link-color",
+            settings.external_link_color ?? "#60a5fa",
+        );
+    }
+
+    function normalizeFilePath(path) {
+        if (!path) return "";
+        if (path.startsWith("file://")) {
+            return decodeURIComponent(path.replace("file://", ""));
+        }
+        return path;
+    }
+
+    function normalizeImageResult(result) {
+        if (typeof result === "string") {
+            return {
+                markdown: result,
+                saved_path: null,
+                filename: null,
+                preview_data_url: "",
+            };
+        }
+        return {
+            markdown: result?.markdown ?? "",
+            saved_path: result?.saved_path ?? null,
+            filename: result?.filename ?? null,
+            preview_data_url: result?.preview_data_url ?? "",
+        };
+    }
+
+    function parseHeadings(content) {
+        const lines = content.split("\n");
+        const headings = [];
+
+        lines.forEach((line, index) => {
+            const match = line.match(/^(#{1,6})\s+(.+)/);
+            if (!match) return;
+
+            headings.push({
+                level: match[1].length,
+                text: match[2].trim(),
+                display: line.trim(),
+                lineIndex: index,
+            });
+        });
+
+        return headings;
+    }
+
+    function formatEntryHeader(template = "#### HH:mm") {
+        const now = new Date();
+        const replacements = {
+            YYYY: String(now.getFullYear()),
+            MM: String(now.getMonth() + 1).padStart(2, "0"),
+            DD: String(now.getDate()).padStart(2, "0"),
+            HH: String(now.getHours()).padStart(2, "0"),
+            mm: String(now.getMinutes()).padStart(2, "0"),
+            ss: String(now.getSeconds()).padStart(2, "0"),
+        };
+
+        return String(template ?? "")
+            .replace(/YYYY/g, replacements.YYYY)
+            .replace(/MM/g, replacements.MM)
+            .replace(/DD/g, replacements.DD)
+            .replace(/HH/g, replacements.HH)
+            .replace(/mm/g, replacements.mm)
+            .replace(/ss/g, replacements.ss);
+    }
+
+    async function insertAfterHeading(notePath, heading, text) {
+        const fileContent = await invoke("read_note_file", { path: notePath });
+        const lines = fileContent.split("\n");
+
+        let insertAt = lines.length;
+        for (let i = heading.lineIndex + 1; i < lines.length; i += 1) {
+            const match = lines[i].match(/^(#{1,6})\s/);
+            if (match && match[1].length <= heading.level) {
+                insertAt = i;
+                break;
+            }
+        }
+
+        const entryLines = [
+            formatEntryHeader(appSettings.entry_header ?? "#### HH:mm"),
+            ...text.split("\n"),
+            "",
+        ];
+        const separator =
+            insertAt > 0 && lines[insertAt - 1]?.trim() !== "" ? [""] : [];
+
+        lines.splice(insertAt, 0, ...separator, ...entryLines);
+
+        await invoke("write_note_file", {
+            path: notePath,
+            content: lines.join("\n"),
+        });
+    }
+
+    function closeAppendPicker() {
+        showAppendPicker = false;
+        appendPickerStep = 1;
+        appendPickerSelectedNote = null;
+        appendPickerHeadings = [];
+        appendPickerQuery = "";
+        appendPickerSelectedIndex = 0;
+        appendPickerHeadingIndex = 0;
+        textareaRef?.focus();
+    }
+
+    function returnAppendPickerToStep1() {
+        appendPickerStep = 1;
+        appendPickerSelectedNote = null;
+        appendPickerHeadings = [];
+        appendPickerHeadingIndex = 0;
+    }
+
+    function handleDragDropEvent(event) {
+        const payload = event?.payload;
+        if (!payload) return;
+
+        if (payload.type === "enter" || payload.type === "over") {
+            isDragging = true;
+            return;
+        }
+
+        if (payload.type === "leave") {
+            isDragging = false;
+            dragCounter = 0;
+            return;
+        }
+
+        if (payload.type === "drop") {
+            isDragging = false;
+            dragCounter = 0;
+            if (Array.isArray(payload.paths)) {
+                handleTauriFileDrop(payload.paths);
+            }
+        }
+    }
+
+    onMount(async () => {
+        try {
+            await getCurrentWindow();
+            isTauri = true;
+        } catch (e) {
+            // Browser preview mode has no Tauri window API.
+            isTauri = false;
+        }
+
+        globalDragEnter = (e) => {
+            if (!isFileDrag(e)) return;
+            e.preventDefault();
+            dragCounter = Math.max(dragCounter, 1);
+            isDragging = true;
+        };
+
+        globalDragOver = (e) => {
+            e.preventDefault();
+            if (isFileDrag(e)) {
+                e.dataTransfer.dropEffect = "copy";
+            }
+        };
+
+        globalDragLeave = (e) => {
+            if (e.target === document.documentElement) {
+                dragCounter = 0;
+                isDragging = false;
+            }
+        };
+
+        globalDrop = (e) => {
+            const container = e.target?.closest?.(".capture-container");
+            if (container) {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDrop(e);
+            }
+        };
+
+        document.addEventListener("dragenter", globalDragEnter, true);
+        document.addEventListener("dragover", globalDragOver, true);
+        document.addEventListener("dragleave", globalDragLeave, true);
+        document.addEventListener("drop", globalDrop, true);
+
+        if (isTauri) {
+            try {
+                unlistenShow = await listen("show_capture", () => {
+                    uploadedImages.forEach((img) => {
+                        if (img.preview && img.preview.startsWith("blob:")) {
+                            URL.revokeObjectURL(img.preview);
+                        }
+                    });
+                    content = "";
+                    uploadedImages = [];
+                    statusMessage = "";
+                    isDragging = false;
+                    dragCounter = 0;
+                    isLoading = false;
+                    closeAppendPicker();
+                    // Required: after the native Tauri show event, macOS needs a short delay
+                    // before the textarea reliably accepts focus.
+                    setTimeout(() => textareaRef?.focus(), 50);
+                });
+
+                await listen("insert_capture_text", (event) => {
+                    const text =
+                        typeof event.payload === "string" ? event.payload : "";
+                    if (!text.trim()) return;
+                    content = text;
+                    // Required: after the native Tauri insert event, macOS needs a short delay
+                    // before the textarea reliably accepts focus.
+                    setTimeout(() => textareaRef?.focus(), 50);
+                });
+
+                await listen("capture_text_failed", (event) => {
+                    const msg =
+                        typeof event.payload === "string"
+                            ? event.payload
+                            : "Nothing to capture";
+                    showStatus("✗ " + msg, "error");
+                });
+
+                await listen("save_as_note", () => {
+                    handleSaveAsNote();
+                });
+
+                unlistenSettingsChanged = await listen(
+                    "settings_changed",
+                    (event) => {
+                        const newSettings = event.payload;
+
+                        appSettings = {
+                            ...appSettings,
+                            background_color:
+                                newSettings.background_color ??
+                                appSettings.background_color,
+                            font_family:
+                                newSettings.font_family ??
+                                appSettings.font_family,
+                            font_size:
+                                newSettings.font_size ?? appSettings.font_size,
+                            border_radius:
+                                newSettings.border_radius ??
+                                appSettings.border_radius,
+                            window_transparency:
+                                newSettings.window_transparency ??
+                                appSettings.window_transparency,
+                            window_blur:
+                                newSettings.window_blur ??
+                                appSettings.window_blur,
+                            window_saturation:
+                                newSettings.window_saturation ??
+                                appSettings.window_saturation,
+                            window_brightness:
+                                newSettings.window_brightness ??
+                                appSettings.window_brightness,
+                            text_color:
+                                newSettings.text_color ??
+                                appSettings.text_color,
+                            accent_color:
+                                newSettings.accent_color ??
+                                appSettings.accent_color,
+                            internal_link_color:
+                                newSettings.internal_link_color ??
+                                appSettings.internal_link_color,
+                            external_link_color:
+                                newSettings.external_link_color ??
+                                appSettings.external_link_color,
+                            entry_header:
+                                newSettings.entry_header ??
+                                appSettings.entry_header,
+                            save_to_daily_shortcut:
+                                newSettings.save_to_daily_shortcut ??
+                                appSettings.save_to_daily_shortcut,
+                            save_as_note_shortcut:
+                                newSettings.save_as_note_shortcut ??
+                                appSettings.save_as_note_shortcut,
+                            append_to_note_shortcut:
+                                newSettings.append_to_note_shortcut ??
+                                appSettings.append_to_note_shortcut,
+                        };
+                        applyColorSettings(appSettings);
+                    },
+                );
+
+                const currentWindow = await getCurrentWindow();
+                unlistenDragDrop =
+                    await currentWindow.onDragDropEvent(handleDragDropEvent);
+
+                try {
+                    const settings = await invoke("load_settings");
+                    appSettings = {
+                        background_color: settings.background_color,
+                        font_family: settings.font_family,
+                        font_size: settings.font_size,
+                        border_radius: settings.border_radius,
+                        window_transparency: settings.window_transparency ?? 55,
+                        window_blur: settings.window_blur ?? 80,
+                        window_saturation: settings.window_saturation ?? 200,
+                        window_brightness: settings.window_brightness ?? 0,
+                        text_color: settings.text_color ?? "#ffffff",
+                        accent_color: settings.accent_color ?? "#8b5cf6",
+                        internal_link_color:
+                            settings.internal_link_color ?? "#a78bfa",
+                        external_link_color:
+                            settings.external_link_color ?? "#60a5fa",
+                        entry_header: settings.entry_header ?? "#### HH:mm",
+                        save_to_daily_shortcut:
+                            settings.save_to_daily_shortcut ?? "Cmd+Enter",
+                        save_as_note_shortcut:
+                            settings.save_as_note_shortcut ?? "Cmd+Shift+Enter",
+                        append_to_note_shortcut:
+                            settings.append_to_note_shortcut ??
+                            "Cmd+Option+Enter",
+                    };
+                    applyColorSettings(appSettings);
+                } catch (e) {
+                    console.error("Failed to load initial settings:", e);
+                }
+
+                // Preload vault notes so the append picker can open immediately.
+                invoke("list_vault_notes")
+                    .then((notes) => {
+                        appendPickerNotes = notes;
+                    })
+                    .catch(() => {
+                        // Non-fatal: the picker can still lazy-load later.
+                    });
+            } catch (e) {
+                console.error("Failed to listen to events:", e);
+            }
+        }
     });
 
-    return headings;
-  }
+    onDestroy(() => {
+        unlistenShow?.();
+        unlistenSettingsChanged?.();
+        unlistenDragDrop?.();
 
-  function formatEntryHeader(template = "#### HH:mm") {
-    const now = new Date();
-    const replacements = {
-      YYYY: String(now.getFullYear()),
-      MM: String(now.getMonth() + 1).padStart(2, "0"),
-      DD: String(now.getDate()).padStart(2, "0"),
-      HH: String(now.getHours()).padStart(2, "0"),
-      mm: String(now.getMinutes()).padStart(2, "0"),
-      ss: String(now.getSeconds()).padStart(2, "0"),
-    };
+        if (globalDragEnter) {
+            document.removeEventListener("dragenter", globalDragEnter, true);
+        }
+        if (globalDragOver) {
+            document.removeEventListener("dragover", globalDragOver, true);
+        }
+        if (globalDragLeave) {
+            document.removeEventListener("dragleave", globalDragLeave, true);
+        }
+        if (globalDrop) {
+            document.removeEventListener("drop", globalDrop, true);
+        }
 
-    return String(template ?? "")
-      .replace(/YYYY/g, replacements.YYYY)
-      .replace(/MM/g, replacements.MM)
-      .replace(/DD/g, replacements.DD)
-      .replace(/HH/g, replacements.HH)
-      .replace(/mm/g, replacements.mm)
-      .replace(/ss/g, replacements.ss);
-  }
-
-  async function insertAfterHeading(notePath, heading, text) {
-    const fileContent = await invoke("read_note_file", { path: notePath });
-    const lines = fileContent.split("\n");
-
-    let insertAt = lines.length;
-    for (let i = heading.lineIndex + 1; i < lines.length; i += 1) {
-      const match = lines[i].match(/^(#{1,6})\s/);
-      if (match && match[1].length <= heading.level) {
-        insertAt = i;
-        break;
-      }
-    }
-
-    const entryLines = [
-      formatEntryHeader(appSettings.entry_header ?? "#### HH:mm"),
-      ...text.split("\n"),
-      "",
-    ];
-    const separator =
-      insertAt > 0 && lines[insertAt - 1]?.trim() !== "" ? [""] : [];
-
-    lines.splice(insertAt, 0, ...separator, ...entryLines);
-
-    await invoke("write_note_file", {
-      path: notePath,
-      content: lines.join("\n"),
+        uploadedImages.forEach((img) => {
+            if (img.preview && img.preview.startsWith("blob:")) {
+                URL.revokeObjectURL(img.preview);
+            }
+        });
     });
-  }
 
-  function closeAppendPicker() {
-    showAppendPicker = false;
-    appendPickerStep = 1;
-    appendPickerSelectedNote = null;
-    appendPickerHeadings = [];
-    appendPickerQuery = "";
-    appendPickerSelectedIndex = 0;
-    appendPickerHeadingIndex = 0;
-    textareaRef?.focus();
-  }
-
-  function returnAppendPickerToStep1() {
-    appendPickerStep = 1;
-    appendPickerSelectedNote = null;
-    appendPickerHeadings = [];
-    appendPickerHeadingIndex = 0;
-  }
-
-  function handleDragDropEvent(event) {
-    const payload = event?.payload;
-    if (!payload) return;
-
-    if (payload.type === "enter" || payload.type === "over") {
-      isDragging = true;
-      return;
+    function showStatus(message, type = "success") {
+        statusMessage = message;
+        statusType = type;
+        // Hide the transient status toast after its display period.
+        setTimeout(() => (statusMessage = ""), 2000);
     }
 
-    if (payload.type === "leave") {
-      isDragging = false;
-      dragCounter = 0;
-      return;
+    function openAppendPicker() {
+        if (!content.trim()) return;
+
+        showAppendPicker = true;
+        appendPickerStep = 1;
+        appendPickerSelectedNote = null;
+        appendPickerHeadings = [];
+        appendPickerQuery = "";
+        appendPickerSelectedIndex = 0;
+        appendPickerHeadingIndex = 0;
+        appendPickerInputRef?.focus();
+
+        if (appendPickerNotes.length === 0) {
+            invoke("list_vault_notes")
+                .then((notes) => {
+                    appendPickerNotes = notes;
+                })
+                .catch(() => {
+                    showStatus("✗ Could not load vault notes", "error");
+                });
+        }
     }
 
-    if (payload.type === "drop") {
-      isDragging = false;
-      dragCounter = 0;
-      if (Array.isArray(payload.paths)) {
-        handleTauriFileDrop(payload.paths);
-      }
+    async function handleAppendToDaily() {
+        if (!content.trim() || isLoading) {
+            if (!content.trim()) {
+                showStatus("Nothing to append", "error");
+            }
+            return;
+        }
+
+        isLoading = true;
+
+        try {
+            await invoke("append_to_daily_note", {
+                text: content.trim(),
+            });
+
+            showStatus("✓ Saved", "success");
+
+            uploadedImages.forEach((img) => {
+                if (img.preview && img.preview.startsWith("blob:")) {
+                    URL.revokeObjectURL(img.preview);
+                }
+            });
+
+            content = "";
+            uploadedImages = [];
+            isDragging = false;
+            dragCounter = 0;
+            isLoading = false;
+
+            // Required: hiding the capture window immediately after save can race the
+            // native save flow on macOS, so the close is delayed slightly.
+            setTimeout(async () => {
+                try {
+                    await invoke("hide_capture");
+                } catch (e) {
+                    console.error("Hide error:", e);
+                }
+            }, 200);
+        } catch (e) {
+            console.error("Append to daily note failed:", e);
+            showStatus("✗ " + e.toString(), "error");
+            isLoading = false;
+        }
     }
-  }
 
-  onMount(async () => {
-    try {
-      await getCurrentWindow();
-      isTauri = true;
-    } catch (e) {
-      // Browser preview mode has no Tauri window API.
-      isTauri = false;
-    }
-
-    globalDragEnter = (e) => {
-      if (!isFileDrag(e)) return;
-      e.preventDefault();
-      dragCounter = Math.max(dragCounter, 1);
-      isDragging = true;
-    };
-
-    globalDragOver = (e) => {
-      e.preventDefault();
-      if (isFileDrag(e)) {
-        e.dataTransfer.dropEffect = "copy";
-      }
-    };
-
-    globalDragLeave = (e) => {
-      if (e.target === document.documentElement) {
-        dragCounter = 0;
+    async function handleClose() {
+        uploadedImages.forEach((img) => {
+            if (img.preview && img.preview.startsWith("blob:")) {
+                URL.revokeObjectURL(img.preview);
+            }
+        });
+        content = "";
+        uploadedImages = [];
         isDragging = false;
-      }
-    };
+        dragCounter = 0;
+        isLoading = false;
 
-    globalDrop = (e) => {
-      const container = e.target?.closest?.(".capture-container");
-      if (container) {
+        try {
+            await invoke("hide_capture");
+        } catch (e) {
+            console.error("Failed to hide window:", e);
+        }
+    }
+
+    async function handleSaveAsNote() {
+        if (!content.trim() || isLoading) return;
+
+        isLoading = true;
+
+        try {
+            const trimmed = content.trim();
+            const lines = trimmed.split("\n");
+            const firstLine = lines[0].trimEnd();
+
+            let title = null;
+            let body = trimmed;
+
+            if (firstLine.match(/^#\s+.+/)) {
+                title = firstLine.replace(/^#+\s+/, "").trim();
+                const rest = lines.slice(1);
+                while (rest.length > 0 && rest[0].trim() === "") {
+                    rest.shift();
+                }
+                body = rest.join("\n").trim();
+            }
+
+            const result = await invoke("save_as_note", {
+                content: body,
+                title: title,
+            });
+            showStatus("✓ " + result, "success");
+
+            uploadedImages.forEach((img) => {
+                if (img.preview && img.preview.startsWith("blob:")) {
+                    URL.revokeObjectURL(img.preview);
+                }
+            });
+            content = "";
+            uploadedImages = [];
+            isDragging = false;
+            dragCounter = 0;
+
+            isLoading = false;
+
+            // Required: hiding the capture window immediately after save can race the
+            // native save flow on macOS, so the close is delayed slightly.
+            setTimeout(async () => {
+                try {
+                    await invoke("hide_capture");
+                } catch (e) {
+                    console.error("Hide error:", e);
+                }
+            }, 200);
+        } catch (e) {
+            console.error("Save as note failed:", e);
+            showStatus("✗ " + e.toString(), "error");
+            isLoading = false;
+        }
+    }
+
+    async function handleNoteSelected(note) {
+        appendPickerSelectedNote = note;
+        appendPickerStep = 2;
+        appendPickerHeadingIndex = 0;
+        appendPickerHeadings = [];
+
+        // Warte länger bevor invoke
+        await tick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        console.log("[debug] calling read_note_file now");
+
+        try {
+            await tick();
+            console.log("[debug] tick done");
+            console.log("[debug] calling read_note_file with path:", note.path);
+            const fileContent = await invoke("read_note_file", {
+                path: note.path,
+            });
+            console.log("[debug] file content length:", fileContent?.length);
+            appendPickerHeadings = parseHeadings(fileContent);
+            console.log(
+                "[debug] headings parsed:",
+                appendPickerHeadings.length,
+            );
+        } catch (e) {
+            console.error(
+                "[debug] read_note_file error:",
+                e,
+                JSON.stringify(e),
+            );
+            appendPickerHeadings = [];
+        }
+    }
+
+    async function handleAppendToNote(note, heading = null) {
+        closeAppendPicker();
+
+        if (!note || !content.trim() || isLoading) return;
+
+        isLoading = true;
+
+        try {
+            if (!heading) {
+                await invoke("append_to_note", {
+                    path: note.path,
+                    text: content.trim(),
+                });
+            } else {
+                await insertAfterHeading(note.path, heading, content.trim());
+            }
+
+            showStatus("✓ Appended", "success");
+
+            uploadedImages.forEach((img) => {
+                if (img.preview && img.preview.startsWith("blob:")) {
+                    URL.revokeObjectURL(img.preview);
+                }
+            });
+
+            content = "";
+            uploadedImages = [];
+            isDragging = false;
+            dragCounter = 0;
+            isLoading = false;
+
+            setTimeout(async () => {
+                try {
+                    await invoke("hide_capture");
+                } catch (e) {
+                    console.error("Hide error:", e);
+                }
+            }, 200);
+        } catch (e) {
+            showStatus("✗ " + e.toString(), "error");
+            isLoading = false;
+        }
+    }
+
+    function matchesShortcut(event, shortcutString) {
+        if (!shortcutString) return false;
+
+        const parts = shortcutString.split("+").map((p) => p.trim());
+        const modifiers = {
+            hasCmd: parts.includes("Cmd") || parts.includes("Command"),
+            hasCtrl: parts.includes("Ctrl") || parts.includes("Control"),
+            hasShift: parts.includes("Shift"),
+            hasAlt:
+                parts.includes("Alt") ||
+                parts.includes("Option") ||
+                parts.includes("Opt"),
+        };
+
+        const key = parts.find(
+            (p) =>
+                ![
+                    "Cmd",
+                    "Command",
+                    "Ctrl",
+                    "Control",
+                    "Shift",
+                    "Alt",
+                    "Option",
+                    "Opt",
+                ].includes(p),
+        );
+
+        if (!key) return false;
+
+        const modifiersMatch =
+            (event.metaKey === modifiers.hasCmd ||
+                event.ctrlKey === modifiers.hasCmd) &&
+            event.ctrlKey === modifiers.hasCtrl &&
+            event.shiftKey === modifiers.hasShift &&
+            event.altKey === modifiers.hasAlt;
+
+        const keyMatches = event.key.toLowerCase() === key.toLowerCase();
+
+        return modifiersMatch && keyMatches;
+    }
+
+    async function handleKeydown(e) {
+        if (e.metaKey && e.key === ",") {
+            e.preventDefault();
+            openSettings();
+            return;
+        }
+
+        if (matchesShortcut(e, appSettings.append_to_note_shortcut)) {
+            e.preventDefault();
+            openAppendPicker();
+            return;
+        }
+
+        if (matchesShortcut(e, appSettings.save_to_daily_shortcut)) {
+            e.preventDefault();
+            handleAppendToDaily();
+            return;
+        }
+
+        if (matchesShortcut(e, appSettings.save_as_note_shortcut)) {
+            e.preventDefault();
+            handleSaveAsNote();
+            return;
+        }
+
+        if (e.key === "Escape") {
+            e.preventDefault();
+            handleClose();
+            return;
+        }
+    }
+
+    async function openSettings() {
+        try {
+            await invoke("open_settings");
+        } catch (e) {
+            console.error("Failed to open settings:", e);
+        }
+    }
+
+    let dragCounter = 0;
+
+    function handleDragEnter(e) {
+        e.preventDefault();
+
+        if (isFileDrag(e)) {
+            dragCounter++;
+            if (dragCounter === 1) {
+                isDragging = true;
+            }
+        }
+    }
+
+    function handleDragLeave(e) {
+        e.preventDefault();
+
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX;
+        const y = e.clientY;
+        const isLeaving =
+            x < rect.left || x > rect.right || y < rect.top || y > rect.bottom;
+
+        if (isLeaving) {
+            dragCounter--;
+            if (dragCounter <= 0) {
+                dragCounter = 0;
+                isDragging = false;
+            }
+        }
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault();
+        if (isFileDrag(e)) {
+            e.dataTransfer.dropEffect = "copy";
+            if (!isDragging) {
+                isDragging = true;
+            }
+        } else {
+            if (e.dataTransfer) {
+                e.dataTransfer.dropEffect = "none";
+            }
+        }
+    }
+
+    async function handleDrop(e) {
         e.preventDefault();
         e.stopPropagation();
-        handleDrop(e);
-      }
-    };
-
-    document.addEventListener("dragenter", globalDragEnter, true);
-    document.addEventListener("dragover", globalDragOver, true);
-    document.addEventListener("dragleave", globalDragLeave, true);
-    document.addEventListener("drop", globalDrop, true);
-
-    if (isTauri) {
-      try {
-        unlistenShow = await listen("show_capture", () => {
-          uploadedImages.forEach((img) => {
-            if (img.preview && img.preview.startsWith("blob:")) {
-              URL.revokeObjectURL(img.preview);
-            }
-          });
-          content = "";
-          uploadedImages = [];
-          statusMessage = "";
-          isDragging = false;
-          dragCounter = 0;
-          isLoading = false;
-          closeAppendPicker();
-          // Required: after the native Tauri show event, macOS needs a short delay
-          // before the textarea reliably accepts focus.
-          setTimeout(() => textareaRef?.focus(), 50);
-        });
-
-        await listen("insert_capture_text", (event) => {
-          const text = typeof event.payload === "string" ? event.payload : "";
-          if (!text.trim()) return;
-          content = text;
-          // Required: after the native Tauri insert event, macOS needs a short delay
-          // before the textarea reliably accepts focus.
-          setTimeout(() => textareaRef?.focus(), 50);
-        });
-
-        await listen("capture_text_failed", (event) => {
-          const msg =
-            typeof event.payload === "string"
-              ? event.payload
-              : "Nothing to capture";
-          showStatus("✗ " + msg, "error");
-        });
-
-        await listen("save_as_note", () => {
-          handleSaveAsNote();
-        });
-
-        unlistenSettingsChanged = await listen("settings_changed", (event) => {
-          const newSettings = event.payload;
-
-          appSettings = {
-            ...appSettings,
-            background_color:
-              newSettings.background_color ?? appSettings.background_color,
-            font_family: newSettings.font_family ?? appSettings.font_family,
-            font_size: newSettings.font_size ?? appSettings.font_size,
-            border_radius:
-              newSettings.border_radius ?? appSettings.border_radius,
-            window_transparency:
-              newSettings.window_transparency ??
-              appSettings.window_transparency,
-            window_blur: newSettings.window_blur ?? appSettings.window_blur,
-            window_saturation:
-              newSettings.window_saturation ?? appSettings.window_saturation,
-            window_brightness:
-              newSettings.window_brightness ?? appSettings.window_brightness,
-            text_color: newSettings.text_color ?? appSettings.text_color,
-            accent_color: newSettings.accent_color ?? appSettings.accent_color,
-            internal_link_color:
-              newSettings.internal_link_color ??
-              appSettings.internal_link_color,
-            external_link_color:
-              newSettings.external_link_color ??
-              appSettings.external_link_color,
-            entry_header: newSettings.entry_header ?? appSettings.entry_header,
-            save_to_daily_shortcut:
-              newSettings.save_to_daily_shortcut ??
-              appSettings.save_to_daily_shortcut,
-            save_as_note_shortcut:
-              newSettings.save_as_note_shortcut ??
-              appSettings.save_as_note_shortcut,
-            append_to_note_shortcut:
-              newSettings.append_to_note_shortcut ??
-              appSettings.append_to_note_shortcut,
-          };
-          applyColorSettings(appSettings);
-        });
-
-        const currentWindow = await getCurrentWindow();
-        unlistenDragDrop =
-          await currentWindow.onDragDropEvent(handleDragDropEvent);
-
-        try {
-          const settings = await invoke("load_settings");
-          appSettings = {
-            background_color: settings.background_color,
-            font_family: settings.font_family,
-            font_size: settings.font_size,
-            border_radius: settings.border_radius,
-            window_transparency: settings.window_transparency ?? 55,
-            window_blur: settings.window_blur ?? 80,
-            window_saturation: settings.window_saturation ?? 200,
-            window_brightness: settings.window_brightness ?? 0,
-            text_color: settings.text_color ?? "#ffffff",
-            accent_color: settings.accent_color ?? "#8b5cf6",
-            internal_link_color: settings.internal_link_color ?? "#a78bfa",
-            external_link_color: settings.external_link_color ?? "#60a5fa",
-            entry_header: settings.entry_header ?? "#### HH:mm",
-            save_to_daily_shortcut:
-              settings.save_to_daily_shortcut ?? "Cmd+Enter",
-            save_as_note_shortcut:
-              settings.save_as_note_shortcut ?? "Cmd+Shift+Enter",
-            append_to_note_shortcut:
-              settings.append_to_note_shortcut ?? "Cmd+Option+Enter",
-          };
-          applyColorSettings(appSettings);
-        } catch (e) {
-          console.error("Failed to load initial settings:", e);
-        }
-
-        // Preload vault notes so the append picker can open immediately.
-        invoke("list_vault_notes")
-          .then((notes) => {
-            appendPickerNotes = notes;
-          })
-          .catch(() => {
-            // Non-fatal: the picker can still lazy-load later.
-          });
-      } catch (e) {
-        console.error("Failed to listen to events:", e);
-      }
-    }
-  });
-
-  onDestroy(() => {
-    unlistenShow?.();
-    unlistenSettingsChanged?.();
-    unlistenDragDrop?.();
-
-    if (globalDragEnter) {
-      document.removeEventListener("dragenter", globalDragEnter, true);
-    }
-    if (globalDragOver) {
-      document.removeEventListener("dragover", globalDragOver, true);
-    }
-    if (globalDragLeave) {
-      document.removeEventListener("dragleave", globalDragLeave, true);
-    }
-    if (globalDrop) {
-      document.removeEventListener("drop", globalDrop, true);
-    }
-
-    uploadedImages.forEach((img) => {
-      if (img.preview && img.preview.startsWith("blob:")) {
-        URL.revokeObjectURL(img.preview);
-      }
-    });
-  });
-
-  function showStatus(message, type = "success") {
-    statusMessage = message;
-    statusType = type;
-    // Hide the transient status toast after its display period.
-    setTimeout(() => (statusMessage = ""), 2000);
-  }
-
-  function openAppendPicker() {
-    if (!content.trim()) return;
-
-    showAppendPicker = true;
-    appendPickerStep = 1;
-    appendPickerSelectedNote = null;
-    appendPickerHeadings = [];
-    appendPickerQuery = "";
-    appendPickerSelectedIndex = 0;
-    appendPickerHeadingIndex = 0;
-    appendPickerInputRef?.focus();
-
-    if (appendPickerNotes.length === 0) {
-      invoke("list_vault_notes")
-        .then((notes) => {
-          appendPickerNotes = notes;
-        })
-        .catch(() => {
-          showStatus("✗ Could not load vault notes", "error");
-        });
-    }
-  }
-
-  async function handleAppendToDaily() {
-    if (!content.trim() || isLoading) {
-      if (!content.trim()) {
-        showStatus("Nothing to append", "error");
-      }
-      return;
-    }
-
-    isLoading = true;
-
-    try {
-      await invoke("append_to_daily_note", {
-        text: content.trim(),
-      });
-
-      showStatus("✓ Saved", "success");
-
-      uploadedImages.forEach((img) => {
-        if (img.preview && img.preview.startsWith("blob:")) {
-          URL.revokeObjectURL(img.preview);
-        }
-      });
-
-      content = "";
-      uploadedImages = [];
-      isDragging = false;
-      dragCounter = 0;
-      isLoading = false;
-
-      // Required: hiding the capture window immediately after save can race the
-      // native save flow on macOS, so the close is delayed slightly.
-      setTimeout(async () => {
-        try {
-          await invoke("hide_capture");
-        } catch (e) {
-          console.error("Hide error:", e);
-        }
-      }, 200);
-    } catch (e) {
-      console.error("Append to daily note failed:", e);
-      showStatus("✗ " + e.toString(), "error");
-      isLoading = false;
-    }
-  }
-
-  async function handleClose() {
-    uploadedImages.forEach((img) => {
-      if (img.preview && img.preview.startsWith("blob:")) {
-        URL.revokeObjectURL(img.preview);
-      }
-    });
-    content = "";
-    uploadedImages = [];
-    isDragging = false;
-    dragCounter = 0;
-    isLoading = false;
-
-    try {
-      await invoke("hide_capture");
-    } catch (e) {
-      console.error("Failed to hide window:", e);
-    }
-  }
-
-  async function handleSaveAsNote() {
-    if (!content.trim() || isLoading) return;
-
-    isLoading = true;
-
-    try {
-      const trimmed = content.trim();
-      const lines = trimmed.split("\n");
-      const firstLine = lines[0].trimEnd();
-
-      let title = null;
-      let body = trimmed;
-
-      if (firstLine.match(/^#\s+.+/)) {
-        title = firstLine.replace(/^#+\s+/, "").trim();
-        const rest = lines.slice(1);
-        while (rest.length > 0 && rest[0].trim() === "") {
-          rest.shift();
-        }
-        body = rest.join("\n").trim();
-      }
-
-      const result = await invoke("save_as_note", {
-        content: body,
-        title: title,
-      });
-      showStatus("✓ " + result, "success");
-
-      uploadedImages.forEach((img) => {
-        if (img.preview && img.preview.startsWith("blob:")) {
-          URL.revokeObjectURL(img.preview);
-        }
-      });
-      content = "";
-      uploadedImages = [];
-      isDragging = false;
-      dragCounter = 0;
-
-      isLoading = false;
-
-      // Required: hiding the capture window immediately after save can race the
-      // native save flow on macOS, so the close is delayed slightly.
-      setTimeout(async () => {
-        try {
-          await invoke("hide_capture");
-        } catch (e) {
-          console.error("Hide error:", e);
-        }
-      }, 200);
-    } catch (e) {
-      console.error("Save as note failed:", e);
-      showStatus("✗ " + e.toString(), "error");
-      isLoading = false;
-    }
-  }
-
-  async function handleNoteSelected(note) {
-    appendPickerSelectedNote = note;
-    appendPickerStep = 2;
-    appendPickerHeadingIndex = 0;
-    appendPickerHeadings = [];
-
-    try {
-      const fileContent = await invoke("read_note_file", { path: note.path });
-      appendPickerHeadings = parseHeadings(fileContent);
-    } catch (e) {
-      await handleAppendToNote(note, null);
-    }
-  }
-
-  async function handleAppendToNote(note, heading = null) {
-    closeAppendPicker();
-
-    if (!note || !content.trim() || isLoading) return;
-
-    isLoading = true;
-
-    try {
-      if (!heading) {
-        await invoke("append_to_note", {
-          path: note.path,
-          text: content.trim(),
-        });
-      } else {
-        await insertAfterHeading(note.path, heading, content.trim());
-      }
-
-      showStatus("✓ Appended", "success");
-
-      uploadedImages.forEach((img) => {
-        if (img.preview && img.preview.startsWith("blob:")) {
-          URL.revokeObjectURL(img.preview);
-        }
-      });
-
-      content = "";
-      uploadedImages = [];
-      isDragging = false;
-      dragCounter = 0;
-      isLoading = false;
-
-      setTimeout(async () => {
-        try {
-          await invoke("hide_capture");
-        } catch (e) {
-          console.error("Hide error:", e);
-        }
-      }, 200);
-    } catch (e) {
-      showStatus("✗ " + e.toString(), "error");
-      isLoading = false;
-    }
-  }
-
-  function matchesShortcut(event, shortcutString) {
-    if (!shortcutString) return false;
-
-    const parts = shortcutString.split("+").map((p) => p.trim());
-    const modifiers = {
-      hasCmd: parts.includes("Cmd") || parts.includes("Command"),
-      hasCtrl: parts.includes("Ctrl") || parts.includes("Control"),
-      hasShift: parts.includes("Shift"),
-      hasAlt:
-        parts.includes("Alt") ||
-        parts.includes("Option") ||
-        parts.includes("Opt"),
-    };
-
-    const key = parts.find(
-      (p) =>
-        ![
-          "Cmd",
-          "Command",
-          "Ctrl",
-          "Control",
-          "Shift",
-          "Alt",
-          "Option",
-          "Opt",
-        ].includes(p),
-    );
-
-    if (!key) return false;
-
-    const modifiersMatch =
-      (event.metaKey === modifiers.hasCmd ||
-        event.ctrlKey === modifiers.hasCmd) &&
-      event.ctrlKey === modifiers.hasCtrl &&
-      event.shiftKey === modifiers.hasShift &&
-      event.altKey === modifiers.hasAlt;
-
-    const keyMatches = event.key.toLowerCase() === key.toLowerCase();
-
-    return modifiersMatch && keyMatches;
-  }
-
-  async function handleKeydown(e) {
-    if (e.metaKey && e.key === ",") {
-      e.preventDefault();
-      openSettings();
-      return;
-    }
-
-    if (matchesShortcut(e, appSettings.append_to_note_shortcut)) {
-      e.preventDefault();
-      openAppendPicker();
-      return;
-    }
-
-    if (matchesShortcut(e, appSettings.save_to_daily_shortcut)) {
-      e.preventDefault();
-      handleAppendToDaily();
-      return;
-    }
-
-    if (matchesShortcut(e, appSettings.save_as_note_shortcut)) {
-      e.preventDefault();
-      handleSaveAsNote();
-      return;
-    }
-
-    if (e.key === "Escape") {
-      e.preventDefault();
-      handleClose();
-      return;
-    }
-  }
-
-  async function openSettings() {
-    try {
-      await invoke("open_settings");
-    } catch (e) {
-      console.error("Failed to open settings:", e);
-    }
-  }
-
-  let dragCounter = 0;
-
-  function handleDragEnter(e) {
-    e.preventDefault();
-
-    if (isFileDrag(e)) {
-      dragCounter++;
-      if (dragCounter === 1) {
-        isDragging = true;
-      }
-    }
-  }
-
-  function handleDragLeave(e) {
-    e.preventDefault();
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX;
-    const y = e.clientY;
-    const isLeaving =
-      x < rect.left || x > rect.right || y < rect.top || y > rect.bottom;
-
-    if (isLeaving) {
-      dragCounter--;
-      if (dragCounter <= 0) {
-        dragCounter = 0;
         isDragging = false;
-      }
-    }
-  }
+        dragCounter = 0;
 
-  function handleDragOver(e) {
-    e.preventDefault();
-    if (isFileDrag(e)) {
-      e.dataTransfer.dropEffect = "copy";
-      if (!isDragging) {
-        isDragging = true;
-      }
-    } else {
-      if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = "none";
-      }
-    }
-  }
-
-  async function handleDrop(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    isDragging = false;
-    dragCounter = 0;
-
-    if (!e.dataTransfer) {
-      showStatus("Failed to import images: dataTransfer unavailable", "error");
-      return;
-    }
-
-    const items = Array.from(e.dataTransfer.items || []);
-    const files = Array.from(e.dataTransfer.files || []);
-
-    if (files.length === 0) {
-      showStatus("Failed to import images: no files found", "error");
-      return;
-    }
-
-    const promises = files.map(async (file, index) => {
-      const ext = file.name.split(".").pop()?.toLowerCase();
-      if (!["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
-        showStatus("Unsupported image: " + file.name, "error");
-        return null;
-      }
-
-      try {
-        let filePath = file.path || file.webkitRelativePath || null;
-
-        if (!filePath && items[index]) {
-          const item = items[index];
-          if (item.kind === "file") {
-            const fileFromItem = item.getAsFile();
-            if (
-              fileFromItem &&
-              (fileFromItem.path || fileFromItem.webkitRelativePath)
-            ) {
-              filePath = fileFromItem.path || fileFromItem.webkitRelativePath;
-            }
-          }
-        }
-
-        let normalizedResult;
-
-        if (filePath) {
-          const result = await invoke("save_image", {
-            filePath: filePath,
-          });
-          normalizedResult = normalizeImageResult(result);
-        } else {
-          if (!isTauri) {
+        if (!e.dataTransfer) {
             showStatus(
-              "Failed to import images outside the Tauri app",
-              "error",
+                "Failed to import images: dataTransfer unavailable",
+                "error",
             );
-            return null;
-          }
+            return;
+        }
 
-          const arrayBuffer = await file.arrayBuffer();
-          const uint8Array = new Uint8Array(arrayBuffer);
+        const items = Array.from(e.dataTransfer.items || []);
+        const files = Array.from(e.dataTransfer.files || []);
 
-          let base64;
-          try {
-            base64 = await new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                const result = reader.result;
-                const base64String =
-                  typeof result === "string"
-                    ? result.split(",")[1] || result
-                    : "";
-                resolve(base64String);
-              };
-              reader.onerror = reject;
-              reader.readAsDataURL(file);
-            });
-          } catch (base64Error) {
-            console.error("Failed to convert to base64:", base64Error);
-            throw new Error("Failed to encode file: " + base64Error.toString());
-          }
+        if (files.length === 0) {
+            showStatus("Failed to import images: no files found", "error");
+            return;
+        }
 
-          try {
-            if (typeof invoke === "undefined") {
-              throw new Error("invoke is undefined - not running in Tauri");
+        const promises = files.map(async (file, index) => {
+            const ext = file.name.split(".").pop()?.toLowerCase();
+            if (!["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
+                showStatus("Unsupported image: " + file.name, "error");
+                return null;
             }
-            const result = await invoke("save_image_from_bytes", {
-              bytesBase64: base64,
-              filename: file.name,
-            });
-            normalizedResult = normalizeImageResult(result);
-          } catch (invokeError) {
-            console.error("Invoke error:", invokeError);
-            throw invokeError;
-          }
-        }
 
-        const previewUrl =
-          normalizedResult?.preview_data_url || URL.createObjectURL(file);
+            try {
+                let filePath = file.path || file.webkitRelativePath || null;
 
-        return {
-          id: Date.now() + Math.random() + index,
-          filename: normalizedResult?.filename || file.name,
-          markdown: normalizedResult?.markdown || "",
-          preview: previewUrl,
-          file: file,
-        };
-      } catch (e) {
-        console.error("Error processing file:", e);
-        showStatus("Failed to import image: " + e.toString(), "error");
-        return null;
-      }
-    });
+                if (!filePath && items[index]) {
+                    const item = items[index];
+                    if (item.kind === "file") {
+                        const fileFromItem = item.getAsFile();
+                        if (
+                            fileFromItem &&
+                            (fileFromItem.path ||
+                                fileFromItem.webkitRelativePath)
+                        ) {
+                            filePath =
+                                fileFromItem.path ||
+                                fileFromItem.webkitRelativePath;
+                        }
+                    }
+                }
 
-    const results = await Promise.all(promises);
-    const validImages = results.filter((img) => img !== null);
+                let normalizedResult;
 
-    if (validImages.length > 0) {
-      let insertPosition = 0;
-      if (textareaRef) {
-        const textareaRect = textareaRef.getBoundingClientRect();
-        const dropX = e.clientX;
-        const dropY = e.clientY;
-        const isOverTextarea =
-          dropX >= textareaRect.left &&
-          dropX <= textareaRect.right &&
-          dropY >= textareaRect.top &&
-          dropY <= textareaRect.bottom;
+                if (filePath) {
+                    const result = await invoke("save_image", {
+                        filePath: filePath,
+                    });
+                    normalizedResult = normalizeImageResult(result);
+                } else {
+                    if (!isTauri) {
+                        showStatus(
+                            "Failed to import images outside the Tauri app",
+                            "error",
+                        );
+                        return null;
+                    }
 
-        if (
-          isOverTextarea ||
-          e.target === textareaRef ||
-          e.target.closest("textarea") === textareaRef
-        ) {
-          if (
-            textareaRef.selectionStart !== null &&
-            textareaRef.selectionStart !== undefined
-          ) {
-            insertPosition = textareaRef.selectionStart;
-          } else {
-            const lineHeight =
-              parseInt(getComputedStyle(textareaRef).lineHeight) || 20;
-            const scrollTop = textareaRef.scrollTop;
-            const relativeY = dropY - textareaRect.top + scrollTop;
-            const estimatedLine = Math.max(
-              0,
-              Math.floor(relativeY / lineHeight),
-            );
+                    const arrayBuffer = await file.arrayBuffer();
+                    const uint8Array = new Uint8Array(arrayBuffer);
 
-            const lines = content.split("\n");
-            let pos = 0;
-            for (let i = 0; i < Math.min(estimatedLine, lines.length); i++) {
-              pos += lines[i].length + 1;
+                    let base64;
+                    try {
+                        base64 = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                                const result = reader.result;
+                                const base64String =
+                                    typeof result === "string"
+                                        ? result.split(",")[1] || result
+                                        : "";
+                                resolve(base64String);
+                            };
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        });
+                    } catch (base64Error) {
+                        console.error(
+                            "Failed to convert to base64:",
+                            base64Error,
+                        );
+                        throw new Error(
+                            "Failed to encode file: " + base64Error.toString(),
+                        );
+                    }
+
+                    try {
+                        if (typeof invoke === "undefined") {
+                            throw new Error(
+                                "invoke is undefined - not running in Tauri",
+                            );
+                        }
+                        const result = await invoke("save_image_from_bytes", {
+                            bytesBase64: base64,
+                            filename: file.name,
+                        });
+                        normalizedResult = normalizeImageResult(result);
+                    } catch (invokeError) {
+                        console.error("Invoke error:", invokeError);
+                        throw invokeError;
+                    }
+                }
+
+                const previewUrl =
+                    normalizedResult?.preview_data_url ||
+                    URL.createObjectURL(file);
+
+                return {
+                    id: Date.now() + Math.random() + index,
+                    filename: normalizedResult?.filename || file.name,
+                    markdown: normalizedResult?.markdown || "",
+                    preview: previewUrl,
+                    file: file,
+                };
+            } catch (e) {
+                console.error("Error processing file:", e);
+                showStatus("Failed to import image: " + e.toString(), "error");
+                return null;
             }
-            insertPosition = Math.min(pos, content.length);
-          }
-        } else {
-          insertPosition = content.length;
-        }
-      } else {
-        insertPosition = content.length;
-      }
-
-      let currentPosition = insertPosition;
-      validImages.forEach((img) => {
-        const imageMarkdown = img.markdown + "\n";
-
-        if (currentPosition >= content.length) {
-          if (content.length > 0 && !content.endsWith("\n")) {
-            content += "\n";
-            currentPosition = content.length;
-          }
-          content += imageMarkdown;
-          currentPosition += imageMarkdown.length;
-        } else {
-          const before = content.substring(0, currentPosition);
-          const after = content.substring(currentPosition);
-
-          const isAtLineStart = before.endsWith("\n") || before.length === 0;
-
-          if (!isAtLineStart && !before.endsWith("\n\n")) {
-            content = before + "\n" + imageMarkdown + after;
-            currentPosition += 1 + imageMarkdown.length;
-          } else {
-            content = before + imageMarkdown + after;
-            currentPosition += imageMarkdown.length;
-          }
-        }
-      });
-
-      uploadedImages = [...uploadedImages, ...validImages];
-
-      showStatus(
-        `✓ ${validImages.length} image${validImages.length > 1 ? "s" : ""} added`,
-        "success",
-      );
-
-      if (textareaRef) {
-        await tick();
-        const newPosition = currentPosition;
-        textareaRef.setSelectionRange(newPosition, newPosition);
-        textareaRef.focus();
-      }
-    }
-  }
-
-  async function handleTauriFileDrop(paths) {
-    isDragging = false;
-    dragCounter = 0;
-
-    if (!paths || paths.length === 0) {
-      showStatus("Failed to import images: no files found", "error");
-      return;
-    }
-
-    const imagePaths = paths.filter((path) => {
-      const ext = path.split(".").pop()?.toLowerCase();
-      return ["png", "jpg", "jpeg", "webp", "gif"].includes(ext);
-    });
-
-    if (imagePaths.length === 0) {
-      showStatus(
-        "Failed to import images: no supported image files found",
-        "error",
-      );
-      return;
-    }
-
-    const promises = imagePaths.map(async (filePath, index) => {
-      try {
-        const result = await invoke("save_image", {
-          filePath: filePath,
         });
-        const normalizedResult = normalizeImageResult(result);
 
-        const previewUrl = normalizedResult.preview_data_url || null;
+        const results = await Promise.all(promises);
+        const validImages = results.filter((img) => img !== null);
 
-        return {
-          id: Date.now() + Math.random() + index,
-          filename:
-            normalizedResult.filename ||
-            normalizeFilePath(normalizedResult.saved_path || filePath)
-              .split("/")
-              .pop() ||
-            `image${index}`,
-          markdown: normalizedResult.markdown,
-          preview: previewUrl,
-          file: null,
-        };
-      } catch (e) {
-        console.error("Error processing file:", e);
-        showStatus("Failed to import image: " + e.toString(), "error");
-        return null;
-      }
-    });
+        if (validImages.length > 0) {
+            let insertPosition = 0;
+            if (textareaRef) {
+                const textareaRect = textareaRef.getBoundingClientRect();
+                const dropX = e.clientX;
+                const dropY = e.clientY;
+                const isOverTextarea =
+                    dropX >= textareaRect.left &&
+                    dropX <= textareaRect.right &&
+                    dropY >= textareaRect.top &&
+                    dropY <= textareaRect.bottom;
 
-    const results = await Promise.all(promises);
-    const validImages = results.filter((img) => img !== null);
+                if (
+                    isOverTextarea ||
+                    e.target === textareaRef ||
+                    e.target.closest("textarea") === textareaRef
+                ) {
+                    if (
+                        textareaRef.selectionStart !== null &&
+                        textareaRef.selectionStart !== undefined
+                    ) {
+                        insertPosition = textareaRef.selectionStart;
+                    } else {
+                        const lineHeight =
+                            parseInt(
+                                getComputedStyle(textareaRef).lineHeight,
+                            ) || 20;
+                        const scrollTop = textareaRef.scrollTop;
+                        const relativeY = dropY - textareaRect.top + scrollTop;
+                        const estimatedLine = Math.max(
+                            0,
+                            Math.floor(relativeY / lineHeight),
+                        );
 
-    if (validImages.length > 0) {
-      uploadedImages = [...uploadedImages, ...validImages];
-      if (content.length > 0 && !content.endsWith("\n")) {
-        content += "\n";
-      }
-      validImages.forEach((img) => {
-        content += img.markdown + "\n";
-      });
-      showStatus(
-        `✓ ${validImages.length} image${validImages.length > 1 ? "s" : ""} added`,
-        "success",
-      );
+                        const lines = content.split("\n");
+                        let pos = 0;
+                        for (
+                            let i = 0;
+                            i < Math.min(estimatedLine, lines.length);
+                            i++
+                        ) {
+                            pos += lines[i].length + 1;
+                        }
+                        insertPosition = Math.min(pos, content.length);
+                    }
+                } else {
+                    insertPosition = content.length;
+                }
+            } else {
+                insertPosition = content.length;
+            }
+
+            let currentPosition = insertPosition;
+            validImages.forEach((img) => {
+                const imageMarkdown = img.markdown + "\n";
+
+                if (currentPosition >= content.length) {
+                    if (content.length > 0 && !content.endsWith("\n")) {
+                        content += "\n";
+                        currentPosition = content.length;
+                    }
+                    content += imageMarkdown;
+                    currentPosition += imageMarkdown.length;
+                } else {
+                    const before = content.substring(0, currentPosition);
+                    const after = content.substring(currentPosition);
+
+                    const isAtLineStart =
+                        before.endsWith("\n") || before.length === 0;
+
+                    if (!isAtLineStart && !before.endsWith("\n\n")) {
+                        content = before + "\n" + imageMarkdown + after;
+                        currentPosition += 1 + imageMarkdown.length;
+                    } else {
+                        content = before + imageMarkdown + after;
+                        currentPosition += imageMarkdown.length;
+                    }
+                }
+            });
+
+            uploadedImages = [...uploadedImages, ...validImages];
+
+            showStatus(
+                `✓ ${validImages.length} image${validImages.length > 1 ? "s" : ""} added`,
+                "success",
+            );
+
+            if (textareaRef) {
+                await tick();
+                const newPosition = currentPosition;
+                textareaRef.setSelectionRange(newPosition, newPosition);
+                textareaRef.focus();
+            }
+        }
     }
 
-    // Required: after the native Tauri drag-drop bridge finishes, macOS needs a
-    // short delay before the textarea reliably regains focus.
-    setTimeout(() => textareaRef?.focus(), 50);
-  }
+    async function handleTauriFileDrop(paths) {
+        isDragging = false;
+        dragCounter = 0;
 
-  function removeImage(id) {
-    const image = uploadedImages.find((img) => img.id === id);
-    if (image && image.preview && image.preview.startsWith("blob:")) {
-      URL.revokeObjectURL(image.preview);
+        if (!paths || paths.length === 0) {
+            showStatus("Failed to import images: no files found", "error");
+            return;
+        }
+
+        const imagePaths = paths.filter((path) => {
+            const ext = path.split(".").pop()?.toLowerCase();
+            return ["png", "jpg", "jpeg", "webp", "gif"].includes(ext);
+        });
+
+        if (imagePaths.length === 0) {
+            showStatus(
+                "Failed to import images: no supported image files found",
+                "error",
+            );
+            return;
+        }
+
+        const promises = imagePaths.map(async (filePath, index) => {
+            try {
+                const result = await invoke("save_image", {
+                    filePath: filePath,
+                });
+                const normalizedResult = normalizeImageResult(result);
+
+                const previewUrl = normalizedResult.preview_data_url || null;
+
+                return {
+                    id: Date.now() + Math.random() + index,
+                    filename:
+                        normalizedResult.filename ||
+                        normalizeFilePath(
+                            normalizedResult.saved_path || filePath,
+                        )
+                            .split("/")
+                            .pop() ||
+                        `image${index}`,
+                    markdown: normalizedResult.markdown,
+                    preview: previewUrl,
+                    file: null,
+                };
+            } catch (e) {
+                console.error("Error processing file:", e);
+                showStatus("Failed to import image: " + e.toString(), "error");
+                return null;
+            }
+        });
+
+        const results = await Promise.all(promises);
+        const validImages = results.filter((img) => img !== null);
+
+        if (validImages.length > 0) {
+            uploadedImages = [...uploadedImages, ...validImages];
+            if (content.length > 0 && !content.endsWith("\n")) {
+                content += "\n";
+            }
+            validImages.forEach((img) => {
+                content += img.markdown + "\n";
+            });
+            showStatus(
+                `✓ ${validImages.length} image${validImages.length > 1 ? "s" : ""} added`,
+                "success",
+            );
+        }
+
+        // Required: after the native Tauri drag-drop bridge finishes, macOS needs a
+        // short delay before the textarea reliably regains focus.
+        setTimeout(() => textareaRef?.focus(), 50);
     }
-    uploadedImages = uploadedImages.filter((img) => img.id !== id);
-  }
+
+    function removeImage(id) {
+        const image = uploadedImages.find((img) => img.id === id);
+        if (image && image.preview && image.preview.startsWith("blob:")) {
+            URL.revokeObjectURL(image.preview);
+        }
+        uploadedImages = uploadedImages.filter((img) => img.id !== id);
+    }
 </script>
 
 <div
-  class="capture-container"
-  class:dragging={isDragging}
-  class:append-picker-open={showAppendPicker}
-  style="
+    class="capture-container"
+    class:dragging={isDragging}
+    class:append-picker-open={showAppendPicker}
+    style="
     --app-background: {appSettings.background_color};
     --app-font-family: {appSettings.font_family};
     --app-font-size: {appSettings.font_size}px;
@@ -1056,493 +1122,498 @@
     --app-text-color: {appSettings.text_color};
     --app-brightness-filter: {brightnessFilter};
   "
-  on:dragenter={handleDragEnter}
-  on:dragleave={handleDragLeave}
-  on:dragover={handleDragOver}
-  on:drop={handleDrop}
-  role="application"
+    on:dragenter={handleDragEnter}
+    on:dragleave={handleDragLeave}
+    on:dragover={handleDragOver}
+    on:drop={handleDrop}
+    role="application"
 >
-  <div class="accent-line" role="presentation"></div>
-
-  <div
-    class="content-wrapper"
-    role="presentation"
-    on:drop={(e) => {
-      handleDrop(e);
-    }}
-    on:dragover={(e) => {
-      e.preventDefault();
-      handleDragOver(e);
-    }}
-    on:dragenter={(e) => {
-      handleDragEnter(e);
-    }}
-  >
-    {#if uploadedImages.some((img) => img.preview)}
-      <div
-        class="image-gallery"
-        role="presentation"
-        on:drop={(e) => {
-          handleDrop(e);
-        }}
-        on:dragover={(e) => {
-          e.preventDefault();
-          handleDragOver(e);
-        }}
-        on:dragenter={(e) => {
-          handleDragEnter(e);
-        }}
-      >
-        {#each uploadedImages.filter((img) => img.preview) as image (image.id)}
-          <div class="image-preview">
-            <img src={image.preview} alt={image.filename} />
-            <button
-              class="remove-btn"
-              on:click={() => removeImage(image.id)}
-              title="Remove"
-            >
-              ×
-            </button>
-            <div class="image-name">{image.filename}</div>
-          </div>
-        {/each}
-      </div>
-    {/if}
+    <div class="accent-line" role="presentation"></div>
 
     <div
-      class="content-area"
-      role="presentation"
-      on:drop={(e) => {
-        handleDrop(e);
-      }}
-      on:dragover={(e) => {
-        e.preventDefault();
-        handleDragOver(e);
-      }}
-      on:dragenter={(e) => {
-        handleDragEnter(e);
-      }}
-    >
-      <textarea
-        bind:this={textareaRef}
-        bind:value={content}
-        on:keydown={handleKeydown}
+        class="content-wrapper"
+        role="presentation"
         on:drop={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          handleDrop(e);
+            handleDrop(e);
         }}
         on:dragover={(e) => {
-          e.preventDefault();
-          handleDragOver(e);
+            e.preventDefault();
+            handleDragOver(e);
         }}
         on:dragenter={(e) => {
-          handleDragEnter(e);
+            handleDragEnter(e);
         }}
-        placeholder="Enter note or drag image here..."
-        disabled={isLoading}
-        spellcheck="false"
-      ></textarea>
+    >
+        {#if uploadedImages.some((img) => img.preview)}
+            <div
+                class="image-gallery"
+                role="presentation"
+                on:drop={(e) => {
+                    handleDrop(e);
+                }}
+                on:dragover={(e) => {
+                    e.preventDefault();
+                    handleDragOver(e);
+                }}
+                on:dragenter={(e) => {
+                    handleDragEnter(e);
+                }}
+            >
+                {#each uploadedImages.filter((img) => img.preview) as image (image.id)}
+                    <div class="image-preview">
+                        <img src={image.preview} alt={image.filename} />
+                        <button
+                            class="remove-btn"
+                            on:click={() => removeImage(image.id)}
+                            title="Remove"
+                        >
+                            ×
+                        </button>
+                        <div class="image-name">{image.filename}</div>
+                    </div>
+                {/each}
+            </div>
+        {/if}
+
+        <div
+            class="content-area"
+            role="presentation"
+            on:drop={(e) => {
+                handleDrop(e);
+            }}
+            on:dragover={(e) => {
+                e.preventDefault();
+                handleDragOver(e);
+            }}
+            on:dragenter={(e) => {
+                handleDragEnter(e);
+            }}
+        >
+            <textarea
+                bind:this={textareaRef}
+                bind:value={content}
+                on:keydown={handleKeydown}
+                on:drop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDrop(e);
+                }}
+                on:dragover={(e) => {
+                    e.preventDefault();
+                    handleDragOver(e);
+                }}
+                on:dragenter={(e) => {
+                    handleDragEnter(e);
+                }}
+                placeholder="Enter note or drag image here..."
+                disabled={isLoading}
+                spellcheck="false"
+            ></textarea>
+        </div>
     </div>
-  </div>
 
-  <div class="resize-handle"></div>
+    <div class="resize-handle"></div>
 
-  {#if isDragging}
-    <div class="drop-overlay"></div>
-  {/if}
+    {#if isDragging}
+        <div class="drop-overlay"></div>
+    {/if}
 
-  {#if statusMessage}
-    <div class="status-toast" class:error={statusType === "error"}>
-      {statusMessage}
-    </div>
-  {/if}
+    {#if statusMessage}
+        <div class="status-toast" class:error={statusType === "error"}>
+            {statusMessage}
+        </div>
+    {/if}
 
-  <AppendToPicker
-    open={showAppendPicker}
-    step={appendPickerStep}
-    query={appendPickerQuery}
-    notes={filterPaletteNotes(appendPickerNotes, appendPickerQuery)}
-    selectedIndex={appendPickerSelectedIndex}
-    selectedNote={appendPickerSelectedNote}
-    headings={appendPickerHeadings}
-    headingIndex={appendPickerHeadingIndex}
-    bind:inputRef={appendPickerInputRef}
-    on:queryChange={(e) => {
-      appendPickerQuery = e.detail.target.value;
-      appendPickerSelectedIndex = 0;
-    }}
-    on:selectNote={(e) => handleNoteSelected(e.detail)}
-    on:selectHeading={(e) =>
-      handleAppendToNote(appendPickerSelectedNote, e.detail)}
-    on:selectIndex={(e) => {
-      appendPickerSelectedIndex = e.detail;
-    }}
-    on:headingIndexChange={(e) => {
-      appendPickerHeadingIndex = e.detail;
-    }}
-    on:backToStep1={() => {
-      returnAppendPickerToStep1();
-    }}
-    on:close={closeAppendPicker}
-  />
+    <AppendToPicker
+        open={showAppendPicker}
+        step={appendPickerStep}
+        query={appendPickerQuery}
+        notes={filterPaletteNotes(appendPickerNotes, appendPickerQuery)}
+        selectedIndex={appendPickerSelectedIndex}
+        selectedNote={appendPickerSelectedNote}
+        headings={appendPickerHeadings}
+        headingIndex={appendPickerHeadingIndex}
+        bind:inputRef={appendPickerInputRef}
+        on:queryChange={(e) => {
+            appendPickerQuery = e.detail.target.value;
+            appendPickerSelectedIndex = 0;
+        }}
+        on:selectNote={(e) => handleNoteSelected(e.detail)}
+        on:selectHeading={(e) =>
+            handleAppendToNote(appendPickerSelectedNote, e.detail)}
+        on:selectIndex={(e) => {
+            appendPickerSelectedIndex = e.detail;
+        }}
+        on:headingIndexChange={(e) => {
+            appendPickerHeadingIndex = e.detail;
+        }}
+        on:backToStep1={() => {
+            returnAppendPickerToStep1();
+        }}
+        on:close={closeAppendPicker}
+    />
 
-  {#if isLoading}
-    <div class="loading-indicator"></div>
-  {/if}
+    {#if isLoading}
+        <div class="loading-indicator"></div>
+    {/if}
 </div>
 
 <style>
-  :global(*) {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-
-  :global(body) {
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    background: transparent;
-  }
-
-  .capture-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: color-mix(
-      in srgb,
-      var(--app-background, #1e1e2e) var(--app-transparency, 55%),
-      transparent
-    );
-    backdrop-filter: blur(var(--app-blur, 80px))
-      saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
-    -webkit-backdrop-filter: blur(var(--app-blur, 80px))
-      saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
-    border-radius: var(--app-border-radius, 12px);
-    border: 0.5px solid rgba(0, 0, 0, 0.08);
-    box-shadow: var(--shadow-md), 0 2px 8px var(--shadow-sm);
-    overflow: clip;
-    display: flex;
-    flex-direction: column;
-    font-family: var(
-      --app-font-family,
-      -apple-system,
-      BlinkMacSystemFont,
-      "SF Pro Display",
-      sans-serif
-    );
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-  }
-
-  .capture-container.dragging {
-    background: rgba(255, 255, 255, 0.7);
-    border-color: rgba(255, 255, 255, 0.7);
-    border-width: 2px;
-    box-shadow: var(--shadow-md), 0 2px 8px var(--shadow-sm);
-  }
-
-  .accent-line {
-    height: 2px;
-    background: linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
-    );
-    background-size: 200% 100%;
-    animation: shimmer 3s linear infinite;
-  }
-
-  .accent-line,
-  .content-wrapper,
-  .status-toast,
-  .resize-handle {
-    transition:
-      filter 0.12s ease,
-      opacity 0.12s ease,
-      transform 0.12s ease;
-  }
-
-  .capture-container.append-picker-open .accent-line,
-  .capture-container.append-picker-open .content-wrapper,
-  .capture-container.append-picker-open .status-toast,
-  .capture-container.append-picker-open .resize-handle {
-    filter: blur(4px) brightness(0.62);
-    opacity: 0.56;
-    transform: scale(0.997);
-    pointer-events: none;
-  }
-
-  @keyframes shimmer {
-    0% {
-      background-position: 200% 0;
+    :global(*) {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
     }
-    100% {
-      background-position: -200% 0;
+
+    :global(body) {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: transparent;
     }
-  }
 
-  .content-wrapper {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .image-gallery {
-    display: flex;
-    gap: 8px;
-    padding: 12px 12px 8px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex-shrink: 0;
-  }
-
-  .image-gallery::-webkit-scrollbar {
-    height: 4px;
-  }
-
-  .image-gallery::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .image-gallery::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.15);
-    border-radius: 2px;
-  }
-
-  .image-preview {
-    position: relative;
-    flex-shrink: 0;
-    width: 80px;
-    height: 80px;
-    border-radius: 8px;
-    overflow: hidden;
-    background: rgba(0, 0, 0, 0.03);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    transition: all 0.2s;
-  }
-
-  .image-preview:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
-
-  .image-preview img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .remove-btn {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(255, 59, 48, 0.9);
-    color: white;
-    font-size: 16px;
-    line-height: 1;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s;
-    padding: 0;
-  }
-
-  .image-preview:hover .remove-btn {
-    opacity: 1;
-  }
-
-  .remove-btn:hover {
-    background: rgba(255, 59, 48, 1);
-    transform: scale(1.1);
-  }
-
-  .image-name {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 4px;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    font-size: 9px;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
-  .image-preview:hover .image-name {
-    opacity: 1;
-  }
-
-  .content-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 12px 16px 16px;
-    overflow: hidden;
-  }
-
-  textarea {
-    flex: 1;
-    width: 100%;
-    border: none;
-    outline: none;
-    resize: none;
-    background: transparent;
-    font-family: inherit;
-    font-size: var(--app-font-size, 15px);
-    line-height: 1.6;
-    color: var(--app-text-color, #ffffff);
-    caret-color: var(--accent-color, #8b5cf6);
-  }
-
-  textarea::placeholder {
-    color: rgba(255, 255, 255, 0.4);
-  }
-
-  textarea:disabled {
-    opacity: 0.6;
-  }
-
-  .resize-handle {
-    position: absolute;
-    bottom: 4px;
-    right: 4px;
-    width: 16px;
-    height: 16px;
-    cursor: nwse-resize;
-    opacity: 0.3;
-    transition: opacity 0.2s;
-  }
-
-  .resize-handle::before {
-    content: "";
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 12px;
-    height: 12px;
-    background: linear-gradient(
-        135deg,
-        transparent 40%,
-        rgba(0, 0, 0, 0.2) 40%,
-        rgba(0, 0, 0, 0.2) 45%,
-        transparent 45%
-      ),
-      linear-gradient(
-        135deg,
-        transparent 50%,
-        rgba(0, 0, 0, 0.2) 50%,
-        rgba(0, 0, 0, 0.2) 55%,
-        transparent 55%
-      );
-    border-radius: 0 0 14px 0;
-  }
-
-  .capture-container:hover .resize-handle {
-    opacity: 0.6;
-  }
-
-  .drop-overlay {
-    position: absolute;
-    inset: 2px;
-    background: none;
-    border: 2px dashed rgba(255, 255, 255, 0.7);
-    border: 2px rgba(255, 255, 255, 0.7);
-    border-radius: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    pointer-events: none;
-  }
-
-  .status-toast {
-    position: absolute;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 8px 16px;
-    background: var(--success-bg);
-    -webkit-backdrop-filter: blur(20px);
-    backdrop-filter: blur(20px);
-    border: 0.5px solid var(--success-border);
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--success-color);
-    animation: fadeInUp 0.2s ease-out;
-    white-space: nowrap;
-    z-index: 100;
-  }
-
-  .status-toast.error {
-    background: var(--error-bg);
-    border-color: var(--error-border);
-    color: var(--error-color);
-  }
-
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) translateY(10px);
+    .capture-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: color-mix(
+            in srgb,
+            var(--app-background, #1e1e2e) var(--app-transparency, 55%),
+            transparent
+        );
+        backdrop-filter: blur(var(--app-blur, 80px))
+            saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
+        -webkit-backdrop-filter: blur(var(--app-blur, 80px))
+            saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
+        border-radius: var(--app-border-radius, 12px);
+        border: 0.5px solid rgba(0, 0, 0, 0.08);
+        box-shadow:
+            var(--shadow-md),
+            0 2px 8px var(--shadow-sm);
+        overflow: clip;
+        display: flex;
+        flex-direction: column;
+        font-family: var(
+            --app-font-family,
+            -apple-system,
+            BlinkMacSystemFont,
+            "SF Pro Display",
+            sans-serif
+        );
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
     }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-  }
 
-  .loading-indicator {
-    position: absolute;
-    top: 2px;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 85%, transparent),
-      transparent
-    );
-    background-size: 200% 100%;
-    animation: loading 1s ease-in-out infinite;
-    z-index: 100;
-  }
-
-  @keyframes loading {
-    0% {
-      background-position: 200% 0;
+    .capture-container.dragging {
+        background: rgba(255, 255, 255, 0.7);
+        border-color: rgba(255, 255, 255, 0.7);
+        border-width: 2px;
+        box-shadow:
+            var(--shadow-md),
+            0 2px 8px var(--shadow-sm);
     }
-    100% {
-      background-position: -200% 0;
-    }
-  }
 
-  textarea::-webkit-scrollbar {
-    width: 6px;
-  }
-  textarea::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  textarea::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.12);
-    border-radius: 3px;
-  }
+    .accent-line {
+        height: 2px;
+        background: linear-gradient(
+            90deg,
+            color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
+            color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
+            color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
+        );
+        background-size: 200% 100%;
+        animation: shimmer 3s linear infinite;
+    }
+
+    .accent-line,
+    .content-wrapper,
+    .status-toast,
+    .resize-handle {
+        transition:
+            filter 0.12s ease,
+            opacity 0.12s ease,
+            transform 0.12s ease;
+    }
+
+    .capture-container.append-picker-open .accent-line,
+    .capture-container.append-picker-open .content-wrapper,
+    .capture-container.append-picker-open .status-toast,
+    .capture-container.append-picker-open .resize-handle {
+        filter: blur(4px) brightness(0.62);
+        opacity: 0.56;
+        transform: scale(0.997);
+        pointer-events: none;
+    }
+
+    @keyframes shimmer {
+        0% {
+            background-position: 200% 0;
+        }
+        100% {
+            background-position: -200% 0;
+        }
+    }
+
+    .content-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .image-gallery {
+        display: flex;
+        gap: 8px;
+        padding: 12px 12px 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        flex-shrink: 0;
+    }
+
+    .image-gallery::-webkit-scrollbar {
+        height: 4px;
+    }
+
+    .image-gallery::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .image-gallery::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 2px;
+    }
+
+    .image-preview {
+        position: relative;
+        flex-shrink: 0;
+        width: 80px;
+        height: 80px;
+        border-radius: 8px;
+        overflow: hidden;
+        background: rgba(0, 0, 0, 0.03);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        transition: all 0.2s;
+    }
+
+    .image-preview:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .image-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .remove-btn {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(255, 59, 48, 0.9);
+        color: white;
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.2s;
+        padding: 0;
+    }
+
+    .image-preview:hover .remove-btn {
+        opacity: 1;
+    }
+
+    .remove-btn:hover {
+        background: rgba(255, 59, 48, 1);
+        transform: scale(1.1);
+    }
+
+    .image-name {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 4px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        font-size: 9px;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .image-preview:hover .image-name {
+        opacity: 1;
+    }
+
+    .content-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 12px 16px 16px;
+        overflow: hidden;
+    }
+
+    textarea {
+        flex: 1;
+        width: 100%;
+        border: none;
+        outline: none;
+        resize: none;
+        background: transparent;
+        font-family: inherit;
+        font-size: var(--app-font-size, 15px);
+        line-height: 1.6;
+        color: var(--app-text-color, #ffffff);
+        caret-color: var(--accent-color, #8b5cf6);
+    }
+
+    textarea::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+    }
+
+    textarea:disabled {
+        opacity: 0.6;
+    }
+
+    .resize-handle {
+        position: absolute;
+        bottom: 4px;
+        right: 4px;
+        width: 16px;
+        height: 16px;
+        cursor: nwse-resize;
+        opacity: 0.3;
+        transition: opacity 0.2s;
+    }
+
+    .resize-handle::before {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 12px;
+        height: 12px;
+        background:
+            linear-gradient(
+                135deg,
+                transparent 40%,
+                rgba(0, 0, 0, 0.2) 40%,
+                rgba(0, 0, 0, 0.2) 45%,
+                transparent 45%
+            ),
+            linear-gradient(
+                135deg,
+                transparent 50%,
+                rgba(0, 0, 0, 0.2) 50%,
+                rgba(0, 0, 0, 0.2) 55%,
+                transparent 55%
+            );
+        border-radius: 0 0 14px 0;
+    }
+
+    .capture-container:hover .resize-handle {
+        opacity: 0.6;
+    }
+
+    .drop-overlay {
+        position: absolute;
+        inset: 2px;
+        background: none;
+        border: 2px dashed rgba(255, 255, 255, 0.7);
+        border: 2px rgba(255, 255, 255, 0.7);
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        pointer-events: none;
+    }
+
+    .status-toast {
+        position: absolute;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 16px;
+        background: var(--success-bg);
+        -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(20px);
+        border: 0.5px solid var(--success-border);
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--success-color);
+        animation: fadeInUp 0.2s ease-out;
+        white-space: nowrap;
+        z-index: 100;
+    }
+
+    .status-toast.error {
+        background: var(--error-bg);
+        border-color: var(--error-border);
+        color: var(--error-color);
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    }
+
+    .loading-indicator {
+        position: absolute;
+        top: 2px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(
+            90deg,
+            transparent,
+            color-mix(in srgb, var(--accent-color, #8b5cf6) 85%, transparent),
+            transparent
+        );
+        background-size: 200% 100%;
+        animation: loading 1s ease-in-out infinite;
+        z-index: 100;
+    }
+
+    @keyframes loading {
+        0% {
+            background-position: 200% 0;
+        }
+        100% {
+            background-position: -200% 0;
+        }
+    }
+
+    textarea::-webkit-scrollbar {
+        width: 6px;
+    }
+    textarea::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    textarea::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.12);
+        border-radius: 3px;
+    }
 </style>

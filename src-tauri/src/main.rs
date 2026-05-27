@@ -23,6 +23,7 @@ use tauri::{
 };
 use tauri_plugin_autostart::ManagerExt;
 use tokio::sync::RwLock;
+use tokio::time::{timeout, Duration};
 
 #[cfg(target_os = "macos")]
 use cocoa::base::{id, BOOL, YES};
@@ -99,13 +100,11 @@ fn resolve_vault_read_path(settings: &Settings, requested_path: &str) -> Result<
     } else {
         vault_root.join(normalized)
     };
-    let canonical = fs::canonicalize(&candidate)
-        .map_err(|e| format!("Failed to resolve requested file path: {}", e))?;
 
-    ensure_markdown_path(&canonical)?;
+    ensure_markdown_path(&candidate)?;
 
-    if canonical.starts_with(&vault_root) {
-        Ok(canonical)
+    if candidate.starts_with(&vault_root) {
+        Ok(candidate)
     } else {
         Err("Requested file is outside the vault".to_string())
     }
@@ -198,7 +197,9 @@ async fn get_or_build_index(state: &tauri::State<'_, AppState>) -> Result<(), St
         build_duration_ms
     );
 
+    log::info!("get_or_build_index: acquiring write lock");
     *state.vault_index.write().await = Some(new_index);
+    log::info!("get_or_build_index: write lock released");
     Ok(())
 }
 
@@ -389,9 +390,20 @@ async fn append_to_note(
 
 #[tauri::command]
 async fn read_note_file(path: String, state: tauri::State<'_, AppState>) -> Result<String, String> {
+    log::info!("read_note_file called with path: {}", path);
     let settings = state.settings.read().await.clone();
     let resolved = resolve_vault_read_path(&settings, &path)?;
-    fs::read_to_string(&resolved).map_err(|e| format!("Failed to read file: {}", e))
+    let result = timeout(
+        Duration::from_secs(5),
+        tokio::fs::read_to_string(&resolved),
+    )
+    .await;
+
+    match result {
+        Ok(Ok(content)) => Ok(content),
+        Ok(Err(e)) => Err(format!("Failed to read file: {}", e)),
+        Err(_) => Err("File read timed out (iCloud download may be pending)".to_string()),
+    }
 }
 
 #[tauri::command]
