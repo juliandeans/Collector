@@ -5,10 +5,13 @@
   --placeholder-color: rgba(0, 0, 0, 0.35);
   --border-color: rgba(0, 0, 0, 0.08);
   --accent-color: #8b5cf6;
+  --text-secondary: rgba(255, 255, 255, 0.5);
   --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', sans-serif;
   --transition-fast: 0.15s cubic-bezier(0.4, 0.0, 0.2, 1);
   --shadow-sm: rgba(0, 0, 0, 0.04);
   --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --overlay-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+                    0 2px 8px rgba(0, 0, 0, 0.3);
 
   /* Shared status colors */
   --success-bg: rgba(52, 199, 89, 0.12);

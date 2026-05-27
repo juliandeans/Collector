@@ -14,8 +14,9 @@
 
     const dispatch = createEventDispatcher();
     let headingListRef;
-
-    let suppressMouseEnter = false;
+    let suppressPointerUntil = 0;
+    let lastPointerX = null;
+    let lastPointerY = null;
 
     function ensureSelectedHeadingVisible() {
         if (!headingListRef || !open || step !== 2) return;
@@ -34,20 +35,46 @@
         const viewBottom = viewTop + headingListRef.clientHeight;
 
         if (itemTop < viewTop) {
-            suppressMouseEnter = true;
+            suppressPointerSelection();
             headingListRef.scrollTop = Math.max(itemTop - paddingTop, 0);
-            requestAnimationFrame(() => { suppressMouseEnter = false; });
             return;
         }
 
         if (itemBottom > viewBottom) {
-            suppressMouseEnter = true;
+            suppressPointerSelection();
             headingListRef.scrollTop = Math.max(
                 itemBottom - headingListRef.clientHeight + paddingBottom,
                 0,
             );
-            requestAnimationFrame(() => { suppressMouseEnter = false; });
         }
+    }
+
+    function suppressPointerSelection() {
+        suppressPointerUntil = performance.now() + 180;
+    }
+
+    function handleHeadingPointerMove(index, event) {
+        const samePointerPosition =
+            event.clientX === lastPointerX &&
+            event.clientY === lastPointerY;
+        const stationaryFirstMove =
+            lastPointerX === null &&
+            event.movementX === 0 &&
+            event.movementY === 0;
+
+        if (samePointerPosition || stationaryFirstMove) {
+            lastPointerX = event.clientX;
+            lastPointerY = event.clientY;
+            return;
+        }
+
+        lastPointerX = event.clientX;
+        lastPointerY = event.clientY;
+
+        if (index === headingIndex) return;
+        if (performance.now() < suppressPointerUntil) return;
+
+        dispatch("headingIndexChange", index);
     }
 
     function focusActiveStep() {
@@ -68,12 +95,17 @@
 
         if (event.key === "ArrowDown") {
             event.preventDefault();
-            dispatch("headingIndexChange", Math.min(headingIndex + 1, maxIndex));
+            suppressPointerSelection();
+            dispatch(
+                "headingIndexChange",
+                Math.min(headingIndex + 1, maxIndex),
+            );
             return;
         }
 
         if (event.key === "ArrowUp") {
             event.preventDefault();
+            suppressPointerSelection();
             dispatch("headingIndexChange", Math.max(headingIndex - 1, 0));
             return;
         }
@@ -123,14 +155,6 @@
     />
 
     <div
-        class="append-to-picker-header"
-        class:append-to-picker-header-visible={open && step === 1}
-        aria-hidden="true"
-    >
-        Append to...
-    </div>
-
-    <div
         class="heading-picker-wrapper"
         class:heading-picker-wrapper-visible={open && step === 2}
         aria-hidden={!(open && step === 2)}
@@ -144,7 +168,6 @@
         />
 
         <div class="heading-picker-panel" role="dialog" aria-modal="true">
-            <div class="heading-picker-eyebrow">Append to...</div>
             <div class="heading-picker-note-name">
                 {selectedNote?.name ?? "Selected note"}
             </div>
@@ -164,7 +187,8 @@
                     type="button"
                     class="heading-picker-item heading-picker-end-item"
                     class:selected={headingIndex === 0}
-                    on:mouseenter={() => { if (!suppressMouseEnter) dispatch("headingIndexChange", 0); }}
+                    on:pointermove={(event) =>
+                        handleHeadingPointerMove(0, event)}
                     on:click={() => dispatch("selectHeading", null)}
                 >
                     <span class="heading-picker-label">Append at end</span>
@@ -178,10 +202,13 @@
                         type="button"
                         class="heading-picker-item"
                         class:selected={headingIndex === index + 1}
-                        on:mouseenter={() => { if (!suppressMouseEnter) dispatch("headingIndexChange", index + 1); }}
+                        on:pointermove={(event) =>
+                            handleHeadingPointerMove(index + 1, event)}
                         on:click={() => dispatch("selectHeading", heading)}
                     >
-                        <span class="heading-picker-label">{heading.display}</span>
+                        <span class="heading-picker-label"
+                            >{heading.display}</span
+                        >
                         <span class="heading-picker-meta">
                             Insert after this section
                         </span>
@@ -198,32 +225,7 @@
         inset: 0;
         pointer-events: none;
         z-index: 121;
-    }
-
-    .append-to-picker-header {
-        position: absolute;
-        top: 60px;
-        left: 50%;
-        width: min(calc(100% - 28px), 520px);
-        padding: 12px 16px 0;
-        transform: translateX(-50%);
-        color: rgba(255, 255, 255, 0.68);
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        opacity: 0;
-        pointer-events: none;
-        text-transform: uppercase;
-        visibility: hidden;
-    }
-
-    .append-to-picker-header.append-to-picker-header-visible {
-        opacity: 1;
-        visibility: visible;
-    }
-
-    :global(.append-to-picker-shell .palette) {
-        padding-top: 24px;
+        overflow-x: hidden;
     }
 
     .heading-picker-wrapper {
@@ -257,10 +259,10 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        border-radius: 12px;
+        border-radius: var(--app-border-radius, 12px);
         background: color-mix(
             in srgb,
-            var(--app-background, #1e1e2e) var(--app-transparency, 55%),
+            var(--app-background, #1e1e2e) var(--app-transparency, 85%),
             transparent
         );
         backdrop-filter: blur(var(--app-blur, 80px))
@@ -268,10 +270,9 @@
         -webkit-backdrop-filter: blur(var(--app-blur, 80px))
             saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
         color: var(--app-text-color, #ffffff);
-        border: 0.5px solid rgba(0, 0, 0, 0.08);
-        box-shadow:
-            0 18px 48px rgba(0, 0, 0, 0.24),
-            0 6px 18px rgba(0, 0, 0, 0.14);
+        font-family: var(--app-font-family, var(--font-family));
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: var(--overlay-shadow);
         transform: translateX(-50%);
         z-index: 1;
     }
@@ -292,15 +293,6 @@
         background-size: 200% 100%;
         animation: shimmer 3s linear infinite;
         z-index: 1;
-    }
-
-    .heading-picker-eyebrow {
-        padding: 12px 16px 0;
-        color: rgba(255, 255, 255, 0.68);
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
     }
 
     .heading-picker-note-name {
@@ -334,7 +326,7 @@
         flex-direction: column;
         gap: 2px;
         width: 100%;
-        padding: 10px 12px;
+        padding: 8px 12px;
         border-radius: 12px;
         cursor: pointer;
         text-align: left;
@@ -343,7 +335,11 @@
 
     .heading-picker-item:hover,
     .heading-picker-item.selected {
-        background: rgba(255, 255, 255, 0.08);
+        background: color-mix(
+            in srgb,
+            var(--accent-color, #8b5cf6) 14%,
+            transparent
+        );
     }
 
     .heading-picker-end-item .heading-picker-label {
@@ -352,13 +348,14 @@
 
     .heading-picker-label {
         color: var(--app-text-color, #ffffff);
-        font-weight: 600;
+        font-weight: 500;
+        font-size: 13px;
     }
 
     .heading-picker-meta {
         margin-top: 2px;
-        color: rgba(255, 255, 255, 0.58);
-        font-size: 12px;
+        color: var(--text-secondary);
+        font-size: 10px;
     }
 
     .heading-picker-results::-webkit-scrollbar {
