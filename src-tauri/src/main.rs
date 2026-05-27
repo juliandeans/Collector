@@ -15,6 +15,7 @@ mod vault_index;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use semver::Version;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -54,6 +55,28 @@ struct AppState {
 fn warn_if_failed<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) {
     if let Err(error) = result {
         log::warn!("{}: {}", context, error);
+    }
+}
+
+async fn check_for_update() -> Option<String> {
+    let response = reqwest::Client::new()
+        .get("https://api.github.com/repos/juliandeans/Collector/releases/latest")
+        .header(reqwest::header::USER_AGENT, "Collector-App")
+        .send()
+        .await
+        .ok()?
+        .error_for_status()
+        .ok()?;
+    let payload: serde_json::Value = response.json().await.ok()?;
+    let tag_name = payload.get("tag_name")?.as_str()?;
+    let latest = tag_name.trim_start_matches('v');
+    let current_version = Version::parse(env!("CARGO_PKG_VERSION")).ok()?;
+    let latest_version = Version::parse(latest).ok()?;
+
+    if latest_version > current_version {
+        Some(latest.to_string())
+    } else {
+        None
     }
 }
 
@@ -956,7 +979,7 @@ fn main() {
 
             let menu = create_tray_menu(&app_handle);
             let settings_for_tray = settings.clone();
-            let _tray = TrayIconBuilder::new()
+            let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
                 .on_menu_event(move |app, event| match event.id().as_ref() {
@@ -971,6 +994,9 @@ fn main() {
                             }
                         });
                     }
+                    "open_update" => {
+                        open::that("https://github.com/juliandeans/Collector/releases/latest").ok();
+                    }
                     "quit" => std::process::exit(0),
                     _ => {}
                 })
@@ -978,6 +1004,60 @@ fn main() {
                     handle_tray_event(_tray.app_handle(), event);
                 })
                 .build(app)?;
+
+            let app_handle_for_update = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Some(latest) = check_for_update().await {
+                    let quick_capture = MenuItem::with_id(
+                        &app_handle_for_update,
+                        "quick_capture",
+                        "Quick Capture (⌘⇧N)",
+                        true,
+                        None::<String>,
+                    )
+                    .unwrap();
+                    let settings = MenuItem::with_id(
+                        &app_handle_for_update,
+                        "settings",
+                        "Settings...",
+                        true,
+                        None::<String>,
+                    )
+                    .unwrap();
+                    let open_update = MenuItem::with_id(
+                        &app_handle_for_update,
+                        "open_update",
+                        format!("Update available: v{}", latest),
+                        true,
+                        None::<String>,
+                    )
+                    .unwrap();
+                    let quit = MenuItem::with_id(
+                        &app_handle_for_update,
+                        "quit",
+                        "Quit",
+                        true,
+                        None::<String>,
+                    )
+                    .unwrap();
+                    let new_menu = Menu::with_items(
+                        &app_handle_for_update,
+                        &[
+                            &quick_capture,
+                            &settings,
+                            &PredefinedMenuItem::separator(&app_handle_for_update).unwrap(),
+                            &open_update,
+                            &PredefinedMenuItem::separator(&app_handle_for_update).unwrap(),
+                            &quit,
+                        ],
+                    )
+                    .unwrap();
+
+                    if let Some(tray) = app_handle_for_update.tray_by_id("main") {
+                        let _ = tray.set_menu(Some(new_menu));
+                    }
+                }
+            });
 
             let detector = edge_detector.clone();
             let app_handle_edge = app_handle.clone();
