@@ -60,14 +60,6 @@
 </script>
 
 <div class="settings-panel">
-    <section class="panel-intro">
-        <h2>Shortcuts</h2>
-        <p class="section-description">
-            Keyboard shortcuts for both windows. Click in the field and press
-            the desired key combination.
-        </p>
-    </section>
-
     <section>
         <h2>Note Window</h2>
         <p class="section-description">

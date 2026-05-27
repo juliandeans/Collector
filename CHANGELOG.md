@@ -19,12 +19,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - *Command Palette* — open any note in your vault with Cmd+P or Cmd+K directly from the capture window
 - *Append to Note* — two-step flow: choose any note in your vault, then append at the end or insert after a specific heading
 - Separate open delay controls for the Note Window and Reader Window
-- Global shortcuts for the Note Window and Reader Window can now optionally close the window — with the same shortcut or a separate one
+- Global shortcuts for the Note Window and Reader Window can now optionally close the window with the same shortcut or a separate one
 - Saving as a new note uses a leading # Heading as the note title and filename
 - Entry header now supports 12-hour time format: h / hh (12h), a / A (am/pm)
 - Note filename template now also supports 12-hour time tokens
 - Update notifications: tray menu shows a notification when a new version is available on GitHub
-- Settings redesigned into a cleaner layout
+- Settings redesigned into a less vibecoded and cleaner layout
 - Activation: separate open delay controls and app exclusions are now configurable in Settings
 ---
 

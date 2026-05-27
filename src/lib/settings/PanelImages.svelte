@@ -80,14 +80,6 @@
 </script>
 
 <div class="settings-panel">
-    <section class="panel-intro">
-        <h2>Images</h2>
-        <p class="section-description">
-            Control where screenshots are stored and how new image embeds are
-            created.
-        </p>
-    </section>
-
     <section>
         <h2>Storage</h2>
         <p class="section-description">

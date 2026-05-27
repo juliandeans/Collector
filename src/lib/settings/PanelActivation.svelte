@@ -71,13 +71,6 @@
 </script>
 
 <div class="settings-panel">
-    <section class="panel-intro">
-        <h2>Activation</h2>
-        <p class="section-description">
-            Control when and how edge detection triggers the panels.
-        </p>
-    </section>
-
     <section>
         <h2>Edge Detection</h2>
         <p class="section-description">

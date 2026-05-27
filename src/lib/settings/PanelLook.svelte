@@ -10,13 +10,6 @@
 </script>
 
 <div class="settings-panel">
-    <section class="panel-intro">
-        <h2>Look & Feel</h2>
-        <p class="section-description">
-            Shared appearance settings for the capture and reader windows.
-        </p>
-    </section>
-
     <section>
         <h2>Window Surface</h2>
         <p class="section-description">

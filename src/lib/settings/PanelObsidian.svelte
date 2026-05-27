@@ -38,14 +38,6 @@
 </script>
 
 <div class="settings-panel">
-    <section class="panel-intro">
-        <h2>Obsidian Integration</h2>
-        <p class="section-description">
-            Configure your vault, daily note location and the default header
-            Collector inserts into captures.
-        </p>
-    </section>
-
     <section>
         <h2>Vault</h2>
         <p class="section-description">

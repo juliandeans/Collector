@@ -97,13 +97,6 @@
 </script>
 
 <div class="settings-panel">
-    <section class="panel-intro">
-        <h2>Reader Panel</h2>
-        <p class="section-description">
-            Configure the left reader window and the tabs shown there by default.
-        </p>
-    </section>
-
     <section>
         <h2>Window Size</h2>
         <p class="section-description">

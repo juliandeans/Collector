@@ -8,13 +8,6 @@
 </script>
 
 <div class="settings-panel">
-    <section class="panel-intro">
-        <h2>New Notes</h2>
-        <p class="section-description">
-            Defaults used when Collector creates a new note file.
-        </p>
-    </section>
-
     <section>
         <h2>Window Size</h2>
         <p class="section-description">

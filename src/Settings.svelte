@@ -1,6 +1,5 @@
 <script>
     import { invoke } from "@tauri-apps/api/core";
-    import { getCurrentWindow } from "@tauri-apps/api/window";
     import { onMount } from "svelte";
     import PanelActivation from "./lib/settings/PanelActivation.svelte";
     import PanelImages from "./lib/settings/PanelImages.svelte";
@@ -24,37 +23,30 @@
         {
             id: "obsidian",
             label: "Obsidian Integration",
-            description: "Vault, daily notes and capture defaults",
         },
         {
             id: "images",
             label: "Images",
-            description: "Screenshot folder and image defaults",
         },
         {
             id: "look",
             label: "Look",
-            description: "Window appearance and typography",
         },
         {
             id: "note-window",
             label: "Note Window",
-            description: "Defaults for newly created notes",
         },
         {
             id: "reader-window",
             label: "Reader Window",
-            description: "Pinned notes and reader filters",
         },
         {
             id: "activation",
             label: "Activation",
-            description: "Edge trigger timing, modifiers, and exclusions",
         },
         {
             id: "shortcuts",
             label: "Shortcuts",
-            description: "Keyboard shortcuts for both windows",
         },
     ];
 
@@ -160,9 +152,6 @@
                             on:click={() => (activePanel = panel.id)}
                         >
                             <span class="nav-item-label">{panel.label}</span>
-                            <span class="nav-item-description"
-                                >{panel.description}</span
-                            >
                         </button>
                     {/each}
                 </nav>
@@ -170,19 +159,19 @@
 
             <div class="settings-content">
                 {#if activePanel === "obsidian"}
-                    <PanelObsidian bind:settings={settings} {showStatus} />
+                    <PanelObsidian bind:settings {showStatus} />
                 {:else if activePanel === "images"}
-                    <PanelImages bind:settings={settings} {showStatus} />
+                    <PanelImages bind:settings {showStatus} />
                 {:else if activePanel === "look"}
-                    <PanelLook bind:settings={settings} {showStatus} />
+                    <PanelLook bind:settings {showStatus} />
                 {:else if activePanel === "note-window"}
-                    <PanelNoteWindow bind:settings={settings} {showStatus} />
+                    <PanelNoteWindow bind:settings {showStatus} />
                 {:else if activePanel === "reader-window"}
-                    <PanelReaderWindow bind:settings={settings} {showStatus} />
+                    <PanelReaderWindow bind:settings {showStatus} />
                 {:else if activePanel === "activation"}
-                    <PanelActivation bind:settings={settings} {showStatus} />
+                    <PanelActivation bind:settings {showStatus} />
                 {:else if activePanel === "shortcuts"}
-                    <PanelShortcuts bind:settings={settings} {showStatus} />
+                    <PanelShortcuts bind:settings {showStatus} />
                 {/if}
             </div>
         </div>
@@ -210,11 +199,11 @@
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
         font-size: 13px;
         color: #1a1a1a;
-        background: #f5f5f7;
+        background: #f2f2f2;
     }
 
     header {
-        padding: 20px 24px;
+        padding: 12px 18px;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(40px);
         -webkit-backdrop-filter: blur(40px);
@@ -261,137 +250,133 @@
 
     main {
         flex: 1;
-        padding: 20px 24px;
         overflow: hidden;
     }
 
     .settings-layout {
         display: grid;
-        grid-template-columns: 240px minmax(0, 1fr);
-        gap: 20px;
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: 0;
         height: 100%;
         min-height: 0;
     }
 
     .settings-sidebar {
         min-height: 0;
+        background: rgba(255, 255, 255, 0.95);
+        border-right: 1px solid rgba(0, 0, 0, 0.07);
+        padding-right: 0;
     }
 
     .settings-nav {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 0px;
         position: sticky;
         top: 0;
+        padding: 0px 0px 8px 0;
     }
 
     .nav-item {
         display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 4px;
+        align-items: center;
         width: 100%;
-        padding: 14px 16px;
-        border-radius: 14px;
-        border: 1px solid rgba(0, 0, 0, 0.08);
-        background: rgba(255, 255, 255, 0.88);
-        backdrop-filter: blur(30px);
-        -webkit-backdrop-filter: blur(30px);
+        padding: 12px 20px;
+        border-radius: 0;
+        border: none;
+        background: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
         color: #374151;
         text-align: left;
-        transition:
-            transform 0.18s ease,
-            box-shadow 0.18s ease,
-            border-color 0.18s ease,
-            background 0.18s ease;
+        transition: background 0.15s ease;
     }
 
     .nav-item:hover {
-        background: linear-gradient(
-            170deg,
-            color-mix(in srgb, var(--accent-color) 3%, transparent) 0%,
-            rgba(255, 255, 255, 0.94) 100%
-        );
-        box-shadow: inset 0px 0px 6px 2px rgba(15, 23, 42, 0.06);
+        background: rgba(0, 0, 0, 0.03);
     }
 
     .nav-item.active {
-        background: linear-gradient(
-            170deg,
-            color-mix(in srgb, var(--accent-color) 6%, transparent) 0%,
-            rgba(255, 255, 255, 0.96) 100%
-        );
+        background: rgba(0, 0, 0, 0.05);
+    }
 
-        box-shadow: inset 0px 0px 6px 2px rgba(15, 23, 42, 0.06);
+    .nav-item.active:hover {
+        background: rgba(0, 0, 0, 0.05);
     }
 
     .nav-item-label {
         font-size: 13px;
-        font-weight: 600;
+        font-weight: 500;
         color: #111827;
-    }
-
-    .nav-item-description {
-        font-size: 11px;
-        line-height: 1.45;
-        color: #6b7280;
     }
 
     .settings-content {
         min-width: 0;
         min-height: 0;
         overflow-y: auto;
+        padding-left: 24px;
         padding-right: 4px;
+        background: none;
     }
 
     :global(.settings-panel) {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 0;
         padding-bottom: 12px;
     }
 
-    :global(section) {
-        background: linear-gradient(
-            180deg,
-            rgba(255, 255, 255, 0.97) 0%,
-            rgba(248, 250, 252, 0.94) 100%
-        );
-        backdrop-filter: blur(40px);
-        -webkit-backdrop-filter: blur(40px);
-        border-radius: 16px;
-        padding: 22px;
-        margin-bottom: 0;
-        border: 1px solid rgba(15, 23, 42, 0.08);
+    :global(.settings-panel > section) {
+        background: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 0 0 24px 0;
+        margin-top: 0px;
+        padding-bottom: 12px;
+        border-top: 1px solid rgba(0, 0, 0, 0.07);
     }
 
-    :global(section h2) {
-        font-size: 15px;
+    :global(.settings-panel > section:first-of-type) {
+        border-top: none;
+        margin-top: 0;
+    }
+
+    :global(.settings-panel > section h2) {
+        font-size: 13px;
         font-weight: 600;
-        margin: 0 0 10px 0;
-        color: #111827;
-        letter-spacing: -0.24px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #6b7280;
+        margin: 0 0 16px 0;
+        padding-top: 12px;
     }
 
     :global(.panel-intro) {
-        background: linear-gradient(
-            155deg,
-            color-mix(in srgb, var(--accent-color) 5%, white) 0%,
-            rgba(255, 255, 255, 0.98) 100%
-        );
+        background: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 0 0 8px 0;
+        margin-top: 0;
+        border-top: none;
     }
 
     :global(.panel-intro h2) {
-        font-size: 16px;
-        margin-bottom: 8px;
-    }
-
-    :global(.panel-intro .section-description) {
-        max-width: 620px;
+        font-size: 18px;
+        font-weight: 600;
+        color: #111827;
+        text-transform: none;
+        letter-spacing: -0.3px;
+        margin-bottom: 6px;
     }
 
     :global(.field) {
-        margin-bottom: 12px;
+        margin-bottom: 4px;
     }
 
     :global(.field:last-child) {
@@ -552,38 +537,62 @@
     @media (max-width: 860px) {
         main {
             overflow-y: auto;
+            padding: 0;
         }
 
         .settings-layout {
             grid-template-columns: 1fr;
             height: auto;
+            gap: 0;
         }
 
         .settings-sidebar {
             overflow-x: auto;
+            margin: 0;
+            background: rgba(255, 255, 255, 0.95);
+            border-right: none;
+            padding: 0px;
+            gap: 0;
         }
 
         .settings-nav {
             position: static;
             flex-direction: row;
             align-items: stretch;
-            padding-bottom: 4px;
+            padding: 0px 0;
+            gap: 0px;
         }
 
         .nav-item {
-            min-width: 220px;
+            width: auto;
+            flex-shrink: 0;
+            padding: 10px 14px;
+            border-bottom: 2px solid transparent;
+            border-left: none;
+            border-radius: 0;
         }
 
         .settings-content {
             overflow: visible;
-            padding-right: 0;
-            background: none;
+            padding: 20px 20px;
+            background: #f2f2f2;
         }
 
-        .settings-panel {
+        .nav-item.active {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-item:hover {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .nav-item.active:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        :global(.settings-panel) {
             padding-bottom: 0;
             background: transparent;
         }
-
     }
 </style>
