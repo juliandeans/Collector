@@ -14,28 +14,36 @@ pub struct CaptureResult {
 }
 
 fn generate_header(template: &str) -> String {
-    let now = Local::now();
+    generate_header_with_time(template, Local::now())
+}
 
+fn generate_header_with_time<Tz: chrono::TimeZone>(
+    template: &str,
+    dt: chrono::DateTime<Tz>,
+) -> String
+where
+    Tz::Offset: std::fmt::Display,
+{
     // 12h-Zeitwerte vorbereiten
-    let hour_12 = now.format("%I").to_string();
+    let hour_12 = dt.format("%I").to_string();
     let hour_12_nopad = if hour_12.starts_with('0') {
         hour_12[1..].to_string()
     } else {
         hour_12.clone()
     };
-    let ampm_lower = now.format("%P").to_string();
-    let ampm_upper = now.format("%p").to_string();
+    let ampm_lower = dt.format("%P").to_string();
+    let ampm_upper = dt.format("%p").to_string();
 
     // Token → Wert Zuordnung.
     // Längere Token zuerst, damit z.B. "hh" vor "h" matched.
     let tokens: &[(&str, String)] = &[
-        ("YYYY", now.format("%Y").to_string()),
-        ("MM", now.format("%m").to_string()),
-        ("DD", now.format("%d").to_string()),
-        ("HH", now.format("%H").to_string()),
+        ("YYYY", dt.format("%Y").to_string()),
+        ("MM", dt.format("%m").to_string()),
+        ("DD", dt.format("%d").to_string()),
+        ("HH", dt.format("%H").to_string()),
         ("hh", hour_12),
-        ("mm", now.format("%M").to_string()),
-        ("ss", now.format("%S").to_string()),
+        ("mm", dt.format("%M").to_string()),
+        ("ss", dt.format("%S").to_string()),
         ("h", hour_12_nopad),
         ("a", ampm_lower),
         ("A", ampm_upper),
@@ -454,5 +462,144 @@ mod tests {
         let path = build_note_relative_path_from_title("///", &settings);
         assert!(path.ends_with(".md"));
         assert_ne!(path, ".md");
+    }
+
+    #[test]
+    fn test_time_tokens_morning_0905() {
+        use chrono::TimeZone;
+        // 09:05:30 AM on 2024-03-15
+        let dt = chrono::Utc.with_ymd_and_hms(2024, 3, 15, 9, 5, 30).unwrap();
+
+        // HH: 24-hour with leading zero
+        assert_eq!(generate_header_with_time("HH", dt), "09");
+
+        // hh: 12-hour with leading zero
+        assert_eq!(generate_header_with_time("hh", dt), "09");
+
+        // h: 12-hour without leading zero
+        assert_eq!(generate_header_with_time("h", dt), "9");
+
+        // mm: minutes with leading zero
+        assert_eq!(generate_header_with_time("mm", dt), "05");
+
+        // ss: seconds with leading zero
+        assert_eq!(generate_header_with_time("ss", dt), "30");
+
+        // A: uppercase AM/PM
+        assert_eq!(generate_header_with_time("A", dt), "AM");
+
+        // a: lowercase am/pm
+        assert_eq!(generate_header_with_time("a", dt), "am");
+
+        // Combined format: h:mm a
+        assert_eq!(generate_header_with_time("h:mm a", dt), "9:05 am");
+
+        // Combined format: HH:mm:ss
+        assert_eq!(generate_header_with_time("HH:mm:ss", dt), "09:05:30");
+
+        // Combined format: hh:mm A
+        assert_eq!(generate_header_with_time("hh:mm A", dt), "09:05 AM");
+
+        // Full date-time format
+        assert_eq!(
+            generate_header_with_time("YYYY-MM-DD HH:mm:ss", dt),
+            "2024-03-15 09:05:30"
+        );
+    }
+
+    #[test]
+    fn test_time_tokens_afternoon_1430() {
+        use chrono::TimeZone;
+        // 14:30:45 (2:30:45 PM) on 2024-03-15
+        let dt = chrono::Utc.with_ymd_and_hms(2024, 3, 15, 14, 30, 45).unwrap();
+
+        // HH: 24-hour with leading zero
+        assert_eq!(generate_header_with_time("HH", dt), "14");
+
+        // hh: 12-hour with leading zero
+        assert_eq!(generate_header_with_time("hh", dt), "02");
+
+        // h: 12-hour without leading zero
+        assert_eq!(generate_header_with_time("h", dt), "2");
+
+        // mm: minutes with leading zero
+        assert_eq!(generate_header_with_time("mm", dt), "30");
+
+        // ss: seconds with leading zero
+        assert_eq!(generate_header_with_time("ss", dt), "45");
+
+        // A: uppercase AM/PM
+        assert_eq!(generate_header_with_time("A", dt), "PM");
+
+        // a: lowercase am/pm
+        assert_eq!(generate_header_with_time("a", dt), "pm");
+
+        // Combined format: h:mm a
+        assert_eq!(generate_header_with_time("h:mm a", dt), "2:30 pm");
+
+        // Combined format: HH:mm:ss
+        assert_eq!(generate_header_with_time("HH:mm:ss", dt), "14:30:45");
+
+        // Combined format: hh:mm A
+        assert_eq!(generate_header_with_time("hh:mm A", dt), "02:30 PM");
+    }
+
+    #[test]
+    fn test_time_tokens_no_double_replacement() {
+        use chrono::TimeZone;
+        // Test that 'a' in "am"/"pm" is not replaced again
+        // and 'A' in "AM"/"PM" is not replaced again
+        let dt_am = chrono::Utc.with_ymd_and_hms(2024, 3, 15, 9, 0, 0).unwrap();
+        let dt_pm = chrono::Utc.with_ymd_and_hms(2024, 3, 15, 14, 0, 0).unwrap();
+
+        // "a" should produce "am" or "pm", not "amm" or "pmm"
+        assert_eq!(generate_header_with_time("a", dt_am), "am");
+        assert_eq!(generate_header_with_time("a", dt_pm), "pm");
+
+        // "A" should produce "AM" or "PM", not "AMM" or "PMM"
+        assert_eq!(generate_header_with_time("A", dt_am), "AM");
+        assert_eq!(generate_header_with_time("A", dt_pm), "PM");
+
+        // Combined: the 'a' in the output "am" should not be replaced by the 'A' token
+        let result = generate_header_with_time("a A", dt_am);
+        assert_eq!(result, "am AM");
+
+        let result = generate_header_with_time("A a", dt_pm);
+        assert_eq!(result, "PM pm");
+    }
+
+    #[test]
+    fn test_time_tokens_hh_before_h() {
+        use chrono::TimeZone;
+        // Verify "hh" is matched as a single token, not as "h" + "h"
+        let dt = chrono::Utc.with_ymd_and_hms(2024, 3, 15, 14, 30, 0).unwrap();
+
+        // "hh" should be "02" (14:30 = 2:30 PM)
+        assert_eq!(generate_header_with_time("hh", dt), "02");
+
+        // "h" alone should be "2"
+        assert_eq!(generate_header_with_time("h", dt), "2");
+
+        // "hhh" should be "02" + "2" = "022"
+        assert_eq!(generate_header_with_time("hhh", dt), "022");
+    }
+
+    #[test]
+    fn test_time_tokens_midnight_and_noon() {
+        use chrono::TimeZone;
+
+        // Midnight: 00:00 (12:00 AM)
+        let midnight = chrono::Utc.with_ymd_and_hms(2024, 3, 15, 0, 0, 0).unwrap();
+        assert_eq!(generate_header_with_time("HH", midnight), "00");
+        assert_eq!(generate_header_with_time("hh", midnight), "12");
+        assert_eq!(generate_header_with_time("h", midnight), "12");
+        assert_eq!(generate_header_with_time("A", midnight), "AM");
+
+        // Noon: 12:00 (12:00 PM)
+        let noon = chrono::Utc.with_ymd_and_hms(2024, 3, 15, 12, 0, 0).unwrap();
+        assert_eq!(generate_header_with_time("HH", noon), "12");
+        assert_eq!(generate_header_with_time("hh", noon), "12");
+        assert_eq!(generate_header_with_time("h", noon), "12");
+        assert_eq!(generate_header_with_time("A", noon), "PM");
     }
 }
