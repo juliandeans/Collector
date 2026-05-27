@@ -9,6 +9,9 @@
 
   const dispatch = createEventDispatcher();
   let resultsRef;
+  let suppressPointerUntil = 0;
+  let lastPointerX = null;
+  let lastPointerY = null;
 
   function ensureSelectedItemVisible() {
     if (!resultsRef || !open || notes.length === 0) return;
@@ -22,13 +25,42 @@
     const viewBottom = viewTop + resultsRef.clientHeight;
 
     if (itemTop < viewTop) {
+      suppressPointerSelection();
       resultsRef.scrollTop = itemTop;
       return;
     }
 
     if (itemBottom > viewBottom) {
+      suppressPointerSelection();
       resultsRef.scrollTop = itemBottom - resultsRef.clientHeight;
     }
+  }
+
+  function suppressPointerSelection() {
+    suppressPointerUntil = performance.now() + 180;
+  }
+
+  function handlePointerMove(index, event) {
+    const samePointerPosition =
+      event.clientX === lastPointerX && event.clientY === lastPointerY;
+    const stationaryFirstMove =
+      lastPointerX === null &&
+      event.movementX === 0 &&
+      event.movementY === 0;
+
+    if (samePointerPosition || stationaryFirstMove) {
+      lastPointerX = event.clientX;
+      lastPointerY = event.clientY;
+      return;
+    }
+
+    lastPointerX = event.clientX;
+    lastPointerY = event.clientY;
+
+    if (index === selectedIndex) return;
+    if (performance.now() < suppressPointerUntil) return;
+
+    dispatch("selectIndex", index);
   }
 
   $: if (open && notes.length > 0 && selectedIndex >= 0) {
@@ -47,6 +79,7 @@
     if (event.key === "ArrowDown") {
       event.preventDefault();
       if (notes.length > 0) {
+        suppressPointerSelection();
         dispatch("selectIndex", Math.min(selectedIndex + 1, notes.length - 1));
       }
       return;
@@ -54,6 +87,7 @@
 
     if (event.key === "ArrowUp") {
       event.preventDefault();
+      suppressPointerSelection();
       dispatch("selectIndex", Math.max(selectedIndex - 1, 0));
       return;
     }
@@ -107,7 +141,7 @@
             class="palette-item"
             class:selected={index === selectedIndex}
             type="button"
-            on:mouseenter={() => dispatch("selectIndex", index)}
+            on:pointermove={(event) => handlePointerMove(index, event)}
             on:click={() => dispatch("openNote", note)}
           >
             <span class="palette-name">{note.name}</span>
@@ -153,10 +187,10 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border-radius: 12px;
+    border-radius: var(--app-border-radius, 12px);
     background: color-mix(
       in srgb,
-      var(--app-background, #1e1e2e) var(--app-transparency, 55%),
+      var(--app-background, #1e1e2e) var(--app-transparency, 85%),
       transparent
     );
     backdrop-filter: blur(var(--app-blur, 80px))
@@ -164,17 +198,9 @@
     -webkit-backdrop-filter: blur(var(--app-blur, 80px))
       saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
     color: var(--app-text-color, #ffffff);
-    font-family: var(
-      --app-font-family,
-      -apple-system,
-      BlinkMacSystemFont,
-      "SF Pro Display",
-      sans-serif
-    );
-    border: 0.5px solid rgba(0, 0, 0, 0.08);
-    box-shadow:
-      0 18px 48px rgba(0, 0, 0, 0.24),
-      0 6px 18px rgba(0, 0, 0, 0.14);
+    font-family: var(--app-font-family, var(--font-family));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: var(--overlay-shadow);
     transform: translateX(-50%) translateZ(0);
     -webkit-transform: translateX(-50%) translateZ(0);
     z-index: 121;
@@ -232,7 +258,7 @@
     flex-direction: column;
     gap: 2px;
     width: 100%;
-    padding: 12px 16px;
+    padding: 8px 12px;
     border-radius: 0;
     cursor: pointer;
     text-align: left;
@@ -245,18 +271,23 @@
 
   .palette-item:hover,
   .palette-item.selected {
-    background: rgba(255, 255, 255, 0.06);
+    background: color-mix(
+      in srgb,
+      var(--accent-color, #8b5cf6) 14%,
+      transparent
+    );
   }
 
   .palette-name {
     color: var(--app-text-color, #ffffff);
-    font-weight: 600;
+    font-weight: 500;
+    font-size: 13px;
   }
 
   .palette-path {
     margin-top: 2px;
-    color: rgba(255, 255, 255, 0.58);
-    font-size: 12px;
+    color: var(--text-secondary);
+    font-size: 10px;
   }
 
   .palette-empty {
@@ -276,5 +307,15 @@
   .palette-results::-webkit-scrollbar-thumb {
     background: rgba(0, 0, 0, 0.12);
     border-radius: 3px;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+
+    100% {
+      background-position: -200% 0;
+    }
   }
 </style>
