@@ -6,16 +6,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ---
 
 ## [1.2.1] - 2026-05-27
+
 ### Fixed
-- Command-Palette and AppendToNote Layout Bugs fixed
-- global css rework stuff
-- Reader: active line no longer highlights the entire line, only the cursor is shown
+- Reader: active line no longer highlights the entire line — only the cursor is shown
+- Overlay styling unified across Command Palette, Append Picker, and Wikilink autocomplete (consistent typography, colors, and shadows)
+- Global CSS variables now load correctly in the Note Window, fixing path colors and other visual inconsistencies in overlays
 
 ### Added
-- *Wikilink Paths* — add relative paths for Obsidian links in the capture window
-- *Note Picker Settings* — configure whether note pickers show vault-relative paths and how many autocomplete results are shown
+- `[[` Wikilink autocomplete in the Note Window — type `[[` to search and insert vault links while capturing
+- Setting: toggle vault-relative paths in all note pickers (Command Palette, Append Picker, Wikilink autocomplete)
+- Setting: configure how many results are shown in note pickers (default: 20)
+
+---
 
 ## [1.2.0] - 2026-05-27
+
 ### Fixed
 - Pinned Reader notes are now stored as vault-relative paths, so they keep working after moving the vault
 - Image folder is now stored as a vault-relative path; existing absolute paths are migrated automatically where possible
