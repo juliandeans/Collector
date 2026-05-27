@@ -5,32 +5,35 @@ on:
     tags:
       - "v*"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   release:
     permissions:
       contents: write
-    runs-on: macos-14  # Apple Silicon runner
-    
+    runs-on: macos-14
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-      
+
       - name: Install frontend dependencies
         run: npm ci
-      
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-      
+
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
-      
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -38,16 +41,6 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'Collector v__VERSION__'
           releaseBody: |
-            ### Fixes
-            - Daily note folder paths now support date placeholders (e.g. Journal/YYYY/MM)
-            - Screenshot previews now display correctly in the capture window
-            - Blank preview box no longer appears when image preview fails
-            - Reader text color now applies consistently to all elements including headings and callouts
-            - Drag overlay in the Reader no longer gets stuck
-
-            ### New
-            - Note filename template is now configurable in Settings
-            - Option to hide callouts in the Reader
-            - Dual monitor support: edge detection and window positioning now work correctly across all monitors
+            See [CHANGELOG.md](https://github.com/juliandeans/Collector/blob/main/CHANGELOG.md) for full release notes.
           releaseDraft: false
           prerelease: false
