@@ -12,6 +12,7 @@
         elementToMarkdownLine,
         htmlToMarkdown,
     } from "./editorSerialization.js";
+    import { getAutocompleteResults } from "./autocomplete.js";
 
     export let rawContent = "";
     export let appSettings = {};
@@ -36,16 +37,11 @@
     let autocompleteRange = null;
 
     function getAutocompleteMatches(query) {
-        if (!query) return vaultNotes.slice(0, 10);
-
-        const lower = query.toLowerCase();
-        return vaultNotes
-            .filter(
-                (note) =>
-                    note.name.toLowerCase().includes(lower) ||
-                    note.relative_path.toLowerCase().includes(lower),
-            )
-            .slice(0, 20);
+        return getAutocompleteResults(
+            query,
+            vaultNotes,
+            appSettings?.autocomplete_results ?? 20,
+        );
     }
 
     function emitAutocompleteChange({

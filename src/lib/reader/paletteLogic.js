@@ -1,12 +1,14 @@
-export function filterPaletteNotes(vaultNotes = [], query = "") {
+export function filterPaletteNotes(vaultNotes = [], query = "", limit = 20) {
   const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) return vaultNotes;
+  if (!normalizedQuery) return vaultNotes.slice(0, limit);
 
-  return vaultNotes.filter(
-    (note) =>
-      note.name.toLowerCase().includes(normalizedQuery) ||
-      note.relative_path.toLowerCase().includes(normalizedQuery),
-  );
+  return vaultNotes
+    .filter(
+      (note) =>
+        note.name.toLowerCase().includes(normalizedQuery) ||
+        note.relative_path.toLowerCase().includes(normalizedQuery),
+    )
+    .slice(0, limit);
 }
 
 export function getOpenVaultNoteIntent(note, tabs = []) {

@@ -5,6 +5,7 @@
   export let query = "";
   export let notes = [];
   export let selectedIndex = 0;
+  export let showPaths = true;
   export let inputRef;
 
   const dispatch = createEventDispatcher();
@@ -145,7 +146,9 @@
             on:click={() => dispatch("openNote", note)}
           >
             <span class="palette-name">{note.name}</span>
-            <span class="palette-path">{note.relative_path}</span>
+            {#if showPaths}
+              <span class="palette-path">{note.relative_path}</span>
+            {/if}
           </button>
         {/each}
       {/if}

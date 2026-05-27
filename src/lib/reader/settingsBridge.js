@@ -65,6 +65,10 @@ export function applySettings(currentSettings = {}, settings = {}) {
       settings.internal_link_color ?? currentSettings.internal_link_color,
     external_link_color:
       settings.external_link_color ?? currentSettings.external_link_color,
+    show_note_paths:
+      settings.show_note_paths ?? currentSettings.show_note_paths ?? true,
+    autocomplete_results:
+      settings.autocomplete_results ?? currentSettings.autocomplete_results ?? 20,
     pinned_notes: normalizePinnedNotes(
       settings.pinned_notes ?? currentSettings.pinned_notes,
     ),

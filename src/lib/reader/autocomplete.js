@@ -1,5 +1,5 @@
-export function getAutocompleteResults(query = "", vaultNotes = []) {
-  if (!query) return vaultNotes.slice(0, 10);
+export function getAutocompleteResults(query = "", vaultNotes = [], limit = 20) {
+  if (!query) return vaultNotes.slice(0, limit);
 
   const lower = query.toLowerCase();
   return vaultNotes
@@ -8,5 +8,5 @@ export function getAutocompleteResults(query = "", vaultNotes = []) {
         note.name.toLowerCase().includes(lower) ||
         note.relative_path.toLowerCase().includes(lower),
     )
-    .slice(0, 20);
+    .slice(0, limit);
 }

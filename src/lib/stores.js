@@ -22,6 +22,8 @@ export const defaultSettings = {
   image_filename: 'screenshot-YYYY-MM-DD-HHmmss',
   default_image_width: '600',
   entry_header: '#### HH:mm',
+  show_note_paths: true,
+  autocomplete_results: 20,
   global_shortcut: 'Cmd+Shift+N',
   global_shortcut_closes_window: false,
   global_close_shortcut: '',

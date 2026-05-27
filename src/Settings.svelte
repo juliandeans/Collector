@@ -54,6 +54,7 @@
         try {
             const loaded = await invoke("load_settings");
             const normalized = {
+                ...defaultSettings,
                 ...loaded,
                 pinned_notes: normalizePinnedNotes(loaded.pinned_notes),
             };

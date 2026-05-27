@@ -3,6 +3,7 @@
 
     export let notes = [];
     export let selectedIndex = 0;
+    export let showPaths = true;
     export let onSelect = () => {};
     export let onHover = () => {};
 
@@ -73,7 +74,9 @@
             on:pointermove={(event) => handlePointerMove(index, event)}
         >
             <span class="wikilink-picker-name">{note.name}</span>
-            <span class="wikilink-picker-path">{note.relative_path}</span>
+            {#if showPaths}
+                <span class="wikilink-picker-path">{note.relative_path}</span>
+            {/if}
         </button>
     {/each}
 </div>

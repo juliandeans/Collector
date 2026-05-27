@@ -5,6 +5,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.1] - 2026-05-27
+### Fixed
+- Command-Palette and AppendToNote Layout Bugs fixed
+- global css rework stuff
+- Reader: active line no longer highlights the entire line, only the cursor is shown
+
+### Added
+- *Wikilink Paths* — add relative paths for Obsidian links in the capture window
+- *Note Picker Settings* — configure whether note pickers show vault-relative paths and how many autocomplete results are shown
+
 ## [1.2.0] - 2026-05-27
 ### Fixed
 - Pinned Reader notes are now stored as vault-relative paths, so they keep working after moving the vault
@@ -26,13 +36,6 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Update notifications: tray menu shows a notification when a new version is available on GitHub
 - Settings redesigned into a less vibecoded and cleaner layout
 - Activation: separate open delay controls and app exclusions are now configurable in Settings
----
-
-## [1.2.1] - 2026-05-27
-
-### Fixed
-- Reader: active line no longer highlights the entire line,
-  only the cursor is shown
 
 ---
 

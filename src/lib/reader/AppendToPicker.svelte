@@ -10,6 +10,7 @@
     export let selectedNote = null;
     export let headings = [];
     export let headingIndex = 0;
+    export let showPaths = true;
     export let inputRef;
 
     const dispatch = createEventDispatcher();
@@ -147,6 +148,7 @@
         {query}
         {notes}
         {selectedIndex}
+        showPaths={showPaths}
         bind:inputRef
         on:queryChange={(event) => dispatch("queryChange", event.detail)}
         on:selectIndex={(event) => dispatch("selectIndex", event.detail)}
@@ -171,9 +173,11 @@
             <div class="heading-picker-note-name">
                 {selectedNote?.name ?? "Selected note"}
             </div>
-            <div class="heading-picker-note-path">
-                {selectedNote?.relative_path ?? ""}
-            </div>
+            {#if showPaths}
+                <div class="heading-picker-note-path">
+                    {selectedNote?.relative_path ?? ""}
+                </div>
+            {/if}
 
             <div
                 class="heading-picker-results"

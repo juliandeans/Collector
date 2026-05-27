@@ -127,6 +127,37 @@
             </small>
         </div>
     </section>
+
+    <section>
+        <h2>Note Pickers</h2>
+        <div class="field">
+            <label class="checkbox" for="show_note_paths">
+                <input
+                    type="checkbox"
+                    id="show_note_paths"
+                    bind:checked={settings.show_note_paths}
+                />
+                <span>Show file paths in note pickers</span>
+            </label>
+            <small>
+                Displays the vault-relative path below each note name in the
+                Command Palette, Append Picker, and Wikilink autocomplete
+            </small>
+        </div>
+
+        <div class="field">
+            <label for="autocomplete_results">Max autocomplete results</label>
+            <input
+                type="number"
+                id="autocomplete_results"
+                min="5"
+                max="50"
+                step="1"
+                bind:value={settings.autocomplete_results}
+            />
+            <small>Number of notes shown in pickers (5–50)</small>
+        </div>
+    </section>
 </div>
 
 <style>

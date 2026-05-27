@@ -78,6 +78,8 @@
     accent_color: "#8b5cf6",
     internal_link_color: "#a78bfa",
     external_link_color: "#60a5fa",
+    show_note_paths: true,
+    autocomplete_results: 20,
     pinned_notes: [],
     reader_hide_frontmatter: true,
     reader_hide_dataview: true,
@@ -118,7 +120,13 @@
 
   $: activeTab = tabs[activeTabIndex] ?? null;
   $: fileMissing = missingFileMessage.trim() !== "";
-  $: filteredVaultNotes = filterPaletteNotes(vaultNotes, paletteQuery);
+  $: showNotePaths = appSettings?.show_note_paths ?? true;
+  $: autocompleteResultLimit = appSettings?.autocomplete_results ?? 20;
+  $: filteredVaultNotes = filterPaletteNotes(
+    vaultNotes,
+    paletteQuery,
+    autocompleteResultLimit,
+  );
   $: if (selectedPaletteIndex >= filteredVaultNotes.length) {
     selectedPaletteIndex = Math.max(filteredVaultNotes.length - 1, 0);
   }
@@ -318,7 +326,11 @@
     showAutocomplete = event.detail.open;
     autocompleteResults =
       event.detail.results ??
-      getAutocompleteResults(event.detail.query, vaultNotes);
+      getAutocompleteResults(
+        event.detail.query,
+        vaultNotes,
+        autocompleteResultLimit,
+      );
     autocompleteRange = event.detail.range;
     autocompleteIndex = event.detail.index ?? 0;
   }
@@ -959,6 +971,7 @@
     query={paletteQuery}
     notes={filteredVaultNotes}
     selectedIndex={selectedPaletteIndex}
+    showPaths={showNotePaths}
     bind:inputRef={paletteInputRef}
     on:queryChange={(event) => {
       paletteQuery = event.detail.currentTarget.value;
@@ -989,7 +1002,9 @@
         on:mouseenter={() => (autocompleteIndex = index)}
       >
         <span class="autocomplete-name">{note.name}</span>
-        <span class="autocomplete-path">{note.relative_path}</span>
+        {#if showNotePaths}
+          <span class="autocomplete-path">{note.relative_path}</span>
+        {/if}
       </button>
     {/each}
   </div>

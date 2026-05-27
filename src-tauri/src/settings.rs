@@ -90,6 +90,10 @@ pub struct Settings {
     #[serde(default = "default_image_width")]
     pub default_image_width: String,
     pub entry_header: String,
+    #[serde(default = "default_true")]
+    pub show_note_paths: bool,
+    #[serde(default = "default_autocomplete_results")]
+    pub autocomplete_results: u32,
     pub global_shortcut: String,
     #[serde(default = "default_false")]
     pub global_shortcut_closes_window: bool,
@@ -239,6 +243,10 @@ fn default_note_template() -> String {
 
 fn default_image_width() -> String {
     "600".to_string()
+}
+
+fn default_autocomplete_results() -> u32 {
+    20
 }
 
 fn default_window_transparency() -> u32 {
@@ -433,6 +441,8 @@ impl Default for Settings {
             image_filename: "screenshot-YYYY-MM-DD-HHmmss".to_string(),
             default_image_width: default_image_width(),
             entry_header: "#### HH:mm".to_string(),
+            show_note_paths: default_true(),
+            autocomplete_results: default_autocomplete_results(),
             global_shortcut: "Cmd+Shift+N".to_string(),
             global_shortcut_closes_window: default_false(),
             global_close_shortcut: String::new(),
@@ -663,6 +673,10 @@ impl Settings {
             return Err("font_size must be between 10 and 24".to_string());
         }
 
+        if self.autocomplete_results < 5 || self.autocomplete_results > 50 {
+            return Err("autocomplete_results must be between 5 and 50".to_string());
+        }
+
         if self.compression_max_kb < 50 || self.compression_max_kb > 2000 {
             return Err("compression_max_kb must be between 50 and 2000".to_string());
         }
@@ -874,6 +888,26 @@ mod tests {
     fn rejects_reader_edge_delay_above_maximum() {
         let settings = Settings {
             reader_edge_open_delay_ms: 20000,
+            ..Default::default()
+        };
+
+        assert!(settings.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_autocomplete_results_below_minimum() {
+        let settings = Settings {
+            autocomplete_results: 4,
+            ..Default::default()
+        };
+
+        assert!(settings.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_autocomplete_results_above_maximum() {
+        let settings = Settings {
+            autocomplete_results: 51,
             ..Default::default()
         };
 

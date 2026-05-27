@@ -52,10 +52,15 @@
         internal_link_color: "#a78bfa",
         external_link_color: "#60a5fa",
         entry_header: "#### HH:mm",
+        show_note_paths: true,
+        autocomplete_results: 20,
         save_to_daily_shortcut: "Cmd+Enter",
         save_as_note_shortcut: "Cmd+Shift+Enter",
         append_to_note_shortcut: "Cmd+Option+Enter",
     };
+
+    $: showNotePaths = appSettings?.show_note_paths ?? true;
+    $: autocompleteResults = appSettings?.autocomplete_results ?? 20;
 
     $: brightnessFilter = (() => {
         const b = appSettings.window_brightness;
@@ -365,6 +370,12 @@
                             entry_header:
                                 newSettings.entry_header ??
                                 appSettings.entry_header,
+                            show_note_paths:
+                                newSettings.show_note_paths ??
+                                appSettings.show_note_paths,
+                            autocomplete_results:
+                                newSettings.autocomplete_results ??
+                                appSettings.autocomplete_results,
                             save_to_daily_shortcut:
                                 newSettings.save_to_daily_shortcut ??
                                 appSettings.save_to_daily_shortcut,
@@ -401,6 +412,9 @@
                         external_link_color:
                             settings.external_link_color ?? "#60a5fa",
                         entry_header: settings.entry_header ?? "#### HH:mm",
+                        show_note_paths: settings.show_note_paths ?? true,
+                        autocomplete_results:
+                            settings.autocomplete_results ?? 20,
                         save_to_daily_shortcut:
                             settings.save_to_daily_shortcut ?? "Cmd+Enter",
                         save_as_note_shortcut:
@@ -799,7 +813,11 @@
         }
 
         const query = before.slice(triggerIndex + 2);
-        const results = getAutocompleteResults(query, appendPickerNotes);
+        const results = getAutocompleteResults(
+            query,
+            appendPickerNotes,
+            autocompleteResults,
+        );
 
         wikiAutocompleteQuery = query;
         wikiAutocompleteMatches = results;
@@ -1346,6 +1364,7 @@
             <WikilinkPicker
                 notes={wikiAutocompleteMatches}
                 selectedIndex={wikiAutocompleteIndex}
+                showPaths={showNotePaths}
                 onSelect={(note) => insertWikilink(note)}
                 onHover={(index) => {
                     wikiAutocompleteIndex = index;
@@ -1358,11 +1377,16 @@
         open={showAppendPicker}
         step={appendPickerStep}
         query={appendPickerQuery}
-        notes={filterPaletteNotes(appendPickerNotes, appendPickerQuery)}
+        notes={filterPaletteNotes(
+            appendPickerNotes,
+            appendPickerQuery,
+            autocompleteResults,
+        )}
         selectedIndex={appendPickerSelectedIndex}
         selectedNote={appendPickerSelectedNote}
         headings={appendPickerHeadings}
         headingIndex={appendPickerHeadingIndex}
+        showPaths={showNotePaths}
         bind:inputRef={appendPickerInputRef}
         on:queryChange={(e) => {
             appendPickerQuery = e.detail.target.value;
