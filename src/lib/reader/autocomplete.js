@@ -8,5 +8,5 @@ export function getAutocompleteResults(query = "", vaultNotes = []) {
         note.name.toLowerCase().includes(lower) ||
         note.relative_path.toLowerCase().includes(lower),
     )
-    .slice(0, 8);
+    .slice(0, 20);
 }
