@@ -2,6 +2,7 @@
     import { tick } from "svelte";
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
+    import FieldIssue from "./FieldIssue.svelte";
     import {
         getReaderIconComponent,
         readerIconOptions,
@@ -10,7 +11,7 @@
     import { filterPaletteNotes } from "../reader/paletteLogic.js";
 
     export let settings;
-    export let showStatus;
+    export let validation = {};
     export let onChange = () => {};
     export let vaultNotes = [];
 
@@ -134,6 +135,7 @@
                     min="200"
                     max="800"
                 />
+                <FieldIssue issue={validation.reader_width} />
             </div>
             <div class="field">
                 <label for="reader_height">Height (px)</label>
@@ -144,6 +146,7 @@
                     min="200"
                     max="1200"
                 />
+                <FieldIssue issue={validation.reader_height} />
             </div>
         </div>
     </Section>
@@ -217,6 +220,7 @@
             Optional icon and label only affect the reader tab display, not the
             actual Markdown file.
         </small>
+        <FieldIssue issue={validation.pinned_notes} />
         <button class="secondary" type="button" on:click={openNotePicker}
             >+ Add Note</button
         >

@@ -1,9 +1,11 @@
 <script>
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
+    import FieldIssue from "./FieldIssue.svelte";
 
     export let settings;
     export let showStatus;
+    export let validation = {};
     export let onChange = () => {};
 
     $: void showStatus;
@@ -77,6 +79,7 @@
                 placeholder="Cmd+Shift+N"
                 on:keydown={(e) => handleShortcutKeyDown(e, "global_shortcut")}
             />
+            <FieldIssue issue={validation.global_shortcut} />
         </div>
         <div class="field">
             <Checkbox bind:checked={settings.global_shortcut_closes_window}>
@@ -95,6 +98,7 @@
                     on:keydown={(e) =>
                         handleShortcutKeyDown(e, "global_close_shortcut")}
                 />
+                <FieldIssue issue={validation.global_close_shortcut} />
                 <small>Leave empty to disable closing via shortcut</small>
             </div>
         {/if}
@@ -111,6 +115,7 @@
                 placeholder="Cmd+Shift+R"
                 on:keydown={(e) => handleShortcutKeyDown(e, "reader_shortcut")}
             />
+            <FieldIssue issue={validation.reader_shortcut} />
         </div>
         <div class="field">
             <Checkbox bind:checked={settings.reader_shortcut_closes_window}>
@@ -129,6 +134,7 @@
                     on:keydown={(e) =>
                         handleShortcutKeyDown(e, "reader_close_shortcut")}
                 />
+                <FieldIssue issue={validation.reader_close_shortcut} />
                 <small>Leave empty to disable closing via shortcut</small>
             </div>
         {/if}
@@ -143,6 +149,7 @@
                 on:keydown={(e) =>
                     handleShortcutKeyDown(e, "reader_open_in_obsidian_shortcut")}
             />
+            <FieldIssue issue={validation.reader_open_in_obsidian_shortcut} />
             <small>Shortcut pressed inside the Reader window</small>
         </div>
         <div class="field">
@@ -156,6 +163,7 @@
                 on:keydown={(e) =>
                     handleShortcutKeyDown(e, "reader_navigate_back_shortcut")}
             />
+            <FieldIssue issue={validation.reader_navigate_back_shortcut} />
             <small>Leave empty to disable</small>
         </div>
         <div class="field">
@@ -169,6 +177,7 @@
                 on:keydown={(e) =>
                     handleShortcutKeyDown(e, "reader_command_palette_shortcut")}
             />
+            <FieldIssue issue={validation.reader_command_palette_shortcut} />
             <small>Shortcut pressed inside the Reader window</small>
         </div>
     </Section>
@@ -185,6 +194,7 @@
                 on:keydown={(e) =>
                     handleShortcutKeyDown(e, "capture_text_shortcut")}
             />
+            <FieldIssue issue={validation.capture_text_shortcut} />
         </div>
         <div class="info-note">
             <div class="info-note-title">Accessibility Permission</div>
@@ -209,6 +219,7 @@
                 on:keydown={(e) =>
                     handleShortcutKeyDown(e, "save_to_daily_shortcut")}
             />
+            <FieldIssue issue={validation.save_to_daily_shortcut} />
         </div>
         <div class="field">
             <label for="save_as_note_shortcut">Create New Note</label>
@@ -221,6 +232,7 @@
                 on:keydown={(e) =>
                     handleShortcutKeyDown(e, "save_as_note_shortcut")}
             />
+            <FieldIssue issue={validation.save_as_note_shortcut} />
         </div>
         <div class="field">
             <label for="append_to_note_shortcut">Append to Note</label>
@@ -233,6 +245,7 @@
                 on:keydown={(e) =>
                     handleShortcutKeyDown(e, "append_to_note_shortcut")}
             />
+            <FieldIssue issue={validation.append_to_note_shortcut} />
         </div>
     </Section>
 </div>

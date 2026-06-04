@@ -1,10 +1,12 @@
 <script>
     import Section from "./Section.svelte";
+    import FieldIssue from "./FieldIssue.svelte";
     import { invoke } from "@tauri-apps/api/core";
     import { open } from "@tauri-apps/plugin-dialog";
 
     export let settings;
     export let showStatus;
+    export let validation = {};
     export let onChange = () => {};
 
     let isIndexing = false;
@@ -50,6 +52,7 @@
                 bind:value={settings.vault_name}
                 placeholder="Vault"
             />
+            <FieldIssue issue={validation.vault_name} />
             <small>Name of your Obsidian vault</small>
         </div>
         <div class="field">
@@ -66,6 +69,7 @@
                     >Choose...</button
                 >
             </div>
+            <FieldIssue issue={validation.vault_path} />
             <div class="reindex-row">
                 <button
                     class="secondary"

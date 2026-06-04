@@ -3,8 +3,10 @@
     import Checkbox from "./Checkbox.svelte";
     import AppPicker from "./AppPicker.svelte";
     import { normalizeDelayValue } from "./delay-utils.js";
+    import FieldIssue from "./FieldIssue.svelte";
 
     export let settings;
+    export let validation = {};
     export let onChange = () => {};
 
     let showAppPicker = false;
@@ -78,6 +80,7 @@
                 <option value="right">Right side</option>
                 <option value="left">Left side</option>
             </select>
+            <FieldIssue issue={validation.edge_side} />
         </div>
 
         <div class="field">
@@ -121,6 +124,7 @@
                     </label>
                 {/if}
             </div>
+            <FieldIssue issue={validation.note_edge_open_delay_ms} />
             <small>Delay before window opens when touching edge</small>
         </div>
     </Section>
@@ -139,6 +143,7 @@
                 <option value="left">Left side</option>
                 <option value="right">Right side</option>
             </select>
+            <FieldIssue issue={validation.reader_edge_side} />
         </div>
 
         <div class="field">
@@ -187,6 +192,7 @@
                     </label>
                 {/if}
             </div>
+            <FieldIssue issue={validation.reader_edge_open_delay_ms} />
             <small>Delay before window opens when touching edge</small>
         </div>
     </Section>

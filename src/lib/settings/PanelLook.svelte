@@ -1,9 +1,11 @@
 <script>
     import Section from "./Section.svelte";
+    import FieldIssue from "./FieldIssue.svelte";
     import { getSystemFonts } from "../utils.js";
 
     export let settings;
     export let showStatus;
+    export let validation = {};
 
     const systemFonts = getSystemFonts();
 
@@ -21,6 +23,7 @@
                 min="0"
                 max="20"
             />
+            <FieldIssue issue={validation.border_radius} />
         </div>
         <div class="field">
             <label for="window_blur">Background Blur: {settings.window_blur ?? 80}px</label>
@@ -31,6 +34,7 @@
                 min="0"
                 max="200"
             />
+            <FieldIssue issue={validation.window_blur} />
             <small>Blurs what is behind the window.</small>
         </div>
         <div class="field">
@@ -44,6 +48,7 @@
                 min="0"
                 max="300"
             />
+            <FieldIssue issue={validation.window_saturation} />
             <small>Adjusts the color intensity behind the window.</small>
         </div>
         <div class="field">
@@ -57,6 +62,7 @@
                 min="-100"
                 max="100"
             />
+            <FieldIssue issue={validation.window_brightness} />
             <small>Darkens or brightens what is behind the window.</small>
         </div>
     </Section>
@@ -76,6 +82,7 @@
                     pattern="^#[0-9A-Fa-f]{6}$"
                 />
             </div>
+            <FieldIssue issue={validation.overlay_color} />
         </div>
         <div class="field">
             <label for="overlay_strength"
@@ -88,6 +95,7 @@
                 min="0"
                 max="100"
             />
+            <FieldIssue issue={validation.overlay_strength} />
             <small>0% = no color overlay, 100% = solid overlay color.</small>
         </div>
     </Section>
@@ -107,6 +115,7 @@
                     pattern="^#[0-9A-Fa-f]{6}$"
                 />
             </div>
+            <FieldIssue issue={validation.accent_color} />
             <small>Used for active tabs, checkboxes, caret, and highlights</small>
         </div>
         <div class="field">
@@ -123,6 +132,7 @@
                     pattern="^#[0-9A-Fa-f]{6}$"
                 />
             </div>
+            <FieldIssue issue={validation.internal_link_color} />
         </div>
         <div class="field">
             <label for="external_link_color">External Links [text](url)</label>
@@ -138,6 +148,7 @@
                     pattern="^#[0-9A-Fa-f]{6}$"
                 />
             </div>
+            <FieldIssue issue={validation.external_link_color} />
         </div>
     </Section>
 
@@ -159,6 +170,7 @@
                 min="10"
                 max="24"
             />
+            <FieldIssue issue={validation.font_size} />
         </div>
         <div class="field">
             <label for="text_color">Text Color</label>
@@ -174,6 +186,7 @@
                     pattern="^#[0-9A-Fa-f]{6}$"
                 />
             </div>
+            <FieldIssue issue={validation.text_color} />
             <small>Default: #ffffff</small>
         </div>
     </Section>

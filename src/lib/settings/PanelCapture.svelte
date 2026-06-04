@@ -1,9 +1,11 @@
 <script>
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
+    import FieldIssue from "./FieldIssue.svelte";
 
     export let settings;
     export let showStatus;
+    export let validation = {};
 
     let showTemplateEditor = false;
 
@@ -22,6 +24,7 @@
                     min="200"
                     max="800"
                 />
+                <FieldIssue issue={validation.window_width} />
             </div>
             <div class="field">
                 <label for="window_height">Height (px)</label>
@@ -32,6 +35,7 @@
                     min="200"
                     max="1200"
                 />
+                <FieldIssue issue={validation.window_height} />
             </div>
         </div>
     </Section>
@@ -61,6 +65,7 @@
                 bind:value={settings.daily_note_folder}
                 placeholder="e.g. Daily Notes/"
             />
+            <FieldIssue issue={validation.daily_note_folder} />
             <small>Relative path in vault for daily notes. Must match your Obsidian Daily Notes folder path.</small>
         </div>
         <div class="field">
@@ -71,6 +76,7 @@
                 bind:value={settings.daily_note_format}
                 placeholder="YYYY-MM-DD"
             />
+            <FieldIssue issue={validation.daily_note_format} />
             <small>
                 Filename format (e.g. YYYY-MM-DD). Supports: YYYY, MM, DD
             </small>
@@ -100,6 +106,7 @@
                     step="100"
                     bind:value={settings.daily_note_create_timeout_ms}
                 />
+                <FieldIssue issue={validation.daily_note_create_timeout_ms} />
                 <small
                     >How long Collector waits for Obsidian to create the daily
                     note before giving up (1000–60000 ms).</small
@@ -171,6 +178,7 @@
                 step="1"
                 bind:value={settings.autocomplete_results}
             />
+            <FieldIssue issue={validation.autocomplete_results} />
             <small>Number of notes shown in pickers (5–50)</small>
         </div>
     </Section>
@@ -184,6 +192,7 @@
                 bind:value={settings.notes_folder}
                 placeholder="Notes/"
             />
+            <FieldIssue issue={validation.notes_folder} />
             <small>Relative path in vault for new notes. Supports date tokens: YYYY, MM, DD, HH, mm, ss</small>
         </div>
         <div class="field">
@@ -194,6 +203,7 @@
                 bind:value={settings.note_filename_template}
                 placeholder="note-YYYY-MM-DD-HHmmss"
             />
+            <FieldIssue issue={validation.note_filename_template} />
             <small
                 >Supported: YYYY, MM, DD, HH (24h), hh / h (12h), mm, ss, A / a
                 (am/pm)</small

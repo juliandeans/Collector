@@ -11,6 +11,7 @@
     import PanelVault from "./lib/settings/PanelVault.svelte";
     import { normalizeDelayValue } from "./lib/settings/delay-utils.js";
     import { normalizePinnedNotes } from "./lib/settings/pinned-notes.js";
+    import { validateSettings } from "./lib/settings/validation.js";
     import { defaultSettings } from "./lib/stores.js";
 
     let settings = { ...defaultSettings };
@@ -19,6 +20,7 @@
     let statusMessage = "";
     let statusType = "";
     let activePanel = "vault";
+    let statusTimeout;
 
     const settingsPanels = [
         { id: "vault", label: "Vault" },
@@ -79,6 +81,8 @@
     };
 
     $: t = prefersDark ? darkTheme : lightTheme;
+    $: validation = validateSettings(settings);
+    $: fieldIssues = validation.fields;
 
     // ── auto-save ──────────────────────────────────────────
 
@@ -101,6 +105,16 @@
     }
 
     async function performSave() {
+        const currentValidation = validateSettings(settings);
+        if (currentValidation.hasErrors) {
+            const plural = currentValidation.errorCount === 1 ? "" : "s";
+            showStatus(
+                `Not saved: fix ${currentValidation.errorCount} highlighted setting${plural}`,
+                "error",
+            );
+            return false;
+        }
+
         try {
             const payload = {
                 ...settings,
@@ -116,9 +130,11 @@
             await invoke("save_settings", { newSettings: payload });
             settings = { ...payload };
             showStatus("Saved", "success");
+            return true;
         } catch (e) {
             console.error("Auto-save failed:", e);
             showStatus("Save failed: " + e.toString(), "error");
+            return false;
         }
     }
 
@@ -151,15 +167,17 @@
     });
 
     onDestroy(() => {
+        clearTimeout(statusTimeout);
         flushPendingSave();
     });
 
     // ── ui helpers ─────────────────────────────────────────
 
     function showStatus(message, type = "success") {
+        clearTimeout(statusTimeout);
         statusMessage = message;
         statusType = type;
-        setTimeout(() => {
+        statusTimeout = setTimeout(() => {
             statusMessage = "";
             statusType = "";
         }, 2000);
@@ -245,19 +263,19 @@
 
             <div class="settings-content" on:input={scheduleAutoSave}>
                 {#if activePanel === "vault"}
-                    <PanelVault bind:settings {showStatus} onChange={scheduleAutoSave} />
+                    <PanelVault bind:settings {showStatus} validation={fieldIssues} onChange={scheduleAutoSave} />
                 {:else if activePanel === "capture"}
-                    <PanelCapture bind:settings {showStatus} />
+                    <PanelCapture bind:settings {showStatus} validation={fieldIssues} />
                 {:else if activePanel === "reader"}
-                    <PanelReader bind:settings {showStatus} {vaultNotes} onChange={scheduleAutoSave} />
+                    <PanelReader bind:settings validation={fieldIssues} {vaultNotes} onChange={scheduleAutoSave} />
                 {:else if activePanel === "look"}
-                    <PanelLook bind:settings {showStatus} />
+                    <PanelLook bind:settings {showStatus} validation={fieldIssues} />
                 {:else if activePanel === "shortcuts"}
-                    <PanelShortcuts bind:settings {showStatus} onChange={scheduleAutoSave} />
+                    <PanelShortcuts bind:settings {showStatus} validation={fieldIssues} onChange={scheduleAutoSave} />
                 {:else if activePanel === "activation"}
-                    <PanelActivation bind:settings onChange={scheduleAutoSave} />
+                    <PanelActivation bind:settings validation={fieldIssues} onChange={scheduleAutoSave} />
                 {:else if activePanel === "images"}
-                    <PanelImages bind:settings {showStatus} onChange={scheduleAutoSave} />
+                    <PanelImages bind:settings {showStatus} validation={fieldIssues} onChange={scheduleAutoSave} />
                 {/if}
             </div>
         </div>
@@ -426,6 +444,19 @@
         padding-bottom: 4px;
     }
 
+    :global(.field small.field-issue) {
+        font-weight: 600;
+        padding-bottom: 0;
+    }
+
+    :global(.field small.field-issue.error) {
+        color: #b44d4d;
+    }
+
+    :global(.field small.field-issue.warning) {
+        color: #9a6a2f;
+    }
+
     :global(input[type="text"]),
     :global(input[type="number"]),
     :global(textarea) {
@@ -487,6 +518,22 @@
     :global(textarea:focus) {
         outline: none;
         background: rgba(139, 92, 246, 0.04);
+    }
+
+    :global(.field:has(.field-issue.error) input[type="text"]),
+    :global(.field:has(.field-issue.error) input[type="number"]),
+    :global(.field:has(.field-issue.error) textarea),
+    :global(.field:has(.field-issue.error) select) {
+        border-color: #b44d4d;
+        background: color-mix(in srgb, #b44d4d 5%, var(--settings-input-bg));
+    }
+
+    :global(.field:has(.field-issue.warning) input[type="text"]),
+    :global(.field:has(.field-issue.warning) input[type="number"]),
+    :global(.field:has(.field-issue.warning) textarea),
+    :global(.field:has(.field-issue.warning) select) {
+        border-color: #a8793f;
+        background: color-mix(in srgb, #a8793f 5%, var(--settings-input-bg));
     }
 
     :global(.section-description) {

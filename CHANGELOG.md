@@ -21,6 +21,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   so changes apply without reopening the Reader window.
 - Transient "Saved ✓" indicator removed from Reader top bar.
   Saves happen silently.
+- Settings validation messages now use softer error and warning colors.
 
 ### Fixed
 - Cmd+P now opens the Reader command palette through the configurable

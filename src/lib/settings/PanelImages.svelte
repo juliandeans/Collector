@@ -1,10 +1,12 @@
 <script>
     import Section from "./Section.svelte";
+    import FieldIssue from "./FieldIssue.svelte";
     import { open } from "@tauri-apps/plugin-dialog";
     import { normalizeComparablePath } from "./path-utils.js";
 
     export let settings;
     export let showStatus;
+    export let validation = {};
     export let onChange = () => {};
 
     function toRelativeVaultDirectoryPath(path = "") {
@@ -97,6 +99,7 @@
                     >Choose...</button
                 >
             </div>
+            <FieldIssue issue={validation.screenshot_path} />
             <small
                 >Relative path in the vault for saved images (folder will be
                 created automatically)</small
@@ -110,6 +113,7 @@
                 bind:value={settings.image_filename}
                 placeholder="screenshot-YYYY-MM-DD-HHmmss"
             />
+            <FieldIssue issue={validation.image_filename} />
             <small>Supports: YYYY, MM, DD, HH (24h), hh / h (12h), mm, ss, A / a</small>
         </div>
     </Section>
@@ -125,6 +129,7 @@
                 max="2000"
                 step="50"
             />
+            <FieldIssue issue={validation.compression_max_kb} />
             <small>Images will be compressed to this size</small>
         </div>
         <div class="field">
@@ -136,6 +141,7 @@
                 placeholder="600"
                 inputmode="numeric"
             />
+            <FieldIssue issue={validation.default_image_width} />
             <small
                 >Optional width in pixels for new image links (leave empty for
                 no width)</small
