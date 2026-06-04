@@ -184,7 +184,7 @@
                 bind:value={settings.notes_folder}
                 placeholder="Notes/"
             />
-            <small>Relative path in vault for new notes</small>
+            <small>Relative path in vault for new notes. Supports date tokens: YYYY, MM, DD, HH, mm, ss</small>
         </div>
         <div class="field">
             <label for="note_filename_template">Note Filename Template</label>

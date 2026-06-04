@@ -121,7 +121,8 @@ pub fn parse_daily_note_path(template: &str) -> String {
 
 pub fn build_note_relative_path(settings: &Settings) -> String {
     let filename = generate_filename_from_template(&settings.note_filename_template);
-    let notes_folder = settings.notes_folder.trim_end_matches('/');
+    let notes_folder = render_datetime_template(&settings.notes_folder);
+    let notes_folder = notes_folder.trim_end_matches('/');
 
     if notes_folder.is_empty() {
         filename
@@ -140,7 +141,8 @@ pub fn build_note_relative_path_from_title(title: &str, settings: &Settings) -> 
         format!("{}.md", sanitized)
     };
 
-    let notes_folder = settings.notes_folder.trim_end_matches('/');
+    let notes_folder = render_datetime_template(&settings.notes_folder);
+    let notes_folder = notes_folder.trim_end_matches('/');
     if notes_folder.is_empty() {
         filename
     } else {

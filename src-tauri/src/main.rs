@@ -363,6 +363,11 @@ async fn save_as_note(
 }
 
 #[tauri::command]
+fn daily_note_folder_has_date_tokens(folder: &str) -> bool {
+    folder.contains("YYYY") || folder.contains("MM") || folder.contains("DD")
+}
+
+#[tauri::command]
 async fn append_to_daily_note(
     text: String,
     state: tauri::State<'_, AppState>,
@@ -374,8 +379,9 @@ async fn append_to_daily_note(
             "Daily Note folder is not configured. Please set it in Settings.".to_string(),
         );
     }
+    let create_parent = daily_note_folder_has_date_tokens(&settings.daily_note_folder);
     let daily_path = capture::build_daily_note_path(&settings);
-    let resolved = resolve_vault_write_path(&settings, &daily_path, false)?;
+    let resolved = resolve_vault_write_path(&settings, &daily_path, create_parent)?;
 
     capture::append_to_daily_note(&text, &resolved, &settings).await?;
 
@@ -565,8 +571,9 @@ async fn get_daily_note_path(state: tauri::State<'_, AppState>) -> Result<String
             "Daily Note folder is not configured. Please set it in Settings.".to_string(),
         );
     }
+    let create_parent = daily_note_folder_has_date_tokens(&settings.daily_note_folder);
     let daily_path = capture::build_daily_note_path(&settings);
-    let file_path = resolve_vault_write_path(&settings, &daily_path, false)?;
+    let file_path = resolve_vault_write_path(&settings, &daily_path, create_parent)?;
     Ok(file_path.to_string_lossy().to_string())
 }
 
