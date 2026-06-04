@@ -1,3 +1,5 @@
+export { matchesShortcut } from "../shortcutMatching.js";
+
 /**
  * Checks if a drag event contains files.
  * @param {DragEvent} e
@@ -101,52 +103,4 @@ export function formatEntryHeader(template = "#### HH:mm") {
  */
 export function getVaultNotePath(note = {}) {
     return note?.relative_path || note?.path || "";
-}
-
-/**
- * Checks if a keyboard event matches a shortcut string like "Cmd+Enter".
- * @param {KeyboardEvent} event
- * @param {string} shortcutString
- * @returns {boolean}
- */
-export function matchesShortcut(event, shortcutString) {
-    if (!shortcutString) return false;
-
-    const parts = shortcutString.split("+").map((p) => p.trim());
-    const modifiers = {
-        hasCmd: parts.includes("Cmd") || parts.includes("Command"),
-        hasCtrl: parts.includes("Ctrl") || parts.includes("Control"),
-        hasShift: parts.includes("Shift"),
-        hasAlt:
-            parts.includes("Alt") ||
-            parts.includes("Option") ||
-            parts.includes("Opt"),
-    };
-
-    const key = parts.find(
-        (p) =>
-            ![
-                "Cmd",
-                "Command",
-                "Ctrl",
-                "Control",
-                "Shift",
-                "Alt",
-                "Option",
-                "Opt",
-            ].includes(p),
-    );
-
-    if (!key) return false;
-
-    const modifiersMatch =
-        (event.metaKey === modifiers.hasCmd ||
-            event.ctrlKey === modifiers.hasCmd) &&
-        event.ctrlKey === modifiers.hasCtrl &&
-        event.shiftKey === modifiers.hasShift &&
-        event.altKey === modifiers.hasAlt;
-
-    const keyMatches = event.key.toLowerCase() === key.toLowerCase();
-
-    return modifiersMatch && keyMatches;
 }

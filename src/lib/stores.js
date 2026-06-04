@@ -61,6 +61,8 @@ export const defaultSettings = {
   reader_shortcut_closes_window: false,
   reader_close_shortcut: '',
   reader_open_in_obsidian_shortcut: 'Cmd+Shift+O',
+  reader_navigate_back_shortcut: '',
+  reader_command_palette_shortcut: 'Cmd+P',
   reader_edge_enabled: true,
   reader_edge_open_delay_enabled: false,
   reader_edge_open_delay_ms: 1000,

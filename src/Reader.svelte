@@ -72,7 +72,7 @@
   let statusType = "";
   let missingFileMessage = "";
   let selectedPaletteIndex = 0;
-  let showSavedIndicator = false;
+  // (showSavedIndicator removed)
   let showAutocomplete = false;
   let autocompleteIndex = 0;
   let autocompleteResults = [];
@@ -92,7 +92,6 @@
   let editorComponent;
   let paletteInputRef;
   let statusTimeout;
-  let savedIndicatorTimeout;
   let unlistenShowReader;
   let unlistenSettingsChanged;
   let cleanupGlobalListeners = () => {};
@@ -458,12 +457,7 @@
         missingFileMessage = "";
       }
 
-      showSavedIndicator = true;
-      clearTimeout(savedIndicatorTimeout);
-      // Keep the saved indicator visible briefly so the save feedback is noticeable.
-      savedIndicatorTimeout = setTimeout(() => {
-        showSavedIndicator = false;
-      }, 1500);
+      // Save completed — no visual feedback needed.
     } catch (error) {
       showStatus(normalizeError(error), "error", 2200);
     } finally {
@@ -860,7 +854,6 @@
           hasTabAtIndex: (index) => Boolean(tabs[index]),
           onCloseTabContextMenu: closeTabContextMenu,
           onCloseActiveTab: closeActiveTab,
-          onOpenPalette: openPalette,
           onFocusSearch: () => searchInputRef?.focus(),
           onSearch: openSearch,
           onSave: forceSave,
@@ -875,6 +868,14 @@
             getShortcut: () => appSettings.reader_open_in_obsidian_shortcut,
             onMatch: handleOpenInObsidian,
           },
+          {
+            getShortcut: () => appSettings.reader_navigate_back_shortcut,
+            onMatch: navigateBack,
+          },
+          {
+            getShortcut: () => appSettings.reader_command_palette_shortcut,
+            onMatch: openPalette,
+          },
         ],
       );
     } catch (error) {
@@ -885,7 +886,6 @@
   onDestroy(() => {
     saveScheduler.clear();
     clearTimeout(statusTimeout);
-    clearTimeout(savedIndicatorTimeout);
     clearHighlights();
     cleanupGlobalListeners?.();
     unlistenShowReader?.();
@@ -913,15 +913,12 @@
   <ReaderTopBar
     {tabs}
     {activeTabIndex}
-    {isSaving}
-    {showSavedIndicator}
-    canGoBack={tabs[activeTabIndex]?.history?.length > 0}
     canOpenInObsidian={Boolean(tabs[activeTabIndex]?.path)}
     on:activateTab={(event) => activateTab(event.detail)}
     on:newTab={openPalette}
-    on:goBack={navigateBack}
     on:openInObsidian={handleOpenInObsidian}
     on:closeReader={hideReader}
+    on:closeTab={(event) => closeTabByIndex(event.detail)}
     on:tabContextMenu={(event) => openTabContextMenu(event.detail)}
   />
 
@@ -993,6 +990,7 @@
     on:close={closePalette}
   />
 
+  <!-- Bottom bar disabled. Re-enable when back navigation is needed. -->
   <StatusToast message={statusMessage} type={statusType} />
 </div>
 

@@ -145,6 +145,32 @@
             />
             <small>Shortcut pressed inside the Reader window</small>
         </div>
+        <div class="field">
+            <label for="reader_navigate_back_shortcut">Navigate Back</label>
+            <input
+                class="shortcut-input"
+                type="text"
+                id="reader_navigate_back_shortcut"
+                bind:value={settings.reader_navigate_back_shortcut}
+                placeholder="Optional"
+                on:keydown={(e) =>
+                    handleShortcutKeyDown(e, "reader_navigate_back_shortcut")}
+            />
+            <small>Leave empty to disable</small>
+        </div>
+        <div class="field">
+            <label for="reader_command_palette_shortcut">Open Command Palette</label>
+            <input
+                class="shortcut-input"
+                type="text"
+                id="reader_command_palette_shortcut"
+                bind:value={settings.reader_command_palette_shortcut}
+                placeholder="Cmd+P"
+                on:keydown={(e) =>
+                    handleShortcutKeyDown(e, "reader_command_palette_shortcut")}
+            />
+            <small>Shortcut pressed inside the Reader window</small>
+        </div>
     </Section>
 
     <Section title="Copy Text to Collector">
