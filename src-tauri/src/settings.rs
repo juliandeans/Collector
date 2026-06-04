@@ -146,6 +146,10 @@ pub struct Settings {
     pub reader_close_shortcut: String,
     #[serde(default = "default_reader_open_in_obsidian_shortcut")]
     pub reader_open_in_obsidian_shortcut: String,
+    #[serde(default)]
+    pub reader_navigate_back_shortcut: String,
+    #[serde(default = "default_reader_command_palette_shortcut")]
+    pub reader_command_palette_shortcut: String,
     #[serde(default = "default_true")]
     pub reader_edge_enabled: bool,
     #[serde(default = "default_false")]
@@ -268,6 +272,10 @@ fn default_reader_shortcut() -> String {
 
 fn default_reader_open_in_obsidian_shortcut() -> String {
     "Cmd+Shift+O".to_string()
+}
+
+fn default_reader_command_palette_shortcut() -> String {
+    "Cmd+P".to_string()
 }
 
 fn default_note_filename_template() -> String {
@@ -510,6 +518,8 @@ impl Default for Settings {
             reader_shortcut_closes_window: default_false(),
             reader_close_shortcut: String::new(),
             reader_open_in_obsidian_shortcut: default_reader_open_in_obsidian_shortcut(),
+            reader_navigate_back_shortcut: String::new(),
+            reader_command_palette_shortcut: default_reader_command_palette_shortcut(),
             reader_edge_enabled: default_true(),
             reader_edge_open_delay_enabled: default_false(),
             reader_edge_open_delay_ms: default_edge_open_delay_ms(),
@@ -881,6 +891,14 @@ impl Settings {
             crate::shortcuts::validate_shortcut(&self.reader_open_in_obsidian_shortcut)?;
         }
 
+        if !self.reader_navigate_back_shortcut.trim().is_empty() {
+            crate::shortcuts::validate_shortcut(&self.reader_navigate_back_shortcut)?;
+        }
+
+        if !self.reader_command_palette_shortcut.trim().is_empty() {
+            crate::shortcuts::validate_shortcut(&self.reader_command_palette_shortcut)?;
+        }
+
         if !self.save_to_daily_shortcut.trim().is_empty() {
             crate::shortcuts::validate_shortcut(&self.save_to_daily_shortcut)?;
         }
@@ -1048,6 +1066,40 @@ mod tests {
         };
 
         assert!(settings.validate().is_err());
+    }
+
+    #[test]
+    fn accepts_empty_reader_action_shortcuts() {
+        let settings = Settings {
+            reader_open_in_obsidian_shortcut: String::new(),
+            reader_navigate_back_shortcut: String::new(),
+            reader_command_palette_shortcut: String::new(),
+            ..Default::default()
+        };
+
+        assert!(settings.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_reader_action_shortcuts() {
+        let cases = [
+            Settings {
+                reader_open_in_obsidian_shortcut: "O".to_string(),
+                ..Default::default()
+            },
+            Settings {
+                reader_navigate_back_shortcut: "Cmd".to_string(),
+                ..Default::default()
+            },
+            Settings {
+                reader_command_palette_shortcut: "Cmd+Plus".to_string(),
+                ..Default::default()
+            },
+        ];
+
+        for settings in cases {
+            assert!(settings.validate().is_err());
+        }
     }
 
     #[test]
