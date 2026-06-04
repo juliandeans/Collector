@@ -439,18 +439,7 @@
             return;
         }
 
-        if ((event.metaKey || event.ctrlKey) && key === "k") {
-            event.preventDefault();
-            event.stopPropagation();
-            dispatch("openPaletteRequest");
-            return;
-        }
-
-        if ((event.metaKey || event.ctrlKey) && key === "p") {
-            event.preventDefault();
-            event.stopPropagation();
-            dispatch("openPaletteRequest");
-        }
+        // Palette shortcut is now handled at window level via configurable shortcut.
     }
 
     function handleEditorMouseDown(event) {

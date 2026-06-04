@@ -4,10 +4,6 @@
 
   export let tabs = [];
   export let activeTabIndex = 0;
-  export let isSaving = false;
-  export let isImportingImages = false;
-  export let showSavedIndicator = false;
-  export let canGoBack = false;
   export let canOpenInObsidian = false;
 
   const dispatch = createEventDispatcher();
@@ -34,56 +30,51 @@
 
       <div class="tab-list">
         {#each tabs as tab, index (tab.path)}
-          <button
-            class="tab-button"
-            class:active={index === activeTabIndex}
-            type="button"
-            title={tab.path}
-            on:mousedown|stopPropagation
-            on:click|stopPropagation={() => dispatch("activateTab", index)}
-            on:contextmenu|stopPropagation={(event) =>
-              dispatch("tabContextMenu", {
-                index,
-                x: event.clientX,
-                y: event.clientY,
-              })}
-          >
-            {#if getTabIcon(tab)}
-              <span class="tab-icon" aria-hidden="true">
-                <svelte:component
-                  this={getTabIcon(tab)}
-                  size={14}
-                  strokeWidth={1.9}
-                />
-              </span>
+          <div class="tab-wrapper" class:pinned={tab.isPinned}>
+            <button
+              class="tab-button"
+              class:active={index === activeTabIndex}
+              class:pinned={tab.isPinned}
+              type="button"
+              title={tab.path}
+              on:mousedown|stopPropagation
+              on:click|stopPropagation={() => dispatch("activateTab", index)}
+              on:contextmenu|stopPropagation={(event) =>
+                dispatch("tabContextMenu", {
+                  index,
+                  x: event.clientX,
+                  y: event.clientY,
+                })}
+            >
+              {#if getTabIcon(tab)}
+                <span class="tab-icon" aria-hidden="true">
+                  <svelte:component
+                    this={getTabIcon(tab)}
+                    size={14}
+                    strokeWidth={1.9}
+                  />
+                </span>
+              {/if}
+              <span class="tab-label">{tab.label}</span>
+            </button>
+            {#if !tab.isPinned}
+              <button
+                class="tab-close"
+                type="button"
+                aria-label={`Close ${tab.label}`}
+                title="Close tab"
+                on:mousedown|stopPropagation
+                on:click|stopPropagation={() => dispatch("closeTab", index)}
+              >
+                ✕
+              </button>
             {/if}
-            <span class="tab-label">{tab.label}</span>
-          </button>
+          </div>
         {/each}
       </div>
     </div>
 
     <div class="topbar-actions">
-      {#if isImportingImages}
-        <span class="save-indicator busy">Importing image...</span>
-      {:else if isSaving}
-        <span class="save-indicator busy">Saving...</span>
-      {:else if showSavedIndicator}
-        <span class="save-indicator">Saved ✓</span>
-      {/if}
-
-      {#if canGoBack}
-        <button
-          class="topbar-btn back-button"
-          type="button"
-          title="Back (⌘[)"
-          on:mousedown|stopPropagation
-          on:click|stopPropagation={() => dispatch("goBack")}
-        >
-          ←
-        </button>
-      {/if}
-
       {#if canOpenInObsidian}
         <button
           class="topbar-btn obsidian-btn"
@@ -183,11 +174,19 @@
   }
 
   .tab-button,
-  .tab-action {
+  .tab-action,
+  .tab-close {
     border: 0;
     background: transparent;
     color: inherit;
     font: inherit;
+  }
+
+  .tab-wrapper {
+    position: relative;
+    flex: 0 0 auto;
+    max-width: 120px;
+    min-width: 0;
   }
 
   .tab-button {
@@ -195,8 +194,8 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    flex: 0 0 auto;
-    max-width: 120px;
+    width: 100%;
+    min-width: 0;
     padding: 8px 10px 10px;
     border-radius: 10px 10px 0 0;
     color: rgba(255, 255, 255, 0.7);
@@ -282,11 +281,8 @@
     opacity: 1;
   }
 
-  .back-button {
-    font-size: 16px;
-  }
-
   .tab-action:hover,
+  .tab-wrapper:hover .tab-button,
   .tab-button:hover {
     background: rgba(255, 255, 255, 0.08);
   }
@@ -295,12 +291,41 @@
     transform: translateY(1px);
   }
 
-  .save-indicator {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.72);
+  .tab-close {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 9px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition:
+      opacity 0.12s ease,
+      background 0.12s ease;
+    z-index: 2;
   }
 
-  .save-indicator.busy {
-    color: rgba(255, 255, 255, 0.9);
+  .tab-wrapper:hover .tab-close,
+  .tab-close:focus-visible {
+    opacity: 1;
+  }
+
+  .tab-close:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--app-text-color, #ffffff);
+  }
+
+  .tab-close:active {
+    background: rgba(255, 255, 255, 0.12);
   }
 </style>

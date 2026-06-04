@@ -1,50 +1,11 @@
+import { matchesShortcut as matchesCustomShortcut } from "../shortcutMatching.js";
+
 function hasPrimaryModifier(event) {
   return event.metaKey || event.ctrlKey;
 }
 
 function matchesShortcut(event, key) {
   return hasPrimaryModifier(event) && event.key.toLowerCase() === key;
-}
-
-/**
- * Checks if a KeyboardEvent matches a shortcut string like "Cmd+Shift+O".
- * Handles Cmd, Ctrl, Shift, Alt modifiers and most standard keys.
- */
-function matchesCustomShortcut(event, shortcutString) {
-  if (!shortcutString) return false;
-
-  const parts = shortcutString.split("+").map((p) => p.trim());
-  const hasCmd = parts.includes("Cmd") || parts.includes("Command");
-  const hasCtrl = parts.includes("Ctrl") || parts.includes("Control");
-  const hasShift = parts.includes("Shift");
-  const hasAlt =
-    parts.includes("Alt") || parts.includes("Option") || parts.includes("Opt");
-
-  const key = parts.find(
-    (p) =>
-      ![
-        "Cmd",
-        "Command",
-        "Ctrl",
-        "Control",
-        "Shift",
-        "Alt",
-        "Option",
-        "Opt",
-      ].includes(p),
-  );
-
-  if (!key) return false;
-
-  const modifiersMatch =
-    (event.metaKey === hasCmd || event.ctrlKey === hasCmd) &&
-    event.ctrlKey === hasCtrl &&
-    event.shiftKey === hasShift &&
-    event.altKey === hasAlt;
-
-  const keyMatches = event.key.toLowerCase() === key.toLowerCase();
-
-  return modifiersMatch && keyMatches;
 }
 
 /**
@@ -71,12 +32,6 @@ export function setupListeners(callbacks = {}, customShortcuts = []) {
       return;
     }
 
-    if (matchesShortcut(event, "k")) {
-      event.preventDefault();
-      callbacks.onOpenPalette?.();
-      return;
-    }
-
     if (matchesShortcut(event, "f")) {
       event.preventDefault();
       if (callbacks.isSearchOpen?.()) {
@@ -84,12 +39,6 @@ export function setupListeners(callbacks = {}, customShortcuts = []) {
       } else {
         callbacks.onSearch?.();
       }
-      return;
-    }
-
-    if (matchesShortcut(event, "p")) {
-      event.preventDefault();
-      callbacks.onOpenPalette?.();
       return;
     }
 

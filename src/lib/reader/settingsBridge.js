@@ -69,6 +69,15 @@ export function applySettings(currentSettings = {}, settings = {}) {
       settings.show_note_paths ?? currentSettings.show_note_paths ?? true,
     autocomplete_results:
       settings.autocomplete_results ?? currentSettings.autocomplete_results ?? 20,
+    reader_open_in_obsidian_shortcut:
+      settings.reader_open_in_obsidian_shortcut ??
+      currentSettings.reader_open_in_obsidian_shortcut,
+    reader_navigate_back_shortcut:
+      settings.reader_navigate_back_shortcut ??
+      currentSettings.reader_navigate_back_shortcut,
+    reader_command_palette_shortcut:
+      settings.reader_command_palette_shortcut ??
+      currentSettings.reader_command_palette_shortcut,
     pinned_notes: normalizePinnedNotes(
       settings.pinned_notes ?? currentSettings.pinned_notes,
     ),
