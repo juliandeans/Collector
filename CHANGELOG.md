@@ -5,6 +5,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.4] - 2026-06-04
+
+### Fixed
+- Daily note folder paths with date tokens (e.g. YYYY/MM/) now 
+  automatically create subdirectories when a new month or year begins
+- Notes folder path now supports date tokens (YYYY, MM, DD, HH, mm, ss) — 
+  e.g. "YYYY/MM/" correctly resolves to "2026/06/" when saving a new note
+
 ## [1.2.3] - 2026-06-03
 
 ### Added
