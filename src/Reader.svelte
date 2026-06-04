@@ -851,24 +851,32 @@
         (event) => handleSettingsChanged(event.payload),
       );
 
-      cleanupGlobalListeners = setupListeners({
-        isTabContextMenuOpen: () => tabContextMenu.open,
-        isAutocompleteOpen: () => showAutocomplete,
-        isSearchOpen: () => showSearch,
-        isPaletteOpen: () => showPalette,
-        hasTabAtIndex: (index) => Boolean(tabs[index]),
-        onCloseTabContextMenu: closeTabContextMenu,
-        onCloseActiveTab: closeActiveTab,
-        onOpenPalette: openPalette,
-        onFocusSearch: () => searchInputRef?.focus(),
-        onSearch: openSearch,
-        onSave: forceSave,
-        onActivateTab: activateTab,
-        onCloseAutocomplete: closeAutocomplete,
-        onCloseSearch: closeSearch,
-        onClosePalette: closePalette,
-        onCloseReader: hideReader,
-      });
+      cleanupGlobalListeners = setupListeners(
+        {
+          isTabContextMenuOpen: () => tabContextMenu.open,
+          isAutocompleteOpen: () => showAutocomplete,
+          isSearchOpen: () => showSearch,
+          isPaletteOpen: () => showPalette,
+          hasTabAtIndex: (index) => Boolean(tabs[index]),
+          onCloseTabContextMenu: closeTabContextMenu,
+          onCloseActiveTab: closeActiveTab,
+          onOpenPalette: openPalette,
+          onFocusSearch: () => searchInputRef?.focus(),
+          onSearch: openSearch,
+          onSave: forceSave,
+          onActivateTab: activateTab,
+          onCloseAutocomplete: closeAutocomplete,
+          onCloseSearch: closeSearch,
+          onClosePalette: closePalette,
+          onCloseReader: hideReader,
+        },
+        [
+          {
+            getShortcut: () => appSettings.reader_open_in_obsidian_shortcut,
+            onMatch: handleOpenInObsidian,
+          },
+        ],
+      );
     } catch (error) {
       showStatus(normalizeError(error), "error", 2400);
     }

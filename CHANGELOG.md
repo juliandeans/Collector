@@ -7,11 +7,26 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [1.2.4] - 2026-06-04
 
+<<<<<<< HEAD
 ### Fixed
 - Daily note folder paths with date tokens (e.g. YYYY/MM/) now 
   automatically create subdirectories when a new month or year begins
 - Notes folder path now supports date tokens (YYYY, MM, DD, HH, mm, ss) — 
   e.g. "YYYY/MM/" correctly resolves to "2026/06/" when saving a new note
+=======
+### Added
+- Configurable keyboard shortcut for "Open in Obsidian" in the Reader
+  window (default: Cmd+Shift+O). Can be set in Settings → Shortcuts.
+  Works as an in-window shortcut, hardcoded shortcuts take precedence.
+
+### Changed
+- lifecycleSetup.js now accepts configurable custom shortcuts via a
+  second `customShortcuts` parameter. Each entry uses a getter function
+  that reads the current settings value at event time — reacts live to
+  settings changes.
+
+---
+>>>>>>> 3a13b1d (shortcut open in obsidian)
 
 ## [1.2.3] - 2026-06-03
 

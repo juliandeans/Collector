@@ -132,6 +132,19 @@
                 <small>Leave empty to disable closing via shortcut</small>
             </div>
         {/if}
+        <div class="field">
+            <label for="reader_open_in_obsidian_shortcut">Open Note in Obsidian</label>
+            <input
+                class="shortcut-input"
+                type="text"
+                id="reader_open_in_obsidian_shortcut"
+                bind:value={settings.reader_open_in_obsidian_shortcut}
+                placeholder="Cmd+Shift+O"
+                on:keydown={(e) =>
+                    handleShortcutKeyDown(e, "reader_open_in_obsidian_shortcut")}
+            />
+            <small>Shortcut pressed inside the Reader window</small>
+        </div>
     </Section>
 
     <Section title="Copy Text to Collector">

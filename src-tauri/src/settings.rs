@@ -144,6 +144,8 @@ pub struct Settings {
     pub reader_shortcut_closes_window: bool,
     #[serde(default)]
     pub reader_close_shortcut: String,
+    #[serde(default = "default_reader_open_in_obsidian_shortcut")]
+    pub reader_open_in_obsidian_shortcut: String,
     #[serde(default = "default_true")]
     pub reader_edge_enabled: bool,
     #[serde(default = "default_false")]
@@ -262,6 +264,10 @@ fn default_window_height() -> u32 {
 
 fn default_reader_shortcut() -> String {
     "Cmd+Shift+R".to_string()
+}
+
+fn default_reader_open_in_obsidian_shortcut() -> String {
+    "Cmd+Shift+O".to_string()
 }
 
 fn default_note_filename_template() -> String {
@@ -503,6 +509,7 @@ impl Default for Settings {
             reader_shortcut: default_reader_shortcut(),
             reader_shortcut_closes_window: default_false(),
             reader_close_shortcut: String::new(),
+            reader_open_in_obsidian_shortcut: default_reader_open_in_obsidian_shortcut(),
             reader_edge_enabled: default_true(),
             reader_edge_open_delay_enabled: default_false(),
             reader_edge_open_delay_ms: default_edge_open_delay_ms(),
@@ -868,6 +875,10 @@ impl Settings {
 
         if !self.reader_close_shortcut.trim().is_empty() {
             crate::shortcuts::validate_shortcut(&self.reader_close_shortcut)?;
+        }
+
+        if !self.reader_open_in_obsidian_shortcut.trim().is_empty() {
+            crate::shortcuts::validate_shortcut(&self.reader_open_in_obsidian_shortcut)?;
         }
 
         if !self.save_to_daily_shortcut.trim().is_empty() {

@@ -60,6 +60,7 @@ export const defaultSettings = {
   reader_shortcut: 'Cmd+Shift+R',
   reader_shortcut_closes_window: false,
   reader_close_shortcut: '',
+  reader_open_in_obsidian_shortcut: 'Cmd+Shift+O',
   reader_edge_enabled: true,
   reader_edge_open_delay_enabled: false,
   reader_edge_open_delay_ms: 1000,
