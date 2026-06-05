@@ -13,6 +13,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Configurable keyboard shortcut for "Navigate Back" in the Reader
   (disabled by default). Keyboard-only, bottom bar currently disabled.
 - Hover close button for unpinned Reader tabs.
+- Reader can now create a missing Daily Note via the configured "Save to
+  Daily Note" shortcut when automatic Daily Note creation is enabled.
 
 ### Changed
 - Reader palette shortcuts are now fully configurable instead of hardcoded

@@ -13,7 +13,7 @@ function matchesShortcut(event, key) {
  *
  * @param {object} callbacks - Named callbacks for hardcoded shortcuts.
  * @param {object[]} customShortcuts - Array of configurable shortcut bindings.
- *   Each entry: { getShortcut: () => string, onMatch: () => void }
+ *   Each entry: { getShortcut: () => string, onMatch: () => void, shouldHandle?: () => boolean }
  *   The getter is called at event time so it always reads the latest value
  *   (e.g. from appSettings), even if settings change while the window is open.
  *   Hardcoded shortcuts are checked first and take precedence.
@@ -78,9 +78,10 @@ export function setupListeners(callbacks = {}, customShortcuts = []) {
     }
 
     // --- Custom configurable shortcuts (checked after hardcoded ones) ---
-    for (const { getShortcut, onMatch } of customShortcuts) {
+    for (const { getShortcut, onMatch, shouldHandle } of customShortcuts) {
       const shortcutStr = getShortcut?.();
       if (shortcutStr && matchesCustomShortcut(event, shortcutStr)) {
+        if (shouldHandle && !shouldHandle()) continue;
         event.preventDefault();
         await onMatch?.();
         return;

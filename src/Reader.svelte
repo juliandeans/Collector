@@ -604,6 +604,27 @@
     }
   }
 
+  function canCreateMissingDailyNote() {
+    const tab = tabs[activeTabIndex];
+    return (
+      tab?.kind === "daily" &&
+      tab.missing &&
+      appSettings?.daily_note_create_if_missing
+    );
+  }
+
+  async function handleCreateDailyNote() {
+    if (!canCreateMissingDailyNote()) return;
+
+    try {
+      await invoke("append_to_daily_note", { text: "" });
+      await syncTabWithDisk(activeTabIndex);
+      showStatus("Daily note created", "success", 1600);
+    } catch (error) {
+      showStatus(normalizeError(error), "error", 2400);
+    }
+  }
+
   function createOpenedNoteTab(note, history = []) {
     return createTab({
       kind: "opened",
@@ -862,8 +883,14 @@
           onCloseSearch: closeSearch,
           onClosePalette: closePalette,
           onCloseReader: hideReader,
+          onCreateDailyNote: handleCreateDailyNote,
         },
         [
+          {
+            getShortcut: () => appSettings.save_to_daily_shortcut,
+            shouldHandle: canCreateMissingDailyNote,
+            onMatch: handleCreateDailyNote,
+          },
           {
             getShortcut: () => appSettings.reader_open_in_obsidian_shortcut,
             onMatch: handleOpenInObsidian,
@@ -948,6 +975,7 @@
     {vaultNotes}
     {showSearch}
     {showAutocomplete}
+    activeTabKind={activeTab?.kind ?? ""}
     {autocompleteResults}
     {autocompleteIndex}
     missingFileMessage={fileMissing ? missingFileMessage : ""}

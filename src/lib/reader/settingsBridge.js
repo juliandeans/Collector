@@ -69,6 +69,12 @@ export function applySettings(currentSettings = {}, settings = {}) {
       settings.show_note_paths ?? currentSettings.show_note_paths ?? true,
     autocomplete_results:
       settings.autocomplete_results ?? currentSettings.autocomplete_results ?? 20,
+    daily_note_create_if_missing:
+      settings.daily_note_create_if_missing ??
+      currentSettings.daily_note_create_if_missing,
+    save_to_daily_shortcut:
+      settings.save_to_daily_shortcut ??
+      currentSettings.save_to_daily_shortcut,
     reader_open_in_obsidian_shortcut:
       settings.reader_open_in_obsidian_shortcut ??
       currentSettings.reader_open_in_obsidian_shortcut,

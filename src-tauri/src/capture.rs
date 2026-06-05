@@ -281,13 +281,15 @@ async fn ensure_daily_note_created(file_path: &Path, settings: &Settings) -> Res
 /// Append `captured_text` to the daily note using section-insert logic.
 ///
 /// If the file does not exist and `daily_note_create_if_missing` is true,
-/// it opens the Obsidian Advanced URI to create it, waits for it, then writes.
+/// it opens the Obsidian Advanced URI to create it, waits for it, then writes
+/// unless `captured_text` is empty.
 pub async fn append_to_daily_note(
     captured_text: &str,
     file_path: &Path,
     settings: &Settings,
 ) -> Result<(), String> {
-    if captured_text.trim().is_empty() {
+    let is_creation_only = captured_text.trim().is_empty();
+    if is_creation_only && !settings.daily_note_create_if_missing {
         return Err("Nothing to append".to_string());
     }
     if settings.daily_note_folder.trim().is_empty() {
@@ -311,6 +313,10 @@ pub async fn append_to_daily_note(
             ));
         }
         ensure_daily_note_created(file_path, settings).await?;
+    }
+
+    if is_creation_only {
+        return Ok(());
     }
 
     // Build the entry with header

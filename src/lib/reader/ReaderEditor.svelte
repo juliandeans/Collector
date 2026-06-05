@@ -18,6 +18,7 @@
     export let appSettings = {};
     export let vaultNotes = [];
     export let missingFileMessage = "";
+    export let activeTabKind = "";
     export let showSearch = false;
     export let showAutocomplete = false;
     export let autocompleteResults = [];
@@ -35,6 +36,25 @@
     let activeParagraphEl = null;
     let renderRequestId = 0;
     let autocompleteRange = null;
+
+    function formatShortcutLabel(shortcut = "") {
+        return String(shortcut ?? "")
+            .split("+")
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .join("+");
+    }
+
+    $: dailyNoteShortcutLabel = formatShortcutLabel(
+        appSettings?.save_to_daily_shortcut,
+    );
+    $: missingFileBannerMessage =
+        missingFileMessage.trim() &&
+        activeTabKind === "daily" &&
+        appSettings?.daily_note_create_if_missing &&
+        dailyNoteShortcutLabel
+            ? `File not found — create with ${dailyNoteShortcutLabel}`
+            : missingFileMessage;
 
     function getAutocompleteMatches(query) {
         return getAutocompleteResults(
@@ -529,8 +549,8 @@
     bind:this={scrollRef}
     on:scroll={() => dispatch("scroll")}
 >
-    {#if missingFileMessage.trim()}
-        <div class="missing-file-banner">{missingFileMessage}</div>
+    {#if missingFileBannerMessage.trim()}
+        <div class="missing-file-banner">{missingFileBannerMessage}</div>
     {/if}
     <div
         class="editor-body"
