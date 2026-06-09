@@ -1097,11 +1097,6 @@
 
             uploadedImages = [...uploadedImages, ...validImages];
 
-            showStatus(
-                `✓ ${validImages.length} image${validImages.length > 1 ? "s" : ""} added`,
-                "success",
-            );
-
             if (textareaRef) {
                 await tick();
                 const newPosition = currentPosition;
@@ -1174,10 +1169,6 @@
             validImages.forEach((img) => {
                 content += img.markdown + "\n";
             });
-            showStatus(
-                `✓ ${validImages.length} image${validImages.length > 1 ? "s" : ""} added`,
-                "success",
-            );
         }
 
         // Required: after the native Tauri drag-drop bridge finishes, macOS needs a
