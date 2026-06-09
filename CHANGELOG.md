@@ -53,6 +53,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Creating a missing Daily Note from the Reader now automatically creates
   the parent folder if it does not exist, consistent with how the Capture
   window handles missing folders.
+- Screenshots captured via Collector now display immediately in the Reader
+  without requiring a manual reindex.
+- Notes already open in the Reader now re-render correctly after a manual
+  reindex, resolving previously blank images.
 
 ---
 
