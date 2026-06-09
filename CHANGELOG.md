@@ -3,7 +3,7 @@
 All notable changes to Collector are documented here.  
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [1.2.5] - 2026-06-04
+## [1.2.5] - 2026-06-09
 
 ### Added
 - Configurable keyboard shortcut for "Open Command Palette" in the Reader
