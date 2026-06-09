@@ -23,7 +23,6 @@ pub struct NoteEntry {
     pub name: String,
     pub relative_path: String,
     pub path: String,
-    pub absolute_path: String,
 }
 
 impl VaultIndex {
@@ -92,8 +91,7 @@ impl VaultIndex {
                 Some(NoteEntry {
                     name,
                     relative_path,
-                    path: absolute_string.clone(),
-                    absolute_path: absolute_string,
+                    path: absolute_string,
                 })
             })
             .collect::<Vec<_>>();
