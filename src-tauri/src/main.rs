@@ -390,9 +390,8 @@ async fn append_to_daily_note(
             "Daily Note folder is not configured. Please set it in Settings.".to_string(),
         );
     }
-    let create_parent = daily_note_folder_has_date_tokens(&settings.daily_note_folder);
     let daily_path = capture::build_daily_note_path(&settings);
-    let resolved = resolve_vault_write_path(&settings, &daily_path, create_parent)?;
+    let resolved = resolve_vault_write_path(&settings, &daily_path, true)?;
 
     capture::append_to_daily_note(&text, &resolved, &settings).await?;
 
