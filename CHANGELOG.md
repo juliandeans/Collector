@@ -42,6 +42,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   including arrow keys and Space.
 - Reader tab close controls now use valid button markup, avoiding nested
   interactive elements and inconsistent click/focus behaviour.
+- Setting the same keyboard shortcut for two different features (e.g.
+  capture shortcut and reader shortcut) now shows a validation error in
+  Settings instead of silently breaking one of them.
+- Creating a missing Daily Note from the Reader via shortcut could trigger
+  multiple Obsidian launches if the shortcut fired in quick succession
+  before the file appeared on disk. A re-entry guard now prevents this.
+- Creating a missing Daily Note from the Reader now automatically creates
+  the parent folder if it does not exist, consistent with how the Capture
+  window handles missing folders.
 
 ---
 
