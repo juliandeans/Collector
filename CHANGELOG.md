@@ -3,6 +3,19 @@
 All notable changes to Collector are documented here.  
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.6] - 2026-06-09
+
+### Fixed
+- Memory footprint growing unboundedly during Reader use. Base64-encoded
+  image data was cached indefinitely in the frontend — every image ever
+  opened in the Reader accumulated for the lifetime of the app, reaching
+  1+ GB after extended use. The cache is now capped at 150 entries (LRU
+  eviction) and fully cleared when the Reader window closes.
+- Internal note index was storing each note's absolute path twice per
+  entry, wasting memory across all IPC calls and frontend windows.
+- Images larger than 20 MB now return an error instead of being loaded
+  into memory for encoding.
+
 ## [1.2.5] - 2026-06-04
 
 ### Added
@@ -17,6 +30,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   Daily Note" shortcut when automatic Daily Note creation is enabled.
 
 ### Changed
+- Image drop confirmation toast ("X images added") removed from capture window.
 - Reader palette shortcuts are now fully configurable instead of hardcoded
   to Cmd+K/Cmd+P.
 - Reader action shortcuts are read from the current settings at keypress time,
