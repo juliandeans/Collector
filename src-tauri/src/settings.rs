@@ -929,6 +929,44 @@ impl Settings {
             );
         }
 
+        // Cross-slot shortcut conflict check
+        let shortcut_fields: [(&str, &str); 6] = [
+            ("Note window shortcut", &self.global_shortcut),
+            ("Note close shortcut", &self.global_close_shortcut),
+            ("Reader shortcut", &self.reader_shortcut),
+            ("Reader close shortcut", &self.reader_close_shortcut),
+            ("Capture text shortcut", &self.capture_text_shortcut),
+            ("Save as note shortcut", &self.save_as_note_shortcut),
+        ];
+
+        for i in 0..shortcut_fields.len() {
+            let trimmed_i = shortcut_fields[i].1.trim();
+            if trimmed_i.is_empty() {
+                continue;
+            }
+            let norm_i = crate::shortcuts::normalize_shortcut(trimmed_i);
+
+            for j in (i + 1)..shortcut_fields.len() {
+                let trimmed_j = shortcut_fields[j].1.trim();
+                if trimmed_j.is_empty() {
+                    continue;
+                }
+
+                // Skip open-vs-close pairs for the same feature (handled by existing checks above)
+                if (i == 0 && j == 1) || (i == 2 && j == 3) {
+                    continue;
+                }
+
+                let norm_j = crate::shortcuts::normalize_shortcut(trimmed_j);
+                if norm_i == norm_j {
+                    return Err(format!(
+                        "Shortcut conflict: {} and {} cannot use the same key combination",
+                        shortcut_fields[i].0, shortcut_fields[j].0,
+                    ));
+                }
+            }
+        }
+
         for pinned_note in &self.pinned_notes {
             if pinned_note.path.trim().is_empty() {
                 return Err("pinned_notes entries must include a path".to_string());
