@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
+const MAX_CACHE_ENTRIES = 150;
+
 export const imagePathCache = new Map();
 
 const INLINE_FIELD_LINE_PATTERN = /^\s*\w[\w\s-]*::\s*.*$/;
@@ -79,6 +81,12 @@ export function getCachedImageSrc(path) {
 export function setCachedImageSrc(path, src) {
   if (!path || !src) return;
   imagePathCache.set(path, src);
+  if (imagePathCache.size > MAX_CACHE_ENTRIES) {
+    const oldestKey = imagePathCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      imagePathCache.delete(oldestKey);
+    }
+  }
 }
 
 export function parseRawBlocks(content = "") {

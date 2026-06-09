@@ -405,7 +405,7 @@
         min-height: 0;
         overflow-y: auto;
         padding-left: 24px;
-        padding-right: 4px;
+        padding-right: 24px;
         background: none;
     }
 

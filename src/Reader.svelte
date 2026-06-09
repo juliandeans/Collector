@@ -579,6 +579,8 @@
     } catch (error) {
       showStatus(normalizeError(error), "error", 2200);
     }
+
+    imagePathCache.clear();
   }
 
   async function openSettings() {
