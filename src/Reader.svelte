@@ -212,6 +212,7 @@
     clearHighlights();
     searchMatches = [];
     searchIndex = 0;
+    editorComponent?.focus();
   }
 
   async function openSearch() {
@@ -762,6 +763,7 @@
     showPalette = false;
     paletteQuery = "";
     selectedPaletteIndex = 0;
+    editorComponent?.focus();
   }
 
   async function openVaultNote(note) {

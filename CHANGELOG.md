@@ -48,6 +48,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Creating a missing Daily Note from the Reader via shortcut could trigger
   multiple Obsidian launches if the shortcut fired in quick succession
   before the file appeared on disk. A re-entry guard now prevents this.
+- Reader lost DOM focus after closing Command Palette or SearchBar
+  overlay, requiring a click before typing or shortcuts worked again.
 - Creating a missing Daily Note from the Reader now automatically creates
   the parent folder if it does not exist, consistent with how the Capture
   window handles missing folders.
