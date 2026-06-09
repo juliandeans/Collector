@@ -617,6 +617,9 @@
 
   async function handleCreateDailyNote() {
     if (!canCreateMissingDailyNote()) return;
+    if (isSaving) return;
+
+    isSaving = true;
 
     try {
       await invoke("append_to_daily_note", { text: "" });
@@ -624,6 +627,8 @@
       showStatus("Daily note created", "success", 1600);
     } catch (error) {
       showStatus(normalizeError(error), "error", 2400);
+    } finally {
+      isSaving = false;
     }
   }
 
