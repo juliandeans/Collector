@@ -152,6 +152,17 @@ fn resolve_vault_write_path(
 }
 
 pub(crate) fn build_image_data_url(path: &Path) -> Result<String, String> {
+    let file_size = fs::metadata(path)
+        .map_err(|e| format!("Failed to inspect image: {}", e))?
+        .len() as usize;
+
+    if file_size > MAX_IMAGE_PAYLOAD_BYTES {
+        return Err(format!(
+            "Image too large to load: {:.1} MB",
+            file_size as f64 / (1024.0 * 1024.0)
+        ));
+    }
+
     let bytes = fs::read(path).map_err(|e| format!("Failed to read image: {}", e))?;
     let mime = match path
         .extension()
