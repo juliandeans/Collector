@@ -16,6 +16,7 @@
     imagePathCache,
     normalizeNewlines,
     preprocessContent,
+    warmImagesInText,
   } from "./lib/reader/contentProcessing.js";
   import { getAutocompleteResults } from "./lib/reader/autocomplete.js";
   import { composeContentFromMarkdown } from "./lib/reader/editorSerialization.js";
@@ -401,6 +402,10 @@
       if (!tab.missing && content === currentContent) {
         if (index === activeTabIndex) {
           missingFileMessage = "";
+          const hasNewImages = await warmImagesInText(content);
+          if (hasNewImages) {
+            await renderContentToEditor(content);
+          }
         }
         return;
       }

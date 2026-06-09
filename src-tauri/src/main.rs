@@ -619,6 +619,13 @@ async fn save_image(
 
     let result = image_handler::process_dropped_file(&file_path, &settings)?;
 
+    // Register new image in vault index so load_images_batch can resolve it.
+    if let Some(ref mut idx) = *state.vault_index.write().await {
+        if let Err(e) = idx.add_image(Path::new(&result.saved_path)) {
+            log::warn!("Failed to add image to vault index: {}", e);
+        }
+    }
+
     Ok(result)
 }
 
@@ -641,6 +648,13 @@ async fn save_image_from_bytes(
         .map_err(|e| format!("Failed to decode base64: {}", e))?;
 
     let result = image_handler::process_dropped_file_from_bytes(bytes, &filename, &settings)?;
+
+    // Register new image in vault index so load_images_batch can resolve it.
+    if let Some(ref mut idx) = *state.vault_index.write().await {
+        if let Err(e) = idx.add_image(Path::new(&result.saved_path)) {
+            log::warn!("Failed to add image to vault index: {}", e);
+        }
+    }
 
     Ok(result)
 }

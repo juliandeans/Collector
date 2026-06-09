@@ -45,6 +45,43 @@ impl VaultIndex {
         Ok(index)
     }
 
+    /// Register a newly saved image in the live index without a full rebuild.
+    /// Uses the same key normalization as walk_dir so resolve_image finds the entry.
+    pub fn add_image(&mut self, image_path: &Path) -> Result<(), String> {
+        let canonical_image = fs::canonicalize(image_path)
+            .map_err(|e| format!("Failed to resolve image path for index: {}", e))?;
+
+        let canonical_vault = Path::new(&self.canonical_vault_path);
+        let relative_path = canonical_image
+            .strip_prefix(canonical_vault)
+            .map_err(|_| "Image is outside the vault".to_string())?
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        let image_name = canonical_image
+            .file_name()
+            .map(|name| name.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        let relative_key = relative_path.to_lowercase();
+
+        self.images_by_rel_path
+            .entry(relative_key)
+            .or_insert(canonical_image.clone());
+        self.images_by_name
+            .entry(image_name)
+            .or_insert(canonical_image);
+        self.file_count += 1;
+
+        log::info!(
+            "Image added to vault index: {} (file_count={})",
+            relative_path,
+            self.file_count
+        );
+
+        Ok(())
+    }
+
     pub fn resolve_image(&self, path: &str) -> Option<&PathBuf> {
         let normalized = normalize_lookup_path(path);
         if normalized.contains('/') {
