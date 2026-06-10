@@ -28,7 +28,6 @@ build/
 .DS_Store
 
 AGENTS.md
-SMART_ROUTING
 SMART_ROUTING.md
 
 # Tauri
