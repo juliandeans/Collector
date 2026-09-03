@@ -6,6 +6,7 @@
 
 mod app_state;
 mod capture;
+mod commands;
 mod edge_detect;
 mod fs_util;
 mod image_handler;
@@ -86,15 +87,6 @@ async fn get_or_build_index(state: &tauri::State<'_, AppState>) -> Result<(), St
 
     *state.vault_index.write().await = Some(new_index);
     Ok(())
-}
-
-#[tauri::command]
-async fn load_settings(state: tauri::State<'_, AppState>) -> Result<Settings, String> {
-    let settings = Settings::load()?;
-
-    *state.settings.write().await = settings.clone();
-
-    Ok(settings)
 }
 
 #[tauri::command]
@@ -530,20 +522,6 @@ async fn save_image_from_bytes(
 }
 
 #[tauri::command]
-async fn toggle_edge_detection(
-    enabled: bool,
-    state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
-    state.edge_detector.set_enabled(enabled).await;
-
-    let mut settings = state.settings.write().await;
-    settings.edge_detection_enabled = enabled;
-    settings.save()?;
-
-    Ok(())
-}
-
-#[tauri::command]
 async fn set_autostart(enabled: bool, app: AppHandle) -> Result<(), String> {
     let manager = app.autolaunch();
 
@@ -628,22 +606,6 @@ async fn hide_reader(app: AppHandle, state: tauri::State<'_, AppState>) -> Resul
     }
     state.edge_detector.set_reader_open(false).await;
     Ok(())
-}
-
-#[tauri::command]
-async fn get_window_info(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
-    let settings = state.settings.read().await;
-    Ok(serde_json::json!({
-        "width": settings.window_width,
-        "height": settings.window_height,
-        "readerWidth": settings.reader_width,
-        "readerHeight": settings.reader_height,
-        "borderRadius": settings.border_radius,
-        "backgroundColor": settings.overlay_color,
-        "fontFamily": settings.font_family,
-        "fontSize": settings.font_size,
-        "edgeSide": settings.edge_side,
-    }))
 }
 
 #[tauri::command]
@@ -1112,7 +1074,7 @@ fn main() {
         })
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
-            load_settings,
+            commands::settings::load_settings,
             save_settings,
             save_as_note,
             append_to_daily_note,
@@ -1129,14 +1091,14 @@ fn main() {
             reindex_vault,
             save_image,
             save_image_from_bytes,
-            toggle_edge_detection,
+            commands::settings::toggle_edge_detection,
             set_autostart,
             is_autostart_enabled,
             hide_capture,
             show_capture,
             show_reader,
             hide_reader,
-            get_window_info,
+            commands::settings::get_window_info,
             open_settings,
             close_settings,
         ])
