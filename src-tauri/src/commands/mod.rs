@@ -4,3 +4,4 @@ pub mod images;
 pub mod settings;
 pub mod system;
 pub mod vault;
+pub mod window;
