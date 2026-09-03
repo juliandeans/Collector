@@ -28,7 +28,6 @@ use tauri::{
 };
 use tauri_plugin_autostart::ManagerExt;
 use tokio::sync::RwLock;
-use tokio::time::{timeout, Duration};
 
 #[cfg(target_os = "macos")]
 use cocoa::base::{id, BOOL, YES};
@@ -40,7 +39,7 @@ use crate::edge_detect::EdgeDetector;
 use crate::image_handler::ProcessedImage;
 use crate::settings::Settings;
 use crate::shortcuts::ShortcutManager;
-use crate::vault_paths::{build_image_data_url, resolve_vault_read_path, resolve_vault_write_path, MAX_IMAGE_PAYLOAD_BYTES};
+use crate::vault_paths::MAX_IMAGE_PAYLOAD_BYTES;
 use std::fs;
 use std::path::Component;
 
@@ -52,40 +51,6 @@ fn warn_if_failed<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) 
     if let Err(error) = result {
         log::warn!("{}: {}", context, error);
     }
-}
-
-async fn get_or_build_index(state: &tauri::State<'_, AppState>) -> Result<(), String> {
-    let vault_path = {
-        let settings = state.settings.read().await;
-        settings.vault_path.clone()
-    };
-
-    {
-        let index = state.vault_index.read().await;
-        if let Some(ref idx) = *index {
-            // Compare against the original vault path used to build the index.
-            // Avoiding fs::canonicalize here prevents potential blocking on iCloud paths.
-            if idx.vault_path == vault_path {
-                return Ok(());
-            }
-        }
-    }
-
-    log::info!(
-        "Building vault index for: {}",
-        crate::log_safety::redact_path_str(&vault_path)
-    );
-    let new_index = vault_index::VaultIndex::build(&vault_path)?;
-    let build_duration_ms = new_index.built_at.elapsed().as_millis();
-    let _ = new_index.resolve_note("");
-    log::info!(
-        "Vault index built: {} files in {} ms",
-        new_index.file_count,
-        build_duration_ms
-    );
-
-    *state.vault_index.write().await = Some(new_index);
-    Ok(())
 }
 
 #[tauri::command]
@@ -197,31 +162,6 @@ async fn save_settings(
 }
 
 #[tauri::command]
-async fn read_note_file(path: String, state: tauri::State<'_, AppState>) -> Result<String, String> {
-    let settings = state.settings.read().await.clone();
-    let resolved = resolve_vault_read_path(&settings, &path)?;
-    let result = timeout(Duration::from_secs(5), tokio::fs::read_to_string(&resolved)).await;
-
-    match result {
-        Ok(Ok(content)) => Ok(content),
-        Ok(Err(e)) => Err(format!("Failed to read file: {}", e)),
-        Err(_) => Err("File read timed out (iCloud download may be pending)".to_string()),
-    }
-}
-
-#[tauri::command]
-async fn write_note_file(
-    path: String,
-    content: String,
-    state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
-    let settings = state.settings.read().await.clone();
-    let resolved = resolve_vault_write_path(&settings, &path, true)?;
-    crate::fs_util::atomic_write_text(&resolved, &content)
-        .map_err(|e| format!("Failed to write file: {}", e))
-}
-
-#[tauri::command]
 async fn open_external_url(url: String) -> Result<(), String> {
     let allowed = ["http://", "https://", "obsidian://"];
     if !allowed
@@ -285,96 +225,6 @@ async fn get_running_apps() -> Result<Vec<String>, String> {
         .collect();
 
     Ok(apps)
-}
-
-#[tauri::command]
-async fn load_image_data_url(
-    path: String,
-    state: tauri::State<'_, AppState>,
-) -> Result<String, String> {
-    get_or_build_index(&state).await?;
-
-    let resolved = {
-        let index = state.vault_index.read().await;
-        let idx = index
-            .as_ref()
-            .ok_or_else(|| "Vault index not available".to_string())?;
-
-        idx.resolve_image(&path)
-            .cloned()
-            .ok_or_else(|| format!("Image not found: {}", path))?
-    };
-
-    build_image_data_url(&resolved)
-}
-
-#[tauri::command]
-async fn load_images_batch(
-    paths: Vec<String>,
-    state: tauri::State<'_, AppState>,
-) -> Result<Vec<(String, String)>, String> {
-    get_or_build_index(&state).await?;
-
-    let index = state.vault_index.read().await;
-    let idx = index
-        .as_ref()
-        .ok_or_else(|| "Vault index not available".to_string())?;
-
-    let mut results = Vec::new();
-
-    for path in paths {
-        let clean = path.split('|').next().unwrap_or("").trim().to_string();
-        if clean.is_empty() {
-            continue;
-        }
-
-        match idx.resolve_image(&clean) {
-            Some(resolved) => {
-                if let Ok(data_url) = build_image_data_url(resolved) {
-                    results.push((clean, data_url));
-                }
-            }
-            None => {}
-        }
-    }
-
-    Ok(results)
-}
-
-#[tauri::command]
-async fn list_vault_notes(
-    state: tauri::State<'_, AppState>,
-) -> Result<Vec<vault_index::NoteEntry>, String> {
-    get_or_build_index(&state).await?;
-
-    let index = state.vault_index.read().await;
-    let idx = index
-        .as_ref()
-        .ok_or_else(|| "Vault index not available".to_string())?;
-
-    Ok(idx.all_notes())
-}
-
-#[tauri::command]
-async fn reindex_vault(state: tauri::State<'_, AppState>) -> Result<usize, String> {
-    let vault_path = {
-        let settings = state.settings.read().await;
-        settings.vault_path.clone()
-    };
-
-    log::info!("Manual vault reindex requested");
-    let new_index = vault_index::VaultIndex::build(&vault_path)?;
-    let count = new_index.file_count;
-    let build_duration_ms = new_index.built_at.elapsed().as_millis();
-    let _ = new_index.resolve_note("");
-    *state.vault_index.write().await = Some(new_index);
-    log::info!(
-        "Vault reindex complete: {} files in {} ms",
-        count,
-        build_duration_ms
-    );
-
-    Ok(count)
 }
 
 #[tauri::command]
@@ -985,16 +835,16 @@ fn main() {
             commands::capture::save_as_note,
             commands::capture::append_to_daily_note,
             commands::capture::append_to_note,
-            read_note_file,
-            write_note_file,
+            commands::vault::read_note_file,
+            commands::vault::write_note_file,
             open_external_url,
             get_running_apps,
             list_applications,
-            load_image_data_url,
-            load_images_batch,
-            list_vault_notes,
+            commands::vault::load_image_data_url,
+            commands::vault::load_images_batch,
+            commands::vault::list_vault_notes,
             commands::capture::get_daily_note_path,
-            reindex_vault,
+            commands::vault::reindex_vault,
             save_image,
             save_image_from_bytes,
             commands::settings::toggle_edge_detection,
