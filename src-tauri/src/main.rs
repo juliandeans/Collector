@@ -229,31 +229,6 @@ async fn get_running_apps() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-async fn set_autostart(enabled: bool, app: AppHandle) -> Result<(), String> {
-    let manager = app.autolaunch();
-
-    if enabled {
-        manager
-            .enable()
-            .map_err(|e| format!("Failed to enable autostart: {}", e))?;
-    } else {
-        manager
-            .disable()
-            .map_err(|e| format!("Failed to disable autostart: {}", e))?;
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn is_autostart_enabled(app: AppHandle) -> Result<bool, String> {
-    let manager = app.autolaunch();
-    manager
-        .is_enabled()
-        .map_err(|e| format!("Failed to check autostart status: {}", e))
-}
-
-#[tauri::command]
 async fn hide_capture(app: AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
     state.edge_detector.set_capture_open(false).await;
 
@@ -799,8 +774,8 @@ fn main() {
             commands::images::save_image,
             commands::images::save_image_from_bytes,
             commands::settings::toggle_edge_detection,
-            set_autostart,
-            is_autostart_enabled,
+            commands::autostart::set_autostart,
+            commands::autostart::is_autostart_enabled,
             hide_capture,
             show_capture,
             show_reader,
