@@ -19,16 +19,13 @@ mod updater;
 mod vault_index;
 mod vault_paths;
 
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Listener, LogicalPosition, LogicalSize, Manager,
 };
-use tauri_plugin_autostart::ManagerExt;
 use tokio::sync::RwLock;
-use tokio::time::{timeout, Duration};
 
 #[cfg(target_os = "macos")]
 use cocoa::base::{id, BOOL, YES};
@@ -37,12 +34,8 @@ use objc::{class, msg_send, sel, sel_impl};
 
 use crate::app_state::AppState;
 use crate::edge_detect::EdgeDetector;
-use crate::image_handler::ProcessedImage;
 use crate::settings::Settings;
 use crate::shortcuts::ShortcutManager;
-use crate::vault_paths::{build_image_data_url, resolve_vault_read_path, resolve_vault_write_path, MAX_IMAGE_PAYLOAD_BYTES};
-use std::fs;
-use std::path::Component;
 
 const WINDOW_INIT_DELAY_MS: u64 = 100;
 
