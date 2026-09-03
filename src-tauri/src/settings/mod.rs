@@ -1,9 +1,4 @@
 use serde::{Deserialize, Deserializer, Serialize};
-use std::fs;
-use std::path::{Component, Path, PathBuf};
-
-use crate::fs_util::atomic_write_text;
-use crate::log_safety::redact_path_str;
 
 mod defaults;
 use self::defaults::*;
