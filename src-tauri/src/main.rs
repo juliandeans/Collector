@@ -4,6 +4,7 @@
 )]
 #![allow(unexpected_cfgs)]
 
+mod app_state;
 mod capture;
 mod edge_detect;
 mod fs_util;
@@ -32,6 +33,7 @@ use cocoa::base::{id, BOOL, YES};
 #[cfg(target_os = "macos")]
 use objc::{class, msg_send, sel, sel_impl};
 
+use crate::app_state::AppState;
 use crate::edge_detect::EdgeDetector;
 use crate::image_handler::ProcessedImage;
 use crate::settings::Settings;
@@ -44,16 +46,6 @@ const WINDOW_INIT_DELAY_MS: u64 = 100;
 const SETTINGS_WINDOW_WIDTH: f64 = 980.0;
 const SETTINGS_WINDOW_HEIGHT: f64 = 720.0;
 const MAX_IMAGE_PAYLOAD_BYTES: usize = 20 * 1024 * 1024;
-
-struct AppState {
-    settings: Arc<RwLock<Settings>>,
-    edge_detector: Arc<EdgeDetector>,
-    shortcut_manager: Arc<ShortcutManager>,
-    reader_shortcut_manager: Arc<ShortcutManager>,
-    capture_text_shortcut_manager: Arc<ShortcutManager>,
-    save_as_note_shortcut_manager: Arc<ShortcutManager>,
-    vault_index: Arc<RwLock<Option<vault_index::VaultIndex>>>,
-}
 
 fn warn_if_failed<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) {
     if let Err(error) = result {
