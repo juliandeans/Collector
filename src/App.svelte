@@ -24,6 +24,7 @@
         computeInputState,
         computeInsertion,
     } from "./lib/app/wikiAutocomplete.js";
+    import * as appendPicker from "./lib/app/appendPicker.js";
     import AppendToPicker from "./lib/reader/AppendToPicker.svelte";
     import CaptureWikilinkOverlay from "./lib/capture/CaptureWikilinkOverlay.svelte";
     import CaptureActionBar from "./lib/capture/CaptureActionBar.svelte";
@@ -35,12 +36,7 @@
     import CaptureDropOverlay from "./lib/capture/CaptureDropOverlay.svelte";
     import CaptureEditor from "./lib/capture/CaptureEditor.svelte";
     import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
-    import {
-        parseHeadings,
-        formatEntryHeader,
-        getVaultNotePath,
-        matchesShortcut,
-    } from "./lib/capture/capture-utils.js";
+    import { getVaultNotePath, matchesShortcut } from "./lib/capture/capture-utils.js";
     import {
         appendToDailyNoteAction,
         saveAsNoteAction,
@@ -86,51 +82,37 @@
 
     $: brightnessFilter = computeBrightnessFilter(appSettings.window_brightness);
 
-    async function insertAfterHeading(notePath, heading, text) {
-        const fileContent = await invoke("read_note_file", { path: notePath });
-        const lines = fileContent.split("\n");
-
-        let insertAt = lines.length;
-        for (let i = heading.lineIndex + 1; i < lines.length; i += 1) {
-            const match = lines[i].match(/^(#{1,6})\s/);
-            if (match && match[1].length <= heading.level) {
-                insertAt = i;
-                break;
-            }
+    function applyAppendPickerState(patch) {
+        if (patch.showAppendPicker !== undefined) {
+            showAppendPicker = patch.showAppendPicker;
         }
-
-        const entryLines = [
-            formatEntryHeader(appSettings.entry_header ?? "#### HH:mm"),
-            ...text.split("\n"),
-            "",
-        ];
-        const separator =
-            insertAt > 0 && lines[insertAt - 1]?.trim() !== "" ? [""] : [];
-
-        lines.splice(insertAt, 0, ...separator, ...entryLines);
-
-        await invoke("write_note_file", {
-            path: notePath,
-            content: lines.join("\n"),
-        });
+        if (patch.appendPickerStep !== undefined) {
+            appendPickerStep = patch.appendPickerStep;
+        }
+        if (patch.appendPickerSelectedNote !== undefined) {
+            appendPickerSelectedNote = patch.appendPickerSelectedNote;
+        }
+        if (patch.appendPickerHeadings !== undefined) {
+            appendPickerHeadings = patch.appendPickerHeadings;
+        }
+        if (patch.appendPickerQuery !== undefined) {
+            appendPickerQuery = patch.appendPickerQuery;
+        }
+        if (patch.appendPickerSelectedIndex !== undefined) {
+            appendPickerSelectedIndex = patch.appendPickerSelectedIndex;
+        }
+        if (patch.appendPickerHeadingIndex !== undefined) {
+            appendPickerHeadingIndex = patch.appendPickerHeadingIndex;
+        }
     }
 
     function closeAppendPicker() {
-        showAppendPicker = false;
-        appendPickerStep = 1;
-        appendPickerSelectedNote = null;
-        appendPickerHeadings = [];
-        appendPickerQuery = "";
-        appendPickerSelectedIndex = 0;
-        appendPickerHeadingIndex = 0;
+        applyAppendPickerState(appendPicker.computeClosedPickerState());
         textareaRef?.focus();
     }
 
     function returnAppendPickerToStep1() {
-        appendPickerStep = 1;
-        appendPickerSelectedNote = null;
-        appendPickerHeadings = [];
-        appendPickerHeadingIndex = 0;
+        applyAppendPickerState(appendPicker.computeStep1PickerState());
     }
 
     function handleDragDropEvent(event) {
@@ -146,14 +128,12 @@
     }
 
     function preloadVaultNotes() {
-        // Preload vault notes so the append picker can open immediately.
-        invoke("list_vault_notes")
-            .then((notes) => {
-                appendPickerNotes = notes;
-            })
-            .catch(() => {
-                // Non-fatal: the picker can still lazy-load later.
-            });
+        appendPicker.preloadVaultNotes({
+            invoke,
+            setNotes: (v) => {
+                appendPickerNotes = v;
+            },
+        });
     }
 
     /* ── onMount ── */
@@ -281,24 +261,17 @@
     function openAppendPicker() {
         if (!content.trim()) return;
 
-        showAppendPicker = true;
-        appendPickerStep = 1;
-        appendPickerSelectedNote = null;
-        appendPickerHeadings = [];
-        appendPickerQuery = "";
-        appendPickerSelectedIndex = 0;
-        appendPickerHeadingIndex = 0;
+        applyAppendPickerState(appendPicker.computeOpenPickerState());
         appendPickerInputRef?.focus();
 
-        if (appendPickerNotes.length === 0) {
-            invoke("list_vault_notes")
-                .then((notes) => {
-                    appendPickerNotes = notes;
-                })
-                .catch(() => {
-                    showStatus("✗ Could not load vault notes", "error");
-                });
-        }
+        appendPicker.loadVaultNotesIfEmpty({
+            invoke,
+            getNotes: () => appendPickerNotes,
+            setNotes: (v) => {
+                appendPickerNotes = v;
+            },
+            showStatus,
+        });
     }
 
     async function handleAppendToDaily() {
@@ -351,71 +324,40 @@
     }
 
     async function handleNoteSelected(note) {
-        // Store the selected note immediately for reference
-        appendPickerSelectedNote = note;
-
-        const notePath = getVaultNotePath(note);
-        if (!notePath) {
-            // No valid path - transition to step 2 with empty headings
-            appendPickerHeadings = [];
-            appendPickerHeadingIndex = 0;
-            appendPickerStep = 2;
-            return;
-        }
-
-        // Load headings BEFORE transitioning to step 2.
-        // This prevents a race condition where the IPC call and UI transition
-        // happen simultaneously, which can freeze WKWebView on macOS.
-        let loadedHeadings = [];
-        try {
-            const fileContent = await invoke("read_note_file", {
-                path: notePath,
-            });
-            // Check if user closed picker or selected a different note while loading
-            if (getVaultNotePath(appendPickerSelectedNote) !== notePath) return;
-            loadedHeadings = parseHeadings(fileContent);
-        } catch (e) {
-            // If loading fails, proceed with empty headings
-            if (getVaultNotePath(appendPickerSelectedNote) !== notePath) return;
-            loadedHeadings = [];
-        }
-
-        // Now that headings are loaded, transition to step 2
-        appendPickerHeadings = loadedHeadings;
-        appendPickerHeadingIndex = 0;
-        // setTimeout(0) gives WKWebView a single event-loop tick
-        // between loading headings and transitioning to step 2.
-        // Without this pause, the simultaneous Svelte DOM update
-        // and IPC completion cause WKWebView to freeze on macOS.
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        appendPickerStep = 2;
+        await appendPicker.selectNote(note, {
+            invoke,
+            getSelectedNote: () => appendPickerSelectedNote,
+            setSelectedNote: (v) => {
+                appendPickerSelectedNote = v;
+            },
+            setHeadings: (v) => {
+                appendPickerHeadings = v;
+            },
+            setHeadingIndex: (v) => {
+                appendPickerHeadingIndex = v;
+            },
+            setStep: (v) => {
+                appendPickerStep = v;
+            },
+        });
     }
 
     async function handleAppendToNote(note, heading = null) {
         closeAppendPicker();
 
-        const notePath = getVaultNotePath(note);
-        if (!notePath || !content.trim() || isLoading) return;
-
-        isLoading = true;
-
-        try {
-            if (!heading) {
-                await invoke("append_to_note", {
-                    path: notePath,
-                    text: content.trim(),
-                });
-            } else {
-                await insertAfterHeading(notePath, heading, content.trim());
-            }
-
-            freeBlobUrls();
-            resetCaptureState();
-            deferHideCapture();
-        } catch (e) {
-            showStatus("✗ " + e.toString(), "error");
-            isLoading = false;
-        }
+        await appendPicker.appendToNote(note, heading, {
+            invoke,
+            getContent: () => content,
+            isLoading,
+            setLoading: (v) => {
+                isLoading = v;
+            },
+            getEntryHeaderTemplate: () => appSettings.entry_header,
+            freeBlobUrls,
+            resetCaptureState,
+            deferHideCapture,
+            showStatus,
+        });
     }
 
     async function handleKeydown(e) {
