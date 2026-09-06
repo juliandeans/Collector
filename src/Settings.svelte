@@ -14,12 +14,12 @@
     import { validateSettings } from "./lib/settings/validation.js";
     import { defaultSettings } from "./lib/stores.js";
 
-    let settings = { ...defaultSettings };
-    let vaultNotes = [];
+    let settings = $state({ ...defaultSettings });
+    let vaultNotes = $state([]);
     let isLoaded = false;
-    let statusMessage = "";
-    let statusType = "";
-    let activePanel = "vault";
+    let statusMessage = $state("");
+    let statusType = $state("");
+    let activePanel = $state("vault");
     let statusTimeout;
 
     const settingsPanels = [
@@ -34,7 +34,7 @@
 
     // ── theme (system dark/light) ─────────────────────────
 
-    let prefersDark = false;
+    let prefersDark = $state(false);
 
     function updateTheme(mq) {
         prefersDark = mq.matches;
@@ -80,9 +80,9 @@
         indicator: "rgba(255,255,255,0.45)",
     };
 
-    $: t = prefersDark ? darkTheme : lightTheme;
-    $: validation = validateSettings(settings);
-    $: fieldIssues = validation.fields;
+    let t = $derived(prefersDark ? darkTheme : lightTheme);
+    let validation = $derived(validateSettings(settings));
+    let fieldIssues = $derived(validation.fields);
 
     // ── auto-save ──────────────────────────────────────────
 
@@ -253,7 +253,7 @@
                             class="nav-item"
                             class:active={activePanel === panel.id}
                             type="button"
-                            on:click={() => (activePanel = panel.id)}
+                            onclick={() => (activePanel = panel.id)}
                         >
                             <span class="nav-item-label">{panel.label}</span>
                         </button>
@@ -261,7 +261,7 @@
                 </nav>
             </aside>
 
-            <div class="settings-content" on:input={scheduleAutoSave}>
+            <div class="settings-content" oninput={scheduleAutoSave}>
                 {#if activePanel === "vault"}
                     <PanelVault bind:settings {showStatus} validation={fieldIssues} onChange={scheduleAutoSave} />
                 {:else if activePanel === "capture"}
@@ -282,9 +282,9 @@
     </main>
 
     <footer>
-        <button class="secondary" on:click={handleReset}>Reset All</button>
+        <button class="secondary" onclick={handleReset}>Reset All</button>
         <div class="spacer"></div>
-        <button class="secondary" on:click={handleClose}>Close</button>
+        <button class="secondary" onclick={handleClose}>Close</button>
     </footer>
 </div>
 

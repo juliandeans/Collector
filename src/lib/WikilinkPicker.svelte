@@ -1,22 +1,31 @@
 <script>
+    import { run, preventDefault } from 'svelte/legacy';
+
     import { tick } from "svelte";
 
-    export let notes = [];
-    export let selectedIndex = 0;
-    export let showPaths = true;
-    export let onSelect = () => {};
-    export let onHover = () => {};
+    /**
+     * @typedef {Object} Props
+     * @property {any} [notes]
+     * @property {number} [selectedIndex]
+     * @property {boolean} [showPaths]
+     * @property {any} [onSelect]
+     * @property {any} [onHover]
+     */
 
-    let pickerRef;
+    /** @type {Props} */
+    let {
+        notes = [],
+        selectedIndex = 0,
+        showPaths = true,
+        onSelect = () => {},
+        onHover = () => {}
+    } = $props();
+
+    let pickerRef = $state();
     let suppressPointerUntil = 0;
     let lastPointerX = null;
     let lastPointerY = null;
 
-    $: {
-        selectedIndex;
-        notes;
-        scrollSelectedIntoView();
-    }
 
     async function scrollSelectedIntoView() {
         await tick();
@@ -62,6 +71,11 @@
 
         onHover(index);
     }
+    run(() => {
+        selectedIndex;
+        notes;
+        scrollSelectedIntoView();
+    });
 </script>
 
 <div class="wikilink-picker" bind:this={pickerRef}>
@@ -70,8 +84,8 @@
             class="wikilink-picker-item"
             class:selected={index === selectedIndex}
             type="button"
-            on:mousedown|preventDefault={() => onSelect(note)}
-            on:pointermove={(event) => handlePointerMove(index, event)}
+            onmousedown={preventDefault(() => onSelect(note))}
+            onpointermove={(event) => handlePointerMove(index, event)}
         >
             <span class="wikilink-picker-name">{note.name}</span>
             {#if showPaths}

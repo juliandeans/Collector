@@ -43,22 +43,22 @@
         closeCaptureAction,
     } from "./lib/capture/capture-actions.js";
 
-    let textareaRef;
-    let content = "";
-    let isDragging = false;
-    let isLoading = false;
-    let statusMessage = "";
-    let statusType = "";
-    let showAppendPicker = false;
-    let appendPickerQuery = "";
-    let appendPickerNotes = [];
-    let appendPickerSelectedIndex = 0;
-    let appendPickerStep = 1;
-    let appendPickerSelectedNote = null;
-    let appendPickerHeadings = [];
-    let appendPickerHeadingIndex = 0;
-    let appendPickerInputRef;
-    let uploadedImages = [];
+    let textareaRef = $state();
+    let content = $state("");
+    let isDragging = $state(false);
+    let isLoading = $state(false);
+    let statusMessage = $state("");
+    let statusType = $state("");
+    let showAppendPicker = $state(false);
+    let appendPickerQuery = $state("");
+    let appendPickerNotes = $state([]);
+    let appendPickerSelectedIndex = $state(0);
+    let appendPickerStep = $state(1);
+    let appendPickerSelectedNote = $state(null);
+    let appendPickerHeadings = $state([]);
+    let appendPickerHeadingIndex = $state(0);
+    let appendPickerInputRef = $state();
+    let uploadedImages = $state([]);
     let unlistenReset;
     let unlistenShow;
     let unlistenInsertCaptureText;
@@ -68,19 +68,19 @@
     let unlistenDragDrop;
     let isTauri = false;
     let cleanupGlobalDragListeners;
-    let wikiAutocompleteOpen = false;
+    let wikiAutocompleteOpen = $state(false);
     let wikiAutocompleteQuery = "";
-    let wikiAutocompleteIndex = 0;
-    let wikiAutocompleteMatches = [];
-    let wikiAutocompletePosition = { left: 0, top: 0 };
+    let wikiAutocompleteIndex = $state(0);
+    let wikiAutocompleteMatches = $state([]);
+    let wikiAutocompletePosition = $state({ left: 0, top: 0 });
     let wikiAnchorPos = 0;
 
-    let appSettings = { ...defaultSettings };
+    let appSettings = $state({ ...defaultSettings });
 
-    $: showNotePaths = appSettings?.show_note_paths ?? true;
-    $: autocompleteResults = appSettings?.autocomplete_results ?? 20;
+    let showNotePaths = $derived(appSettings?.show_note_paths ?? true);
+    let autocompleteResults = $derived(appSettings?.autocomplete_results ?? 20);
 
-    $: brightnessFilter = computeBrightnessFilter(appSettings.window_brightness);
+    let brightnessFilter = $derived(computeBrightnessFilter(appSettings.window_brightness));
 
     function applyAppendPickerState(patch) {
         if (patch.showAppendPicker !== undefined) {
@@ -572,10 +572,10 @@
     --app-text-color: {appSettings.text_color};
     --app-brightness-filter: {brightnessFilter};
   "
-    on:dragenter={handleDragEnter}
-    on:dragleave={handleDragLeave}
-    on:dragover={handleDragOver}
-    on:drop={handleDrop}
+    ondragenter={handleDragEnter}
+    ondragleave={handleDragLeave}
+    ondragover={handleDragOver}
+    ondrop={handleDrop}
     role="application"
 >
     <CaptureAccentLine />
@@ -583,14 +583,14 @@
     <div
         class="content-wrapper"
         role="presentation"
-        on:drop={(e) => {
+        ondrop={(e) => {
             handleDrop(e);
         }}
-        on:dragover={(e) => {
+        ondragover={(e) => {
             e.preventDefault();
             handleDragOver(e);
         }}
-        on:dragenter={(e) => {
+        ondragenter={(e) => {
             handleDragEnter(e);
         }}
     >

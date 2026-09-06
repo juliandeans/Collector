@@ -1,4 +1,6 @@
 <script>
+  import { run, preventDefault } from 'svelte/legacy';
+
   import { ENABLE_DEMO_FAKE_BG } from "./lib/demo-fake-bg.js";
   const DEMO_FAKE_BG = import.meta.env.DEV && ENABLE_DEMO_FAKE_BG;
 
@@ -57,60 +59,62 @@
   } from "./lib/reader/paletteLogic.js";
   import { defaultSettings } from "./lib/stores.js";
 
-  let tabs = [];
-  let activeTabIndex = 0;
-  let showPalette = false;
-  let paletteQuery = "";
-  let vaultNotes = [];
+  let tabs = $state([]);
+  let activeTabIndex = $state(0);
+  let showPalette = $state(false);
+  let paletteQuery = $state("");
+  let vaultNotes = $state([]);
   let isSaving = false;
-  let rawContent = "";
-  let strippedFrontmatter = "";
+  let rawContent = $state("");
+  let strippedFrontmatter = $state("");
   let codeblockMap = new Map();
   let hiddenBlockMap = new Map();
   const scrollPositions = new Map();
-  let appSettings = { ...defaultSettings };
-  let statusMessage = "";
-  let statusType = "";
-  let missingFileMessage = "";
-  let selectedPaletteIndex = 0;
+  let appSettings = $state({ ...defaultSettings });
+  let statusMessage = $state("");
+  let statusType = $state("");
+  let missingFileMessage = $state("");
+  let selectedPaletteIndex = $state(0);
   // (showSavedIndicator removed)
-  let showAutocomplete = false;
-  let autocompleteIndex = 0;
-  let autocompleteResults = [];
-  let autocompleteRange = null;
-  let showSearch = false;
-  let searchQuery = "";
-  let searchMatches = [];
-  let searchIndex = 0;
-  let searchInputRef;
-  let tabContextMenu = {
+  let showAutocomplete = $state(false);
+  let autocompleteIndex = $state(0);
+  let autocompleteResults = $state([]);
+  let autocompleteRange = $state(null);
+  let showSearch = $state(false);
+  let searchQuery = $state("");
+  let searchMatches = $state([]);
+  let searchIndex = $state(0);
+  let searchInputRef = $state();
+  let tabContextMenu = $state({
     open: false,
     x: 0,
     y: 0,
     tabIndex: -1,
-  };
+  });
 
-  let editorComponent;
-  let paletteInputRef;
+  let editorComponent = $state();
+  let paletteInputRef = $state();
   let statusTimeout;
   let unlistenShowReader;
   let unlistenSettingsChanged;
   let cleanupGlobalListeners = () => {};
   const saveScheduler = createDebouncedJob(600);
 
-  $: activeTab = tabs[activeTabIndex] ?? null;
-  $: fileMissing = missingFileMessage.trim() !== "";
-  $: showNotePaths = appSettings?.show_note_paths ?? true;
-  $: autocompleteResultLimit = appSettings?.autocomplete_results ?? 20;
-  $: filteredVaultNotes = filterPaletteNotes(
+  let activeTab = $derived(tabs[activeTabIndex] ?? null);
+  let fileMissing = $derived(missingFileMessage.trim() !== "");
+  let showNotePaths = $derived(appSettings?.show_note_paths ?? true);
+  let autocompleteResultLimit = $derived(appSettings?.autocomplete_results ?? 20);
+  let filteredVaultNotes = $derived(filterPaletteNotes(
     vaultNotes,
     paletteQuery,
     autocompleteResultLimit,
-  );
-  $: if (selectedPaletteIndex >= filteredVaultNotes.length) {
-    selectedPaletteIndex = Math.max(filteredVaultNotes.length - 1, 0);
-  }
-  $: brightnessFilter = computeBrightnessFilter(appSettings.window_brightness);
+  ));
+  run(() => {
+    if (selectedPaletteIndex >= filteredVaultNotes.length) {
+      selectedPaletteIndex = Math.max(filteredVaultNotes.length - 1, 0);
+    }
+  });
+  let brightnessFilter = $derived(computeBrightnessFilter(appSettings.window_brightness));
 
   function normalizeError(error) {
     return typeof error === "string"
@@ -1047,9 +1051,9 @@
         class="autocomplete-item"
         class:selected={index === autocompleteIndex}
         type="button"
-        on:mousedown|preventDefault={() =>
-          editorComponent?.insertAutocompleteResult?.(note)}
-        on:mouseenter={() => (autocompleteIndex = index)}
+        onmousedown={preventDefault(() =>
+          editorComponent?.insertAutocompleteResult?.(note))}
+        onmouseenter={() => (autocompleteIndex = index)}
       >
         <span class="autocomplete-name">{note.name}</span>
         {#if showNotePaths}
