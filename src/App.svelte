@@ -3,7 +3,6 @@
     const DEMO_FAKE_BG = import.meta.env.DEV && ENABLE_DEMO_FAKE_BG;
 
     import { invoke } from "@tauri-apps/api/core";
-    import { listen } from "@tauri-apps/api/event";
     import { onMount, onDestroy, tick } from "svelte";
     import { getCurrentWindow } from "@tauri-apps/api/window";
     import { defaultSettings } from "./lib/stores.js";
@@ -13,6 +12,12 @@
         applySettingsUpdate,
         computeBrightnessFilter,
     } from "./lib/app/settingsBridge.js";
+    import {
+        setupGlobalDragListeners,
+        setupCaptureWindowListeners,
+        setupSettingsListener,
+        setupTauriDragDrop,
+    } from "./lib/app/lifecycleSetup.js";
     import AppendToPicker from "./lib/reader/AppendToPicker.svelte";
     import CaptureWikilinkOverlay from "./lib/capture/CaptureWikilinkOverlay.svelte";
     import CaptureActionBar from "./lib/capture/CaptureActionBar.svelte";
@@ -68,16 +73,13 @@
     let unlistenSettingsChanged;
     let unlistenDragDrop;
     let isTauri = false;
-    let globalDragEnter;
-    let globalDragOver;
+    let cleanupGlobalDragListeners;
     let wikiAutocompleteOpen = false;
     let wikiAutocompleteQuery = "";
     let wikiAutocompleteIndex = 0;
     let wikiAutocompleteMatches = [];
     let wikiAutocompletePosition = { left: 0, top: 0 };
     let wikiAnchorPos = 0;
-    let globalDragLeave;
-    let globalDrop;
 
     let appSettings = { ...defaultSettings };
 
@@ -157,106 +159,6 @@
         }
     }
 
-    /* ── onMount setup helpers ── */
-
-    function setupGlobalDragListeners() {
-        globalDragEnter = (e) => {
-            if (!isFileDrag(e)) return;
-            e.preventDefault();
-            dragCounter = Math.max(dragCounter, 1);
-            isDragging = true;
-        };
-
-        globalDragOver = (e) => {
-            e.preventDefault();
-            if (isFileDrag(e)) {
-                e.dataTransfer.dropEffect = "copy";
-            }
-        };
-
-        globalDragLeave = (e) => {
-            if (e.target === document.documentElement) {
-                dragCounter = 0;
-                isDragging = false;
-            }
-        };
-
-        globalDrop = (e) => {
-            const container = e.target?.closest?.(".capture-container");
-            if (container) {
-                e.preventDefault();
-                e.stopPropagation();
-                handleDrop(e);
-            }
-        };
-
-        document.addEventListener("dragenter", globalDragEnter, true);
-        document.addEventListener("dragover", globalDragOver, true);
-        document.addEventListener("dragleave", globalDragLeave, true);
-        document.addEventListener("drop", globalDrop, true);
-    }
-
-    async function setupCaptureWindowListeners() {
-        // reset_capture: clear all capture state for a fresh start.
-        // Emitted before show_capture when the user wants a clean slate
-        // (global shortcut, edge detection, tray).
-        // NOT emitted by capture-text (Cmd+Shift+C) — that must append.
-        unlistenReset = await listen("reset_capture", () => {
-            freeBlobUrls();
-            resetCaptureState();
-            statusMessage = "";
-            closeAppendPicker();
-        });
-
-        unlistenShow = await listen("show_capture", () => {
-            // Just show and focus — no reset, so existing content survives.
-            setTimeout(() => textareaRef?.focus(), 50);
-        });
-
-        unlistenInsertCaptureText = await listen("insert_capture_text", (event) => {
-            const text = typeof event.payload === "string" ? event.payload : "";
-            if (!text.trim()) return;
-            // Append captured text to existing content instead of replacing it.
-            // If content is empty, set directly; otherwise add spacing then append.
-            if (!content.trim()) {
-                content = text;
-            } else {
-                // Add spacing: if content doesn't end with a blank line, insert two newlines.
-                // If it already ends with a blank line, insert one newline.
-                const endsWithBlank = /\n\s*\n$/.test(content);
-                content = content + (endsWithBlank ? "\n" : "\n\n") + text;
-            }
-            // Required: after the native Tauri insert event, macOS needs a short delay
-            // before the textarea reliably accepts focus.
-            setTimeout(() => textareaRef?.focus(), 50);
-        });
-
-        unlistenCaptureTextFailed = await listen("capture_text_failed", (event) => {
-            const msg =
-                typeof event.payload === "string"
-                    ? event.payload
-                    : "Nothing to capture";
-            showStatus("✗ " + msg, "error");
-        });
-
-        unlistenSaveAsNote = await listen("save_as_note", () => {
-            handleSaveAsNote();
-        });
-    }
-
-    async function setupSettingsListener() {
-        unlistenSettingsChanged = await listen("settings_changed", (event) => {
-            appSettings = applySettingsUpdate(appSettings, event.payload);
-            applyColorSettings(appSettings);
-        });
-    }
-
-    async function setupTauriDragDrop() {
-        const currentWindow = await getCurrentWindow();
-        unlistenDragDrop =
-            await currentWindow.onDragDropEvent(handleDragDropEvent);
-    }
-
     function preloadVaultNotes() {
         // Preload vault notes so the append picker can open immediately.
         invoke("list_vault_notes")
@@ -279,13 +181,58 @@
             isTauri = false;
         }
 
-        setupGlobalDragListeners();
+        cleanupGlobalDragListeners = setupGlobalDragListeners({
+            setIsDragging: (v) => {
+                isDragging = v;
+            },
+            getDragCounter: () => dragCounter,
+            setDragCounter: (v) => {
+                dragCounter = v;
+            },
+            handleDrop,
+        });
 
         if (isTauri) {
             try {
-                await setupCaptureWindowListeners();
-                await setupSettingsListener();
-                await setupTauriDragDrop();
+                await setupCaptureWindowListeners({
+                    getContent: () => content,
+                    setContent: (v) => {
+                        content = v;
+                    },
+                    setStatusMessage: (v) => {
+                        statusMessage = v;
+                    },
+                    focusTextarea: () => setTimeout(() => textareaRef?.focus(), 50),
+                    freeBlobUrls,
+                    resetCaptureState,
+                    closeAppendPicker,
+                    showStatus,
+                    handleSaveAsNote,
+                    setUnlistenReset: (fn) => {
+                        unlistenReset = fn;
+                    },
+                    setUnlistenShow: (fn) => {
+                        unlistenShow = fn;
+                    },
+                    setUnlistenInsertCaptureText: (fn) => {
+                        unlistenInsertCaptureText = fn;
+                    },
+                    setUnlistenCaptureTextFailed: (fn) => {
+                        unlistenCaptureTextFailed = fn;
+                    },
+                    setUnlistenSaveAsNote: (fn) => {
+                        unlistenSaveAsNote = fn;
+                    },
+                });
+                unlistenSettingsChanged = await setupSettingsListener({
+                    getAppSettings: () => appSettings,
+                    setAppSettings: (v) => {
+                        appSettings = v;
+                    },
+                    applyColorSettings,
+                    applySettingsUpdate,
+                });
+                unlistenDragDrop = await setupTauriDragDrop({ handleDragDropEvent });
                 await loadInitialSettings({
                     invoke,
                     setAppSettings: (settings) => {
@@ -307,19 +254,7 @@
         unlistenSaveAsNote?.();
         unlistenSettingsChanged?.();
         unlistenDragDrop?.();
-
-        if (globalDragEnter) {
-            document.removeEventListener("dragenter", globalDragEnter, true);
-        }
-        if (globalDragOver) {
-            document.removeEventListener("dragover", globalDragOver, true);
-        }
-        if (globalDragLeave) {
-            document.removeEventListener("dragleave", globalDragLeave, true);
-        }
-        if (globalDrop) {
-            document.removeEventListener("drop", globalDrop, true);
-        }
+        cleanupGlobalDragListeners?.();
 
         freeBlobUrls();
     });
