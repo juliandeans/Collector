@@ -1,15 +1,17 @@
 <script>
+    import { run } from 'svelte/legacy';
+
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
     import FieldIssue from "./FieldIssue.svelte";
 
-    export let settings;
-    export let showStatus;
-    export let validation = {};
+    let { settings = $bindable(), showStatus, validation = {} } = $props();
 
-    let showTemplateEditor = false;
+    let showTemplateEditor = $state(false);
 
-    $: void showStatus;
+    run(() => {
+        void showStatus;
+    });
 </script>
 
 <div class="settings-panel">
@@ -216,7 +218,7 @@
             <label for="note_template">Template Text</label>
             <button
                 class="secondary"
-                on:click={() => (showTemplateEditor = !showTemplateEditor)}
+                onclick={() => (showTemplateEditor = !showTemplateEditor)}
             >
                 {showTemplateEditor ? "Hide Template" : "Edit Template"}
             </button>
@@ -227,7 +229,7 @@
                     placeholder="---&#10;created: <% tp.date.now(&quot;YYYY-MM-DD hh:mm&quot;) %>&#10;modified: &#10;daily: &quot;[[<% tp.date.now(&quot;YYYY-MM-DD&quot;) %>]]&quot;&#10;tags: inbox&#10;type: inbox&#10;---"
                     rows="8"
                     class="template-editor"
-                />
+></textarea>
                 <small
                     >This text will be inserted at the beginning of each new
                     note (e.g. for frontmatter/properties)</small

@@ -1,5 +1,11 @@
 <script>
-    export let issue = null;
+    /**
+     * @typedef {Object} Props
+     * @property {any} [issue]
+     */
+
+    /** @type {Props} */
+    let { issue = null } = $props();
 </script>
 
 {#if issue?.message}

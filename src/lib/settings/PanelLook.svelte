@@ -1,15 +1,17 @@
 <script>
+    import { run } from 'svelte/legacy';
+
     import Section from "./Section.svelte";
     import FieldIssue from "./FieldIssue.svelte";
     import { getSystemFonts } from "../utils.js";
 
-    export let settings;
-    export let showStatus;
-    export let validation = {};
+    let { settings = $bindable(), showStatus, validation = {} } = $props();
 
     const systemFonts = getSystemFonts();
 
-    $: void showStatus;
+    run(() => {
+        void showStatus;
+    });
 </script>
 
 <div class="settings-panel">

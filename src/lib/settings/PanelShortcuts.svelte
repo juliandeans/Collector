@@ -1,14 +1,20 @@
 <script>
+    import { run } from 'svelte/legacy';
+
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
     import FieldIssue from "./FieldIssue.svelte";
 
-    export let settings;
-    export let showStatus;
-    export let validation = {};
-    export let onChange = () => {};
+    let {
+        settings = $bindable(),
+        showStatus,
+        validation = {},
+        onChange = () => {}
+    } = $props();
 
-    $: void showStatus;
+    run(() => {
+        void showStatus;
+    });
 
     function handleShortcutKeyDown(event, field) {
         event.preventDefault();
@@ -77,7 +83,7 @@
                 id="global_shortcut"
                 bind:value={settings.global_shortcut}
                 placeholder="Cmd+Shift+N"
-                on:keydown={(e) => handleShortcutKeyDown(e, "global_shortcut")}
+                onkeydown={(e) => handleShortcutKeyDown(e, "global_shortcut")}
             />
             <FieldIssue issue={validation.global_shortcut} />
         </div>
@@ -95,7 +101,7 @@
                     id="global_close_shortcut"
                     bind:value={settings.global_close_shortcut}
                     placeholder="Optional"
-                    on:keydown={(e) =>
+                    onkeydown={(e) =>
                         handleShortcutKeyDown(e, "global_close_shortcut")}
                 />
                 <FieldIssue issue={validation.global_close_shortcut} />
@@ -113,7 +119,7 @@
                 id="reader_shortcut"
                 bind:value={settings.reader_shortcut}
                 placeholder="Cmd+Shift+R"
-                on:keydown={(e) => handleShortcutKeyDown(e, "reader_shortcut")}
+                onkeydown={(e) => handleShortcutKeyDown(e, "reader_shortcut")}
             />
             <FieldIssue issue={validation.reader_shortcut} />
         </div>
@@ -131,7 +137,7 @@
                     id="reader_close_shortcut"
                     bind:value={settings.reader_close_shortcut}
                     placeholder="Optional"
-                    on:keydown={(e) =>
+                    onkeydown={(e) =>
                         handleShortcutKeyDown(e, "reader_close_shortcut")}
                 />
                 <FieldIssue issue={validation.reader_close_shortcut} />
@@ -146,7 +152,7 @@
                 id="reader_open_in_obsidian_shortcut"
                 bind:value={settings.reader_open_in_obsidian_shortcut}
                 placeholder="Cmd+Shift+O"
-                on:keydown={(e) =>
+                onkeydown={(e) =>
                     handleShortcutKeyDown(e, "reader_open_in_obsidian_shortcut")}
             />
             <FieldIssue issue={validation.reader_open_in_obsidian_shortcut} />
@@ -160,7 +166,7 @@
                 id="reader_navigate_back_shortcut"
                 bind:value={settings.reader_navigate_back_shortcut}
                 placeholder="Optional"
-                on:keydown={(e) =>
+                onkeydown={(e) =>
                     handleShortcutKeyDown(e, "reader_navigate_back_shortcut")}
             />
             <FieldIssue issue={validation.reader_navigate_back_shortcut} />
@@ -174,7 +180,7 @@
                 id="reader_command_palette_shortcut"
                 bind:value={settings.reader_command_palette_shortcut}
                 placeholder="Cmd+P"
-                on:keydown={(e) =>
+                onkeydown={(e) =>
                     handleShortcutKeyDown(e, "reader_command_palette_shortcut")}
             />
             <FieldIssue issue={validation.reader_command_palette_shortcut} />
@@ -191,7 +197,7 @@
                 id="capture_text_shortcut"
                 bind:value={settings.capture_text_shortcut}
                 placeholder="Cmd+Shift+C"
-                on:keydown={(e) =>
+                onkeydown={(e) =>
                     handleShortcutKeyDown(e, "capture_text_shortcut")}
             />
             <FieldIssue issue={validation.capture_text_shortcut} />
@@ -216,7 +222,7 @@
                 id="save_to_daily_shortcut"
                 bind:value={settings.save_to_daily_shortcut}
                 placeholder="Cmd+Enter"
-                on:keydown={(e) =>
+                onkeydown={(e) =>
                     handleShortcutKeyDown(e, "save_to_daily_shortcut")}
             />
             <FieldIssue issue={validation.save_to_daily_shortcut} />
@@ -229,7 +235,7 @@
                 id="save_as_note_shortcut"
                 bind:value={settings.save_as_note_shortcut}
                 placeholder="Cmd+Shift+Enter"
-                on:keydown={(e) =>
+                onkeydown={(e) =>
                     handleShortcutKeyDown(e, "save_as_note_shortcut")}
             />
             <FieldIssue issue={validation.save_as_note_shortcut} />
@@ -242,7 +248,7 @@
                 id="append_to_note_shortcut"
                 bind:value={settings.append_to_note_shortcut}
                 placeholder="Cmd+Option+Enter"
-                on:keydown={(e) =>
+                onkeydown={(e) =>
                     handleShortcutKeyDown(e, "append_to_note_shortcut")}
             />
             <FieldIssue issue={validation.append_to_note_shortcut} />

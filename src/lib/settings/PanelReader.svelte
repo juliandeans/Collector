@@ -1,4 +1,7 @@
 <script>
+    import { run, createBubbler, stopPropagation } from 'svelte/legacy';
+
+    const bubble = createBubbler();
     import { tick } from "svelte";
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
@@ -10,15 +13,17 @@
     import { normalizePinnedNotes } from "./pinned-notes.js";
     import { filterPaletteNotes } from "../reader/paletteLogic.js";
 
-    export let settings;
-    export let validation = {};
-    export let onChange = () => {};
-    export let vaultNotes = [];
+    let {
+        settings = $bindable(),
+        validation = {},
+        onChange = () => {},
+        vaultNotes = []
+    } = $props();
 
-    let notePickerOpen = false;
-    let pickerQuery = "";
-    let pickerIndex = 0;
-    let pickerInputRef;
+    let notePickerOpen = $state(false);
+    let pickerQuery = $state("");
+    let pickerIndex = $state(0);
+    let pickerInputRef = $state();
 
     function getFilename(path) {
         return (
@@ -27,9 +32,9 @@
         );
     }
 
-    let pickerResultsRef;
+    let pickerResultsRef = $state();
 
-    $: filteredPickerNotes = filterPaletteNotes(vaultNotes, pickerQuery, 20);
+    let filteredPickerNotes = $derived(filterPaletteNotes(vaultNotes, pickerQuery, 20));
 
     function ensurePickerItemVisible() {
         if (!pickerResultsRef) return;
@@ -48,9 +53,11 @@
         }
     }
 
-    $: if (notePickerOpen && filteredPickerNotes.length > 0 && pickerIndex >= 0) {
-        void tick().then(ensurePickerItemVisible);
-    }
+    run(() => {
+        if (notePickerOpen && filteredPickerNotes.length > 0 && pickerIndex >= 0) {
+            void tick().then(ensurePickerItemVisible);
+        }
+    });
 
     function openNotePicker() {
         pickerQuery = "";
@@ -58,9 +65,11 @@
         notePickerOpen = true;
     }
 
-    $: if (notePickerOpen) {
-        void tick().then(() => pickerInputRef?.focus());
-    }
+    run(() => {
+        if (notePickerOpen) {
+            void tick().then(() => pickerInputRef?.focus());
+        }
+    });
 
     function closeNotePicker() {
         notePickerOpen = false;
@@ -163,7 +172,7 @@
                                     type="text"
                                     value={note.label}
                                     placeholder={getFilename(note.path)}
-                                    on:input={(event) =>
+                                    oninput={(event) =>
                                         updatePinnedNote(
                                             note.path,
                                             "label",
@@ -179,7 +188,7 @@
                                         type="button"
                                         title={iconOption.label}
                                         aria-label={iconOption.label}
-                                        on:click={() =>
+                                        onclick={() =>
                                             updatePinnedNote(
                                                 note.path,
                                                 "icon",
@@ -187,10 +196,10 @@
                                             )}
                                     >
                                         {#if iconOption.component}
-                                            <svelte:component
-                                                this={getReaderIconComponent(
+                                            {@const SvelteComponent = getReaderIconComponent(
                                                     iconOption.id,
                                                 )}
+                                            <SvelteComponent
                                                 size={14}
                                                 strokeWidth={1.9}
                                             />
@@ -205,7 +214,7 @@
                         <button
                             class="remove-note"
                             type="button"
-                            on:click={() => removePinnedNote(note.path)}
+                            onclick={() => removePinnedNote(note.path)}
                         >
                             ✕
                         </button>
@@ -221,20 +230,20 @@
             actual Markdown file.
         </small>
         <FieldIssue issue={validation.pinned_notes} />
-        <button class="secondary" type="button" on:click={openNotePicker}
+        <button class="secondary" type="button" onclick={openNotePicker}
             >+ Add Note</button
         >
     </Section>
 
     {#if notePickerOpen}
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <div class="picker-backdrop" on:click={closeNotePicker}>
+        <div class="picker-backdrop" onclick={closeNotePicker}>
             <div
                 class="picker-panel"
                 role="dialog"
                 aria-modal="true"
-                on:click|stopPropagation
-                on:keydown={handlePickerKeydown}
+                onclick={stopPropagation(bubble('click'))}
+                onkeydown={handlePickerKeydown}
             >
                 <input
                     bind:this={pickerInputRef}
@@ -242,10 +251,10 @@
                     class="picker-input"
                     placeholder="Search vault notes..."
                     spellcheck="false"
-                    on:input={() => {
+                    oninput={() => {
                         pickerIndex = 0;
                     }}
-                    on:keydown={handlePickerKeydown}
+                    onkeydown={handlePickerKeydown}
                 />
                 <div class="picker-results" bind:this={pickerResultsRef}>
                     {#if filteredPickerNotes.length === 0}
@@ -256,8 +265,8 @@
                                 class="picker-item"
                                 class:selected={idx === pickerIndex}
                                 type="button"
-                                on:click={() => pickNote(note)}
-                                on:pointermove={() => {
+                                onclick={() => pickNote(note)}
+                                onpointermove={() => {
                                     pickerIndex = idx;
                                 }}
                             >

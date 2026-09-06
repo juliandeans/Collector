@@ -1,18 +1,24 @@
 <script>
+    import { run } from 'svelte/legacy';
+
     import Section from "./Section.svelte";
     import FieldIssue from "./FieldIssue.svelte";
     import { invoke } from "@tauri-apps/api/core";
     import { open } from "@tauri-apps/plugin-dialog";
 
-    export let settings;
-    export let showStatus;
-    export let validation = {};
-    export let onChange = () => {};
+    let {
+        settings = $bindable(),
+        showStatus,
+        validation = {},
+        onChange = () => {}
+    } = $props();
 
-    let isIndexing = false;
-    let indexStatus = "";
+    let isIndexing = $state(false);
+    let indexStatus = $state("");
 
-    $: void showStatus;
+    run(() => {
+        void showStatus;
+    });
 
     async function pickVaultPath() {
         const selected = await open({
@@ -65,7 +71,7 @@
                     placeholder="/Users/username/Vault"
                     readonly
                 />
-                <button class="secondary" on:click={pickVaultPath}
+                <button class="secondary" onclick={pickVaultPath}
                     >Choose...</button
                 >
             </div>
@@ -74,7 +80,7 @@
                 <button
                     class="secondary"
                     type="button"
-                    on:click={handleReindex}
+                    onclick={handleReindex}
                     disabled={isIndexing}
                 >
                     {isIndexing ? "Indexing..." : "↻ Re-index Vault"}

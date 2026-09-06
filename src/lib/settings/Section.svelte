@@ -1,6 +1,6 @@
 <script>
-    export let title;
-    let collapsed = false;
+    let { title, children } = $props();
+    let collapsed = $state(false);
 
     function toggle() {
         collapsed = !collapsed;
@@ -8,12 +8,12 @@
 </script>
 
 <section class:collapsed>
-    <button type="button" class="section-header" on:click={toggle}>
+    <button type="button" class="section-header" onclick={toggle}>
         <span class="section-title">{title}</span>
     </button>
     {#if !collapsed}
         <div class="section-body">
-            <slot />
+            {@render children?.()}
         </div>
     {/if}
 </section>

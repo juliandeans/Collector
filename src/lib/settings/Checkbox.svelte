@@ -1,16 +1,30 @@
 <script>
+    import { createBubbler } from 'svelte/legacy';
+
+    const bubble = createBubbler();
+    
     /**
-     * Custom styled checkbox – adapts to light/dark mode via CSS vars.
-     * Wraps a hidden native input for accessibility and form behaviour.
-     *
-     * Props mirror a native checkbox: checked, disabled, id, name, value.
-     * `on:change` works as usual.
+     * @typedef {Object} Props
+     * @property {boolean} [checked] - Custom styled checkbox – adapts to light/dark mode via CSS vars.
+Wraps a hidden native input for accessibility and form behaviour.
+Props mirror a native checkbox: checked, disabled, id, name, value.
+`on:change` works as usual.
+     * @property {boolean} [disabled]
+     * @property {any} [id]
+     * @property {any} [name]
+     * @property {any} [value]
+     * @property {import('svelte').Snippet} [children]
      */
-    export let checked = false;
-    export let disabled = false;
-    export let id = undefined;
-    export let name = undefined;
-    export let value = undefined;
+
+    /** @type {Props} */
+    let {
+        checked = $bindable(false),
+        disabled = false,
+        id = undefined,
+        name = undefined,
+        value = undefined,
+        children
+    } = $props();
 </script>
 
 <label class="checkbox-wrapper" class:disabled>
@@ -21,10 +35,10 @@
         {value}
         bind:checked
         {disabled}
-        on:change
-        on:click
-        on:focus
-        on:blur
+        onchange={bubble('change')}
+        onclick={bubble('click')}
+        onfocus={bubble('focus')}
+        onblur={bubble('blur')}
     />
     <span class="checkbox-visual" aria-hidden="true">
         {#if checked}
@@ -44,7 +58,7 @@
         {/if}
     </span>
     <span class="checkbox-label">
-        <slot />
+        {@render children?.()}
     </span>
 </label>
 

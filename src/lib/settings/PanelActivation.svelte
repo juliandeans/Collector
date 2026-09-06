@@ -5,11 +5,9 @@
     import { normalizeDelayValue } from "./delay-utils.js";
     import FieldIssue from "./FieldIssue.svelte";
 
-    export let settings;
-    export let validation = {};
-    export let onChange = () => {};
+    let { settings = $bindable(), validation = {}, onChange = () => {} } = $props();
 
-    let showAppPicker = false;
+    let showAppPicker = $state(false);
 
     function modifierLabel(mod) {
         return (
@@ -59,10 +57,10 @@
         onChange();
     }
 
-    $: showConflictHint =
-        settings.edge_detection_enabled &&
+    let showConflictHint =
+        $derived(settings.edge_detection_enabled &&
         settings.reader_edge_enabled &&
-        settings.edge_side === settings.reader_edge_side;
+        settings.edge_side === settings.reader_edge_side);
 </script>
 
 <div class="settings-panel">
@@ -115,7 +113,7 @@
                             min="50"
                             max="10000"
                             step="50"
-                            on:blur={() =>
+                            onblur={() =>
                                 normalizeDelayField(
                                     "note_edge_open_delay_ms",
                                 )}
@@ -183,7 +181,7 @@
                             min="50"
                             max="10000"
                             step="50"
-                            on:blur={() =>
+                            onblur={() =>
                                 normalizeDelayField(
                                     "reader_edge_open_delay_ms",
                                 )}
@@ -241,7 +239,7 @@
                             <button
                                 class="exclusion-remove"
                                 type="button"
-                                on:click={() => removeExcludedApp(app)}
+                                onclick={() => removeExcludedApp(app)}
                             >
                                 ✕
                             </button>
@@ -253,7 +251,7 @@
             <button
                 class="secondary add-app-btn"
                 type="button"
-                on:click={toggleAppPicker}
+                onclick={toggleAppPicker}
             >
                 + Add App
             </button>

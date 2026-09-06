@@ -4,10 +4,12 @@
     import { open } from "@tauri-apps/plugin-dialog";
     import { normalizeComparablePath } from "./path-utils.js";
 
-    export let settings;
-    export let showStatus;
-    export let validation = {};
-    export let onChange = () => {};
+    let {
+        settings = $bindable(),
+        showStatus,
+        validation = {},
+        onChange = () => {}
+    } = $props();
 
     function toRelativeVaultDirectoryPath(path = "") {
         const normalizedPath = normalizeComparablePath(path.trim());
@@ -95,7 +97,7 @@
                     bind:value={settings.screenshot_path}
                     placeholder="Grafiken/Screenshots"
                 />
-                <button class="secondary" on:click={pickScreenshotPath}
+                <button class="secondary" onclick={pickScreenshotPath}
                     >Choose...</button
                 >
             </div>

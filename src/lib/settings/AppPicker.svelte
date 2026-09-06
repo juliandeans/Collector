@@ -1,38 +1,34 @@
 <script>
+  import { run, createBubbler, stopPropagation } from 'svelte/legacy';
+
+  const bubble = createBubbler();
   import { invoke } from "@tauri-apps/api/core";
   import { createEventDispatcher, tick } from "svelte";
 
-  /** @type {boolean} */
-  export let show = false;
-  /** @type {string[]} */
-  export let excludedApps = [];
-  /** @type {() => void} */
-  export let onAdd = () => {};
+  
+  
+  
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [show]
+   * @property {string[]} [excludedApps]
+   * @property {() => void} [onAdd]
+   */
+
+  /** @type {Props} */
+  let { show = false, excludedApps = [], onAdd = () => {} } = $props();
 
   const dispatch = createEventDispatcher();
 
-  let allApps = [];
-  let runningSet = new Set();
-  let loadedAll = false;
-  let query = "";
-  let selectedIndex = 0;
-  let inputRef;
+  let allApps = $state([]);
+  let runningSet = $state(new Set());
+  let loadedAll = $state(false);
+  let query = $state("");
+  let selectedIndex = $state(0);
+  let inputRef = $state();
 
-  $: filteredApps = query
-    ? allApps.filter((app) =>
-        app.toLowerCase().includes(query.trim().toLowerCase()),
-      )
-    : allApps;
 
-  $: if (show) {
-    void tick().then(() => {
-      inputRef?.focus();
-    });
-  }
 
-  $: if (show && !loadedAll) {
-    loadAllApps();
-  }
 
   async function loadAllApps() {
     loadedAll = true;
@@ -89,17 +85,34 @@
   }
 
 
+  let filteredApps = $derived(query
+    ? allApps.filter((app) =>
+        app.toLowerCase().includes(query.trim().toLowerCase()),
+      )
+    : allApps);
+  run(() => {
+    if (show) {
+      void tick().then(() => {
+        inputRef?.focus();
+      });
+    }
+  });
+  run(() => {
+    if (show && !loadedAll) {
+      loadAllApps();
+    }
+  });
 </script>
 
 {#if show}
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="picker-backdrop" on:click={close}>
+  <div class="picker-backdrop" onclick={close}>
     <div
       class="picker-panel"
       role="dialog"
       aria-modal="true"
-      on:click|stopPropagation
-      on:keydown={handleKeydown}
+      onclick={stopPropagation(bubble('click'))}
+      onkeydown={handleKeydown}
     >
       <div class="picker-search-row">
         <input
@@ -108,14 +121,14 @@
           class="picker-search"
           placeholder="Search apps…"
           spellcheck="false"
-          on:input={handleSearchInput}
-          on:keydown={handleKeydown}
+          oninput={handleSearchInput}
+          onkeydown={handleKeydown}
         />
         <button
           class="choose-btn"
           type="button"
           title="Browse all installed applications"
-          on:click={chooseApp}
+          onclick={chooseApp}
         >
           All Apps
         </button>
@@ -135,8 +148,8 @@
               class="picker-item"
               class:selected={idx === selectedIndex}
               type="button"
-              on:click={() => addApp(app)}
-              on:pointermove={() => {
+              onclick={() => addApp(app)}
+              onpointermove={() => {
                 selectedIndex = idx;
               }}
             >
