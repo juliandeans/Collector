@@ -1,5 +1,5 @@
 <script>
-  
+
   /**
    * @typedef {Object} Props
    * @property {boolean} [show]

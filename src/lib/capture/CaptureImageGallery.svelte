@@ -4,7 +4,7 @@
   const bubble = createBubbler();
   import { createEventDispatcher } from "svelte";
 
-  
+
   /**
    * @typedef {Object} Props
    * @property {Array} [images]

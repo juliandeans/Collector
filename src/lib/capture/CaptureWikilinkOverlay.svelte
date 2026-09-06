@@ -2,15 +2,15 @@
   import { createEventDispatcher } from "svelte";
   import WikilinkPicker from "../WikilinkPicker.svelte";
 
-  
-  
-  
-  
-  
+
+
+
+
+
 
   const dispatch = createEventDispatcher();
 
-  
+
   /**
    * @typedef {Object} Props
    * @property {boolean} [open]

@@ -2,13 +2,15 @@
     import { createBubbler } from 'svelte/legacy';
 
     const bubble = createBubbler();
-    
+
     /**
+     * Custom styled checkbox – adapts to light/dark mode via CSS vars.
+     * Wraps a hidden native input for accessibility and form behaviour.
+     * Props mirror a native checkbox: checked, disabled, id, name, value.
+     * `on:change` works as usual.
+     *
      * @typedef {Object} Props
-     * @property {boolean} [checked] - Custom styled checkbox – adapts to light/dark mode via CSS vars.
-Wraps a hidden native input for accessibility and form behaviour.
-Props mirror a native checkbox: checked, disabled, id, name, value.
-`on:change` works as usual.
+     * @property {boolean} [checked]
      * @property {boolean} [disabled]
      * @property {any} [id]
      * @property {any} [name]

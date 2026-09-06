@@ -1,11 +1,11 @@
 <script>
   import { createEventDispatcher } from "svelte";
 
-  
-  
-  
-  
-  
+
+
+
+
+
   /**
    * @typedef {Object} Props
    * @property {boolean} [show]

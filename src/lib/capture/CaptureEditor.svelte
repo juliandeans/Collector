@@ -2,10 +2,10 @@
   import { createBubbler } from 'svelte/legacy';
 
   const bubble = createBubbler();
-  
-  
-  
-  
+
+
+
+
   /**
    * @typedef {Object} Props
    * @property {string} [content]

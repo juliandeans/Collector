@@ -5,9 +5,9 @@
   import { invoke } from "@tauri-apps/api/core";
   import { createEventDispatcher, tick } from "svelte";
 
-  
-  
-  
+
+
+
   /**
    * @typedef {Object} Props
    * @property {boolean} [show]
@@ -105,7 +105,7 @@
 </script>
 
 {#if show}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div class="picker-backdrop" onclick={close}>
     <div
       class="picker-panel"
