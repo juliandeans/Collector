@@ -19,6 +19,11 @@
         setupTauriDragDrop,
     } from "./lib/app/lifecycleSetup.js";
     import * as dragDropImages from "./lib/app/dragDropImages.js";
+    import {
+        computeClosedState,
+        computeInputState,
+        computeInsertion,
+    } from "./lib/app/wikiAutocomplete.js";
     import AppendToPicker from "./lib/reader/AppendToPicker.svelte";
     import CaptureWikilinkOverlay from "./lib/capture/CaptureWikilinkOverlay.svelte";
     import CaptureActionBar from "./lib/capture/CaptureActionBar.svelte";
@@ -30,17 +35,12 @@
     import CaptureDropOverlay from "./lib/capture/CaptureDropOverlay.svelte";
     import CaptureEditor from "./lib/capture/CaptureEditor.svelte";
     import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
-    import { getAutocompleteResults } from "./lib/reader/autocomplete.js";
     import {
         parseHeadings,
         formatEntryHeader,
         getVaultNotePath,
         matchesShortcut,
     } from "./lib/capture/capture-utils.js";
-    import {
-        findWikiTrigger,
-        computeWikilinkInsertion,
-    } from "./lib/capture/wiki-utils.js";
     import {
         appendToDailyNoteAction,
         saveAsNoteAction,
@@ -480,160 +480,39 @@
         }
     }
 
-    function openWikiAutocomplete(trigger, matches) {
-        wikiAutocompleteQuery = trigger.query;
+    function applyWikiState({ open, query, matches, index, position, anchorPos }) {
+        wikiAutocompleteOpen = open;
+        wikiAutocompleteQuery = query;
         wikiAutocompleteMatches = matches;
-        wikiAutocompleteIndex = 0;
-        wikiAnchorPos = trigger.triggerIndex;
-        wikiAutocompletePosition = getWikiDropdownPosition(
-            trigger.triggerIndex,
-            textareaRef?.selectionStart ?? trigger.triggerIndex,
-        );
-        wikiAutocompleteOpen = matches.length > 0;
-    }
-
-    function resetWikiAutocomplete() {
-        wikiAutocompleteOpen = false;
-        wikiAutocompleteQuery = "";
-        wikiAutocompleteMatches = [];
-        wikiAutocompleteIndex = 0;
-        wikiAutocompletePosition = { left: 0, top: 0 };
-        wikiAnchorPos = 0;
+        wikiAutocompleteIndex = index;
+        wikiAutocompletePosition = position;
+        wikiAnchorPos = anchorPos;
     }
 
     function handleWikiInput() {
-        if (!textareaRef) return;
-
-        const val = textareaRef.value;
-        const cursor = textareaRef.selectionStart;
-        const trigger = findWikiTrigger(val, cursor);
-
-        if (!trigger) {
-            closeWikiAutocomplete();
-            return;
-        }
-
-        const results = getAutocompleteResults(
-            trigger.query,
-            appendPickerNotes,
-            autocompleteResults,
-        );
-
-        openWikiAutocomplete(trigger, results);
+        const state = computeInputState({
+            textarea: textareaRef,
+            notes: appendPickerNotes,
+            limit: autocompleteResults,
+        });
+        if (state === null) return;
+        applyWikiState(state);
     }
 
     function insertWikilink(note) {
-        if (!textareaRef) return;
-
-        const val = textareaRef.value;
-        const cursor = textareaRef.selectionStart;
-        const queryLen = wikiAutocompleteQuery.length;
-
-        if (cursor - queryLen - 2 < 0) return;
-
-        const { before, after, insertion, newPosition } =
-            computeWikilinkInsertion(val, cursor, queryLen, note.name);
-
-        textareaRef.value = before + insertion + after;
-        textareaRef.selectionStart = newPosition;
-        textareaRef.selectionEnd = newPosition;
-        textareaRef.focus();
-
-        content = textareaRef.value;
-        closeWikiAutocomplete();
-    }
-
-    function getTextareaPosition(textarea, position) {
-        const rect = textarea.getBoundingClientRect();
-        const style = getComputedStyle(textarea);
-        const mirror = document.createElement("div");
-        const marker = document.createElement("span");
-        const copyStyles = [
-            "boxSizing",
-            "borderTopWidth",
-            "borderRightWidth",
-            "borderBottomWidth",
-            "borderLeftWidth",
-            "fontFamily",
-            "fontSize",
-            "fontStyle",
-            "fontVariant",
-            "fontWeight",
-            "letterSpacing",
-            "lineHeight",
-            "paddingTop",
-            "paddingRight",
-            "paddingBottom",
-            "paddingLeft",
-            "tabSize",
-            "textIndent",
-            "textTransform",
-            "wordBreak",
-            "wordSpacing",
-        ];
-
-        copyStyles.forEach((property) => {
-            mirror.style[property] = style[property];
+        const newContent = computeInsertion({
+            textarea: textareaRef,
+            query: wikiAutocompleteQuery,
+            note,
         });
+        if (newContent === null) return;
 
-        mirror.style.position = "absolute";
-        mirror.style.visibility = "hidden";
-        mirror.style.pointerEvents = "none";
-        mirror.style.whiteSpace = "pre-wrap";
-        mirror.style.wordWrap = "break-word";
-        mirror.style.overflowWrap = "break-word";
-        mirror.style.overflow = "hidden";
-        mirror.style.width = `${textarea.offsetWidth}px`;
-        mirror.style.top = "0";
-        mirror.style.left = "-9999px";
-
-        const textBefore = textarea.value.substring(0, position);
-        mirror.textContent = textBefore.endsWith("\n")
-            ? `${textBefore} `
-            : textBefore;
-        marker.textContent = ".";
-        mirror.appendChild(marker);
-        document.body.appendChild(mirror);
-
-        try {
-            const lineHeight = parseFloat(style.lineHeight) || 24;
-
-            return {
-                left: rect.left + marker.offsetLeft - textarea.scrollLeft,
-                top: rect.top + marker.offsetTop - textarea.scrollTop,
-                bottom:
-                    rect.top +
-                    marker.offsetTop -
-                    textarea.scrollTop +
-                    lineHeight,
-            };
-        } finally {
-            mirror.remove();
-        }
-    }
-
-    function clampWikiDropdownLeft(left) {
-        const margin = 12;
-        const pickerWidth = Math.min(320, window.innerWidth - margin * 2);
-        const maxLeft = window.innerWidth - pickerWidth - margin;
-
-        return Math.max(margin, Math.min(left, maxLeft));
-    }
-
-    function getWikiDropdownPosition(anchorPosition, cursorPosition) {
-        if (!textareaRef) return { left: 0, top: 0 };
-
-        const anchorRect = getTextareaPosition(textareaRef, anchorPosition);
-        const caretRect = getTextareaPosition(textareaRef, cursorPosition);
-
-        return {
-            left: clampWikiDropdownLeft(anchorRect.left),
-            top: caretRect.bottom + 6,
-        };
+        content = newContent;
+        applyWikiState(computeClosedState());
     }
 
     function closeWikiAutocomplete() {
-        resetWikiAutocomplete();
+        applyWikiState(computeClosedState());
     }
 
     async function openSettings() {
