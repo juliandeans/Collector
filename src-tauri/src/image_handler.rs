@@ -9,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::capture::render_datetime_template;
 use crate::log_safety::{redact_path, summarize_bytes};
 use crate::settings::Settings;
-use crate::{build_image_data_url, normalize_path};
+use crate::vault_paths::{build_image_data_url, normalize_path};
 
 /// Result of saving an image
 #[derive(Debug)]
