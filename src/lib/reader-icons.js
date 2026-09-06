@@ -11,7 +11,7 @@ import {
   Receipt,
   Scale,
   ScrollText,
-} from "lucide-svelte";
+} from "@lucide/svelte";
 
 export const readerIconOptions = [
   { id: "", label: "None", component: null },
