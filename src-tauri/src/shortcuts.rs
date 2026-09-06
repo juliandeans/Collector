@@ -69,7 +69,7 @@ impl ShortcutManager {
                                             window.hide(),
                                             "Failed to hide capture window",
                                         );
-                                        let state = app_handle2.state::<crate::AppState>();
+                                        let state = app_handle2.state::<crate::app_state::AppState>();
                                         state.edge_detector.set_capture_open(false).await;
                                     } else {
                                         warn_if_failed(
@@ -131,7 +131,7 @@ impl ShortcutManager {
                             if let Some(window) = app_handle2.get_webview_window("capture") {
                                 if window.is_visible().unwrap_or(false) {
                                     warn_if_failed(window.hide(), "Failed to hide capture window");
-                                    let state = app_handle2.state::<crate::AppState>();
+                                    let state = app_handle2.state::<crate::app_state::AppState>();
                                     state.edge_detector.set_capture_open(false).await;
                                 }
                             }
@@ -314,7 +314,7 @@ impl ShortcutManager {
                                             window.hide(),
                                             "Failed to hide reader window",
                                         );
-                                        let state = app_handle2.state::<crate::AppState>();
+                                        let state = app_handle2.state::<crate::app_state::AppState>();
                                         state.edge_detector.set_reader_open(false).await;
                                     } else {
                                         warn_if_failed(
@@ -367,7 +367,7 @@ impl ShortcutManager {
                             if let Some(window) = app_handle2.get_webview_window("reader") {
                                 if window.is_visible().unwrap_or(false) {
                                     warn_if_failed(window.hide(), "Failed to hide reader window");
-                                    let state = app_handle2.state::<crate::AppState>();
+                                    let state = app_handle2.state::<crate::app_state::AppState>();
                                     state.edge_detector.set_reader_open(false).await;
                                 }
                             }
