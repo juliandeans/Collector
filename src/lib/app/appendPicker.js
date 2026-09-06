@@ -142,7 +142,7 @@ export async function appendToNote(
     {
         invoke,
         getContent,
-        isLoading,
+        getIsLoading,
         setLoading,
         getEntryHeaderTemplate,
         freeBlobUrls,
@@ -153,7 +153,7 @@ export async function appendToNote(
 ) {
     const notePath = getVaultNotePath(note);
     const content = getContent();
-    if (!notePath || !content.trim() || isLoading) return;
+    if (!notePath || !content.trim() || getIsLoading()) return;
 
     setLoading(true);
 

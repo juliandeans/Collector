@@ -36,7 +36,7 @@
     import CaptureDropOverlay from "./lib/capture/CaptureDropOverlay.svelte";
     import CaptureEditor from "./lib/capture/CaptureEditor.svelte";
     import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
-    import { getVaultNotePath, matchesShortcut } from "./lib/capture/capture-utils.js";
+    import { matchesShortcut } from "./lib/capture/capture-utils.js";
     import {
         appendToDailyNoteAction,
         saveAsNoteAction,
@@ -168,6 +168,8 @@
                     setStatusMessage: (v) => {
                         statusMessage = v;
                     },
+                    // Required: after the native Tauri capture events, macOS needs a
+                    // short delay before the textarea reliably accepts focus.
                     focusTextarea: () => setTimeout(() => textareaRef?.focus(), 50),
                     freeBlobUrls,
                     resetCaptureState,
@@ -348,7 +350,7 @@
         await appendPicker.appendToNote(note, heading, {
             invoke,
             getContent: () => content,
-            isLoading,
+            getIsLoading: () => isLoading,
             setLoading: (v) => {
                 isLoading = v;
             },
