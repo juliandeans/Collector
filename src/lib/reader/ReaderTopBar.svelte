@@ -1,10 +1,19 @@
 <script>
+  import { createBubbler, stopPropagation } from 'svelte/legacy';
+
+  const bubble = createBubbler();
   import { createEventDispatcher } from "svelte";
   import { getReaderIconComponent } from "../reader-icons.js";
 
-  export let tabs = [];
-  export let activeTabIndex = 0;
-  export let canOpenInObsidian = false;
+  /**
+   * @typedef {Object} Props
+   * @property {any} [tabs]
+   * @property {number} [activeTabIndex]
+   * @property {boolean} [canOpenInObsidian]
+   */
+
+  /** @type {Props} */
+  let { tabs = [], activeTabIndex = 0, canOpenInObsidian = false } = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -22,8 +31,8 @@
         class="tab-action"
         type="button"
         title="Open Command Palette"
-        on:mousedown|stopPropagation
-        on:click|stopPropagation={() => dispatch("newTab")}
+        onmousedown={stopPropagation(bubble('mousedown'))}
+        onclick={stopPropagation(() => dispatch("newTab"))}
       >
         +
       </button>
@@ -37,19 +46,19 @@
               class:pinned={tab.isPinned}
               type="button"
               title={tab.path}
-              on:mousedown|stopPropagation
-              on:click|stopPropagation={() => dispatch("activateTab", index)}
-              on:contextmenu|stopPropagation={(event) =>
+              onmousedown={stopPropagation(bubble('mousedown'))}
+              onclick={stopPropagation(() => dispatch("activateTab", index))}
+              oncontextmenu={stopPropagation((event) =>
                 dispatch("tabContextMenu", {
                   index,
                   x: event.clientX,
                   y: event.clientY,
-                })}
+                }))}
             >
               {#if getTabIcon(tab)}
+                {@const SvelteComponent = getTabIcon(tab)}
                 <span class="tab-icon" aria-hidden="true">
-                  <svelte:component
-                    this={getTabIcon(tab)}
+                  <SvelteComponent
                     size={14}
                     strokeWidth={1.9}
                   />
@@ -63,8 +72,8 @@
                 type="button"
                 aria-label={`Close ${tab.label}`}
                 title="Close tab"
-                on:mousedown|stopPropagation
-                on:click|stopPropagation={() => dispatch("closeTab", index)}
+                onmousedown={stopPropagation(bubble('mousedown'))}
+                onclick={stopPropagation(() => dispatch("closeTab", index))}
               >
                 ✕
               </button>
@@ -80,8 +89,8 @@
           class="topbar-btn obsidian-btn"
           type="button"
           title="Open in Obsidian"
-          on:mousedown|stopPropagation
-          on:click|stopPropagation={() => dispatch("openInObsidian")}
+          onmousedown={stopPropagation(bubble('mousedown'))}
+          onclick={stopPropagation(() => dispatch("openInObsidian"))}
         >
           <svg width="14" height="14" viewBox="0 0 100 100" fill="none">
             <path
@@ -102,8 +111,8 @@
         class="topbar-btn close-btn"
         type="button"
         title="Close Reader"
-        on:mousedown|stopPropagation
-        on:click|stopPropagation={() => dispatch("closeReader")}
+        onmousedown={stopPropagation(bubble('mousedown'))}
+        onclick={stopPropagation(() => dispatch("closeReader"))}
       >
         ✕
       </button>

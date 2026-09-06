@@ -1,7 +1,16 @@
 <script>
+  import { createBubbler, stopPropagation } from 'svelte/legacy';
+
+  const bubble = createBubbler();
   import { createEventDispatcher } from "svelte";
 
-  export let canGoBack = false;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [canGoBack]
+   */
+
+  /** @type {Props} */
+  let { canGoBack = false } = $props();
 
   const dispatch = createEventDispatcher();
 </script>
@@ -13,8 +22,8 @@
     type="button"
     title="Back"
     disabled={!canGoBack}
-    on:mousedown|stopPropagation
-    on:click|stopPropagation={() => canGoBack && dispatch("goBack")}
+    onmousedown={stopPropagation(bubble('mousedown'))}
+    onclick={stopPropagation(() => canGoBack && dispatch("goBack"))}
   >
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <path

@@ -1,11 +1,23 @@
 <script>
   import { createEventDispatcher } from "svelte";
 
-  export let open = false;
-  export let query = "";
-  export let matchCount = 0;
-  export let activeIndex = 0;
-  export let inputRef;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   * @property {string} [query]
+   * @property {number} [matchCount]
+   * @property {number} [activeIndex]
+   * @property {any} inputRef
+   */
+
+  /** @type {Props} */
+  let {
+    open = false,
+    query = "",
+    matchCount = 0,
+    activeIndex = 0,
+    inputRef = $bindable()
+  } = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -30,8 +42,8 @@
       value={query}
       class="search-input"
       placeholder="Search…"
-      on:input={(event) => dispatch("queryChange", event)}
-      on:keydown={handleKeydown}
+      oninput={(event) => dispatch("queryChange", event)}
+      onkeydown={handleKeydown}
     />
     <span class="search-count">
       {matchCount > 0
@@ -40,13 +52,13 @@
           ? "0 results"
           : ""}
     </span>
-    <button class="search-nav" type="button" on:click={() => dispatch("step", -1)}
+    <button class="search-nav" type="button" onclick={() => dispatch("step", -1)}
       >↑</button
     >
-    <button class="search-nav" type="button" on:click={() => dispatch("step", 1)}
+    <button class="search-nav" type="button" onclick={() => dispatch("step", 1)}
       >↓</button
     >
-    <button class="search-close" type="button" on:click={() => dispatch("close")}
+    <button class="search-close" type="button" onclick={() => dispatch("close")}
       >✕</button
     >
   </div>

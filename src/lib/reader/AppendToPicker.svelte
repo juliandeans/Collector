@@ -1,20 +1,39 @@
 <script>
+    import { run } from 'svelte/legacy';
+
     import { createEventDispatcher, tick } from "svelte";
     import CommandPalette from "./CommandPalette.svelte";
 
-    export let open = false;
-    export let step = 1;
-    export let query = "";
-    export let notes = [];
-    export let selectedIndex = 0;
-    export let selectedNote = null;
-    export let headings = [];
-    export let headingIndex = 0;
-    export let showPaths = true;
-    export let inputRef;
+    /**
+     * @typedef {Object} Props
+     * @property {boolean} [open]
+     * @property {number} [step]
+     * @property {string} [query]
+     * @property {any} [notes]
+     * @property {number} [selectedIndex]
+     * @property {any} [selectedNote]
+     * @property {any} [headings]
+     * @property {number} [headingIndex]
+     * @property {boolean} [showPaths]
+     * @property {any} inputRef
+     */
+
+    /** @type {Props} */
+    let {
+        open = false,
+        step = 1,
+        query = "",
+        notes = [],
+        selectedIndex = 0,
+        selectedNote = null,
+        headings = [],
+        headingIndex = 0,
+        showPaths = true,
+        inputRef = $bindable()
+    } = $props();
 
     const dispatch = createEventDispatcher();
-    let headingListRef;
+    let headingListRef = $state();
     let suppressPointerUntil = 0;
     let lastPointerX = null;
     let lastPointerY = null;
@@ -126,17 +145,21 @@
         }
     }
 
-    $: if (open && step === 1) {
-        void tick().then(() => {
-            focusActiveStep();
-        });
-    }
+    run(() => {
+        if (open && step === 1) {
+            void tick().then(() => {
+                focusActiveStep();
+            });
+        }
+    });
 
-    $: if (open && step === 2) {
-        setTimeout(() => {
-            headingListRef?.focus({ preventScroll: true });
-        }, 0);
-    }
+    run(() => {
+        if (open && step === 2) {
+            setTimeout(() => {
+                headingListRef?.focus({ preventScroll: true });
+            }, 0);
+        }
+    });
 </script>
 
 <div class="append-to-picker-shell">
@@ -163,8 +186,8 @@
             class="heading-picker-backdrop"
             aria-label="Close append picker"
             tabindex="-1"
-            on:mousedown={() => dispatch("close")}
-        />
+            onmousedown={() => dispatch("close")}
+></button>
 
         <div class="heading-picker-panel" role="dialog" aria-modal="true">
             <div class="heading-picker-note-name">
@@ -182,15 +205,15 @@
                 role="listbox"
                 aria-label="Append targets"
                 tabindex="0"
-                on:keydown={handleHeadingKeydown}
+                onkeydown={handleHeadingKeydown}
             >
                 <button
                     type="button"
                     class="heading-picker-item heading-picker-end-item"
                     class:selected={headingIndex === 0}
-                    on:pointermove={(event) =>
+                    onpointermove={(event) =>
                         handleHeadingPointerMove(0, event)}
-                    on:click={() => dispatch("selectHeading", null)}
+                    onclick={() => dispatch("selectHeading", null)}
                 >
                     <span class="heading-picker-label">Append at end</span>
                     <span class="heading-picker-meta">
@@ -203,9 +226,9 @@
                         type="button"
                         class="heading-picker-item"
                         class:selected={headingIndex === index + 1}
-                        on:pointermove={(event) =>
+                        onpointermove={(event) =>
                             handleHeadingPointerMove(index + 1, event)}
-                        on:click={() => dispatch("selectHeading", heading)}
+                        onclick={() => dispatch("selectHeading", heading)}
                     >
                         <span class="heading-picker-label"
                             >{heading.display}</span

@@ -1,6 +1,12 @@
 <script>
-  export let message = "";
-  export let type = "";
+  /**
+   * @typedef {Object} Props
+   * @property {string} [message]
+   * @property {string} [type]
+   */
+
+  /** @type {Props} */
+  let { message = "", type = "" } = $props();
 </script>
 
 {#if message}

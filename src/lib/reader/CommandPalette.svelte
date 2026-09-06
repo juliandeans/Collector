@@ -1,15 +1,30 @@
 <script>
+  import { run } from 'svelte/legacy';
+
   import { createEventDispatcher, tick } from "svelte";
 
-  export let open = false;
-  export let query = "";
-  export let notes = [];
-  export let selectedIndex = 0;
-  export let showPaths = true;
-  export let inputRef;
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   * @property {string} [query]
+   * @property {any} [notes]
+   * @property {number} [selectedIndex]
+   * @property {boolean} [showPaths]
+   * @property {any} inputRef
+   */
+
+  /** @type {Props} */
+  let {
+    open = false,
+    query = "",
+    notes = [],
+    selectedIndex = 0,
+    showPaths = true,
+    inputRef = $bindable()
+  } = $props();
 
   const dispatch = createEventDispatcher();
-  let resultsRef;
+  let resultsRef = $state();
   let suppressPointerUntil = 0;
   let lastPointerX = null;
   let lastPointerY = null;
@@ -64,11 +79,13 @@
     dispatch("selectIndex", index);
   }
 
-  $: if (open && notes.length > 0 && selectedIndex >= 0) {
-    void tick().then(() => {
-      ensureSelectedItemVisible();
-    });
-  }
+  run(() => {
+    if (open && notes.length > 0 && selectedIndex >= 0) {
+      void tick().then(() => {
+        ensureSelectedItemVisible();
+      });
+    }
+  });
 
   function handleInput(event) {
     dispatch("queryChange", event);
@@ -119,8 +136,8 @@
     class="palette-backdrop"
     aria-label="Close palette"
     tabindex="-1"
-    on:mousedown={() => dispatch("close")}
-  />
+    onmousedown={() => dispatch("close")}
+></button>
 
   <div class="palette" role="dialog" aria-modal="true">
     <input
@@ -129,8 +146,8 @@
       class="palette-input"
       placeholder="Search vault notes..."
       spellcheck="false"
-      on:input={handleInput}
-      on:keydown={handleKeydown}
+      oninput={handleInput}
+      onkeydown={handleKeydown}
     />
 
     <div class="palette-results" bind:this={resultsRef}>
@@ -142,8 +159,8 @@
             class="palette-item"
             class:selected={index === selectedIndex}
             type="button"
-            on:pointermove={(event) => handlePointerMove(index, event)}
-            on:click={() => dispatch("openNote", note)}
+            onpointermove={(event) => handlePointerMove(index, event)}
+            onclick={() => dispatch("openNote", note)}
           >
             <span class="palette-name">{note.name}</span>
             {#if showPaths}

@@ -14,23 +14,42 @@
     } from "./editorSerialization.js";
     import { getAutocompleteResults } from "./autocomplete.js";
 
-    export let rawContent = "";
-    export let appSettings = {};
-    export let vaultNotes = [];
-    export let missingFileMessage = "";
-    export let activeTabKind = "";
-    export let showSearch = false;
-    export let showAutocomplete = false;
-    export let autocompleteResults = [];
-    export let autocompleteIndex = 0;
-    export let codeblockMap = new Map();
-    export let hiddenBlockMap = new Map();
-    export let setStrippedFrontmatter = () => {};
+    /**
+     * @typedef {Object} Props
+     * @property {string} [rawContent]
+     * @property {any} [appSettings]
+     * @property {any} [vaultNotes]
+     * @property {string} [missingFileMessage]
+     * @property {string} [activeTabKind]
+     * @property {boolean} [showSearch]
+     * @property {boolean} [showAutocomplete]
+     * @property {any} [autocompleteResults]
+     * @property {number} [autocompleteIndex]
+     * @property {any} [codeblockMap]
+     * @property {any} [hiddenBlockMap]
+     * @property {any} [setStrippedFrontmatter]
+     */
+
+    /** @type {Props} */
+    let {
+        rawContent = "",
+        appSettings = {},
+        vaultNotes = [],
+        missingFileMessage = "",
+        activeTabKind = "",
+        showSearch = false,
+        showAutocomplete = false,
+        autocompleteResults = [],
+        autocompleteIndex = 0,
+        codeblockMap = new Map(),
+        hiddenBlockMap = new Map(),
+        setStrippedFrontmatter = () => {}
+    } = $props();
 
     const dispatch = createEventDispatcher();
 
-    let editorRef;
-    let scrollRef;
+    let editorRef = $state();
+    let scrollRef = $state();
     let isComposing = false;
     let isRenderingContent = false;
     let activeParagraphEl = null;
@@ -45,16 +64,16 @@
             .join("+");
     }
 
-    $: dailyNoteShortcutLabel = formatShortcutLabel(
+    let dailyNoteShortcutLabel = $derived(formatShortcutLabel(
         appSettings?.save_to_daily_shortcut,
-    );
-    $: missingFileBannerMessage =
-        missingFileMessage.trim() &&
+    ));
+    let missingFileBannerMessage =
+        $derived(missingFileMessage.trim() &&
         activeTabKind === "daily" &&
         appSettings?.daily_note_create_if_missing &&
         dailyNoteShortcutLabel
             ? `File not found — create with ${dailyNoteShortcutLabel}`
-            : missingFileMessage;
+            : missingFileMessage);
 
     function getAutocompleteMatches(query) {
         return getAutocompleteResults(
@@ -547,7 +566,7 @@
 <div
     class="editor-scroll"
     bind:this={scrollRef}
-    on:scroll={() => dispatch("scroll")}
+    onscroll={() => dispatch("scroll")}
 >
     {#if missingFileBannerMessage.trim()}
         <div class="missing-file-banner">{missingFileBannerMessage}</div>
@@ -561,13 +580,13 @@
         aria-multiline="true"
         tabindex="0"
         data-placeholder="Start writing..."
-        on:input={handleInput}
-        on:keydown={handleKeydown}
-        on:paste={handleEditorPaste}
-        on:mousedown={handleEditorMouseDown}
-        on:blur={handleEditorBlur}
-        on:compositionstart={handleCompositionStart}
-        on:compositionend={handleCompositionEnd}
+        oninput={handleInput}
+        onkeydown={handleKeydown}
+        onpaste={handleEditorPaste}
+        onmousedown={handleEditorMouseDown}
+        onblur={handleEditorBlur}
+        oncompositionstart={handleCompositionStart}
+        oncompositionend={handleCompositionEnd}
     ></div>
 </div>
 
