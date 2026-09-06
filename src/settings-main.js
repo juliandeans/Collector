@@ -1,6 +1,7 @@
+import { mount } from 'svelte';
 import Settings from './Settings.svelte';
 
-const app = new Settings({
+const app = mount(Settings, {
     target: document.getElementById('app'),
 });
 

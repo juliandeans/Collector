@@ -1,7 +1,8 @@
 import "./global.css";
+import { mount } from "svelte";
 import Reader from "./Reader.svelte";
 
-const app = new Reader({
+const app = mount(Reader, {
   target: document.getElementById("app"),
 });
 
