@@ -18,6 +18,7 @@
         setupSettingsListener,
         setupTauriDragDrop,
     } from "./lib/app/lifecycleSetup.js";
+    import * as dragDropImages from "./lib/app/dragDropImages.js";
     import AppendToPicker from "./lib/reader/AppendToPicker.svelte";
     import CaptureWikilinkOverlay from "./lib/capture/CaptureWikilinkOverlay.svelte";
     import CaptureActionBar from "./lib/capture/CaptureActionBar.svelte";
@@ -31,9 +32,6 @@
     import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
     import { getAutocompleteResults } from "./lib/reader/autocomplete.js";
     import {
-        isFileDrag,
-        normalizeFilePath,
-        normalizeImageResult,
         parseHeadings,
         formatEntryHeader,
         getVaultNotePath,
@@ -136,27 +134,15 @@
     }
 
     function handleDragDropEvent(event) {
-        const payload = event?.payload;
-        if (!payload) return;
-
-        if (payload.type === "enter" || payload.type === "over") {
-            isDragging = true;
-            return;
-        }
-
-        if (payload.type === "leave") {
-            isDragging = false;
-            dragCounter = 0;
-            return;
-        }
-
-        if (payload.type === "drop") {
-            isDragging = false;
-            dragCounter = 0;
-            if (Array.isArray(payload.paths)) {
-                handleTauriFileDrop(payload.paths);
-            }
-        }
+        dragDropImages.handleDragDropEvent(event, {
+            setIsDragging: (v) => {
+                isDragging = v;
+            },
+            setDragCounter: (v) => {
+                dragCounter = v;
+            },
+            handleTauriFileDrop,
+        });
     }
 
     function preloadVaultNotes() {
@@ -661,345 +647,89 @@
     let dragCounter = 0;
 
     function handleDragEnter(e) {
-        e.preventDefault();
-
-        if (isFileDrag(e)) {
-            dragCounter++;
-            if (dragCounter === 1) {
-                isDragging = true;
-            }
-        }
+        dragDropImages.handleDragEnter(e, {
+            getDragCounter: () => dragCounter,
+            setDragCounter: (v) => {
+                dragCounter = v;
+            },
+            setIsDragging: (v) => {
+                isDragging = v;
+            },
+        });
     }
 
     function handleDragLeave(e) {
-        e.preventDefault();
-
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX;
-        const y = e.clientY;
-        const isLeaving =
-            x < rect.left || x > rect.right || y < rect.top || y > rect.bottom;
-
-        if (isLeaving) {
-            dragCounter--;
-            if (dragCounter <= 0) {
-                dragCounter = 0;
-                isDragging = false;
-            }
-        }
+        dragDropImages.handleDragLeave(e, {
+            getDragCounter: () => dragCounter,
+            setDragCounter: (v) => {
+                dragCounter = v;
+            },
+            setIsDragging: (v) => {
+                isDragging = v;
+            },
+        });
     }
 
     function handleDragOver(e) {
-        e.preventDefault();
-        if (isFileDrag(e)) {
-            e.dataTransfer.dropEffect = "copy";
-            if (!isDragging) {
-                isDragging = true;
-            }
-        } else {
-            if (e.dataTransfer) {
-                e.dataTransfer.dropEffect = "none";
-            }
-        }
+        dragDropImages.handleDragOver(e, {
+            getIsDragging: () => isDragging,
+            setIsDragging: (v) => {
+                isDragging = v;
+            },
+        });
     }
 
     async function handleDrop(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        isDragging = false;
-        dragCounter = 0;
-
-        if (!e.dataTransfer) {
-            showStatus(
-                "Failed to import images: dataTransfer unavailable",
-                "error",
-            );
-            return;
-        }
-
-        const items = Array.from(e.dataTransfer.items || []);
-        const files = Array.from(e.dataTransfer.files || []);
-
-        if (files.length === 0) {
-            showStatus("Failed to import images: no files found", "error");
-            return;
-        }
-
-        const promises = files.map(async (file, index) => {
-            const ext = file.name.split(".").pop()?.toLowerCase();
-            if (!["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
-                showStatus("Unsupported image: " + file.name, "error");
-                return null;
-            }
-
-            try {
-                let filePath = file.path || file.webkitRelativePath || null;
-
-                if (!filePath && items[index]) {
-                    const item = items[index];
-                    if (item.kind === "file") {
-                        const fileFromItem = item.getAsFile();
-                        if (
-                            fileFromItem &&
-                            (fileFromItem.path ||
-                                fileFromItem.webkitRelativePath)
-                        ) {
-                            filePath =
-                                fileFromItem.path ||
-                                fileFromItem.webkitRelativePath;
-                        }
-                    }
-                }
-
-                let normalizedResult;
-
-                if (filePath) {
-                    const result = await invoke("save_image", {
-                        filePath: filePath,
-                    });
-                    normalizedResult = normalizeImageResult(result);
-                } else {
-                    if (!isTauri) {
-                        showStatus(
-                            "Failed to import images outside the Tauri app",
-                            "error",
-                        );
-                        return null;
-                    }
-
-                    const arrayBuffer = await file.arrayBuffer();
-                    const uint8Array = new Uint8Array(arrayBuffer);
-
-                    let base64;
-                    try {
-                        base64 = await new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                                const result = reader.result;
-                                const base64String =
-                                    typeof result === "string"
-                                        ? result.split(",")[1] || result
-                                        : "";
-                                resolve(base64String);
-                            };
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
-                        });
-                    } catch (base64Error) {
-                        console.error(
-                            "Failed to convert to base64:",
-                            base64Error,
-                        );
-                        throw new Error(
-                            "Failed to encode file: " + base64Error.toString(),
-                        );
-                    }
-
-                    try {
-                        if (typeof invoke === "undefined") {
-                            throw new Error(
-                                "invoke is undefined - not running in Tauri",
-                            );
-                        }
-                        const result = await invoke("save_image_from_bytes", {
-                            bytesBase64: base64,
-                            filename: file.name,
-                        });
-                        normalizedResult = normalizeImageResult(result);
-                    } catch (invokeError) {
-                        console.error("Invoke error:", invokeError);
-                        throw invokeError;
-                    }
-                }
-
-                const previewUrl =
-                    normalizedResult?.preview_data_url ||
-                    URL.createObjectURL(file);
-
-                return {
-                    id: Date.now() + Math.random() + index,
-                    filename: normalizedResult?.filename || file.name,
-                    markdown: normalizedResult?.markdown || "",
-                    preview: previewUrl,
-                    file: file,
-                };
-            } catch (e) {
-                console.error("Error processing file:", e);
-                showStatus("Failed to import image: " + e.toString(), "error");
-                return null;
-            }
+        await dragDropImages.handleDrop(e, {
+            invoke,
+            getIsTauri: () => isTauri,
+            getTextarea: () => textareaRef,
+            getContent: () => content,
+            setContent: (v) => {
+                content = v;
+            },
+            updateImages: (fn) => {
+                uploadedImages = fn(uploadedImages);
+            },
+            setIsDragging: (v) => {
+                isDragging = v;
+            },
+            setDragCounter: (v) => {
+                dragCounter = v;
+            },
+            showStatus,
+            tick,
         });
-
-        const results = await Promise.all(promises);
-        const validImages = results.filter((img) => img !== null);
-
-        if (validImages.length > 0) {
-            let insertPosition = 0;
-            if (textareaRef) {
-                const textareaRect = textareaRef.getBoundingClientRect();
-                const dropX = e.clientX;
-                const dropY = e.clientY;
-                const isOverTextarea =
-                    dropX >= textareaRect.left &&
-                    dropX <= textareaRect.right &&
-                    dropY >= textareaRect.top &&
-                    dropY <= textareaRect.bottom;
-
-                if (
-                    isOverTextarea ||
-                    e.target === textareaRef ||
-                    e.target.closest("textarea") === textareaRef
-                ) {
-                    if (
-                        textareaRef.selectionStart !== null &&
-                        textareaRef.selectionStart !== undefined
-                    ) {
-                        insertPosition = textareaRef.selectionStart;
-                    } else {
-                        const lineHeight =
-                            parseInt(
-                                getComputedStyle(textareaRef).lineHeight,
-                            ) || 20;
-                        const scrollTop = textareaRef.scrollTop;
-                        const relativeY = dropY - textareaRect.top + scrollTop;
-                        const estimatedLine = Math.max(
-                            0,
-                            Math.floor(relativeY / lineHeight),
-                        );
-
-                        const lines = content.split("\n");
-                        let pos = 0;
-                        for (
-                            let i = 0;
-                            i < Math.min(estimatedLine, lines.length);
-                            i++
-                        ) {
-                            pos += lines[i].length + 1;
-                        }
-                        insertPosition = Math.min(pos, content.length);
-                    }
-                } else {
-                    insertPosition = content.length;
-                }
-            } else {
-                insertPosition = content.length;
-            }
-
-            let currentPosition = insertPosition;
-            validImages.forEach((img) => {
-                const imageMarkdown = img.markdown + "\n";
-
-                if (currentPosition >= content.length) {
-                    if (content.length > 0 && !content.endsWith("\n")) {
-                        content += "\n";
-                        currentPosition = content.length;
-                    }
-                    content += imageMarkdown;
-                    currentPosition += imageMarkdown.length;
-                } else {
-                    const before = content.substring(0, currentPosition);
-                    const after = content.substring(currentPosition);
-
-                    const isAtLineStart =
-                        before.endsWith("\n") || before.length === 0;
-
-                    if (!isAtLineStart && !before.endsWith("\n\n")) {
-                        content = before + "\n" + imageMarkdown + after;
-                        currentPosition += 1 + imageMarkdown.length;
-                    } else {
-                        content = before + imageMarkdown + after;
-                        currentPosition += imageMarkdown.length;
-                    }
-                }
-            });
-
-            uploadedImages = [...uploadedImages, ...validImages];
-
-            if (textareaRef) {
-                await tick();
-                const newPosition = currentPosition;
-                textareaRef.setSelectionRange(newPosition, newPosition);
-                textareaRef.focus();
-            }
-        }
     }
 
     async function handleTauriFileDrop(paths) {
-        isDragging = false;
-        dragCounter = 0;
-
-        if (!paths || paths.length === 0) {
-            showStatus("Failed to import images: no files found", "error");
-            return;
-        }
-
-        const imagePaths = paths.filter((path) => {
-            const ext = path.split(".").pop()?.toLowerCase();
-            return ["png", "jpg", "jpeg", "webp", "gif"].includes(ext);
+        await dragDropImages.handleTauriFileDrop(paths, {
+            invoke,
+            getContent: () => content,
+            setContent: (v) => {
+                content = v;
+            },
+            updateImages: (fn) => {
+                uploadedImages = fn(uploadedImages);
+            },
+            getTextarea: () => textareaRef,
+            setIsDragging: (v) => {
+                isDragging = v;
+            },
+            setDragCounter: (v) => {
+                dragCounter = v;
+            },
+            showStatus,
         });
-
-        if (imagePaths.length === 0) {
-            showStatus(
-                "Failed to import images: no supported image files found",
-                "error",
-            );
-            return;
-        }
-
-        const promises = imagePaths.map(async (filePath, index) => {
-            try {
-                const result = await invoke("save_image", {
-                    filePath: filePath,
-                });
-                const normalizedResult = normalizeImageResult(result);
-
-                const previewUrl = normalizedResult.preview_data_url || null;
-
-                return {
-                    id: Date.now() + Math.random() + index,
-                    filename:
-                        normalizedResult.filename ||
-                        normalizeFilePath(
-                            normalizedResult.saved_path || filePath,
-                        )
-                            .split("/")
-                            .pop() ||
-                        `image${index}`,
-                    markdown: normalizedResult.markdown,
-                    preview: previewUrl,
-                    file: null,
-                };
-            } catch (e) {
-                console.error("Error processing file:", e);
-                showStatus("Failed to import image: " + e.toString(), "error");
-                return null;
-            }
-        });
-
-        const results = await Promise.all(promises);
-        const validImages = results.filter((img) => img !== null);
-
-        if (validImages.length > 0) {
-            uploadedImages = [...uploadedImages, ...validImages];
-            if (content.length > 0 && !content.endsWith("\n")) {
-                content += "\n";
-            }
-            validImages.forEach((img) => {
-                content += img.markdown + "\n";
-            });
-        }
-
-        // Required: after the native Tauri drag-drop bridge finishes, macOS needs a
-        // short delay before the textarea reliably regains focus.
-        setTimeout(() => textareaRef?.focus(), 50);
     }
 
     function removeImage(id) {
-        const image = uploadedImages.find((img) => img.id === id);
-        if (image && image.preview && image.preview.startsWith("blob:")) {
-            URL.revokeObjectURL(image.preview);
-        }
-        uploadedImages = uploadedImages.filter((img) => img.id !== id);
+        dragDropImages.removeImage(id, {
+            getImages: () => uploadedImages,
+            updateImages: (fn) => {
+                uploadedImages = fn(uploadedImages);
+            },
+        });
     }
 </script>
 
