@@ -7,6 +7,12 @@
     import { onMount, onDestroy, tick } from "svelte";
     import { getCurrentWindow } from "@tauri-apps/api/window";
     import { defaultSettings } from "./lib/stores.js";
+    import {
+        applyColorSettings,
+        loadInitialSettings,
+        applySettingsUpdate,
+        computeBrightnessFilter,
+    } from "./lib/app/settingsBridge.js";
     import AppendToPicker from "./lib/reader/AppendToPicker.svelte";
     import CaptureWikilinkOverlay from "./lib/capture/CaptureWikilinkOverlay.svelte";
     import CaptureActionBar from "./lib/capture/CaptureActionBar.svelte";
@@ -78,36 +84,7 @@
     $: showNotePaths = appSettings?.show_note_paths ?? true;
     $: autocompleteResults = appSettings?.autocomplete_results ?? 20;
 
-    $: brightnessFilter = (() => {
-        const b = appSettings.window_brightness;
-        if (b === 0) return " brightness(1)";
-
-        if (b > 0) {
-            const brightnessValue = 1 + (b / 100) * 0.6;
-            const contrastValue = 1 - (b / 100) * 0.25;
-            return ` brightness(${brightnessValue}) contrast(${contrastValue})`;
-        } else {
-            const brightnessValue = 1 + (b / 100) * 0.7;
-            const contrastValue = 1 + (-b / 100) * 0.3;
-            return ` brightness(${brightnessValue}) contrast(${contrastValue})`;
-        }
-    })();
-
-    function applyColorSettings(settings = appSettings) {
-        const root = document.documentElement;
-        root.style.setProperty(
-            "--accent-color",
-            settings.accent_color ?? "#8b5cf6",
-        );
-        root.style.setProperty(
-            "--internal-link-color",
-            settings.internal_link_color ?? "#a78bfa",
-        );
-        root.style.setProperty(
-            "--external-link-color",
-            settings.external_link_color ?? "#60a5fa",
-        );
-    }
+    $: brightnessFilter = computeBrightnessFilter(appSettings.window_brightness);
 
     async function insertAfterHeading(notePath, heading, text) {
         const fileContent = await invoke("read_note_file", { path: notePath });
@@ -269,56 +246,7 @@
 
     async function setupSettingsListener() {
         unlistenSettingsChanged = await listen("settings_changed", (event) => {
-            const newSettings = event.payload;
-
-            appSettings = {
-                ...appSettings,
-                overlay_color:
-                    newSettings.overlay_color ??
-                    appSettings.overlay_color,
-                font_family: newSettings.font_family ?? appSettings.font_family,
-                font_size: newSettings.font_size ?? appSettings.font_size,
-                border_radius:
-                    newSettings.border_radius ?? appSettings.border_radius,
-                overlay_strength:
-                    newSettings.overlay_strength ??
-                    appSettings.overlay_strength,
-                window_blur: newSettings.window_blur ?? appSettings.window_blur,
-                window_saturation:
-                    newSettings.window_saturation ??
-                    appSettings.window_saturation,
-                window_brightness:
-                    newSettings.window_brightness ??
-                    appSettings.window_brightness,
-                text_color: newSettings.text_color ?? appSettings.text_color,
-                accent_color:
-                    newSettings.accent_color ?? appSettings.accent_color,
-                internal_link_color:
-                    newSettings.internal_link_color ??
-                    appSettings.internal_link_color,
-                external_link_color:
-                    newSettings.external_link_color ??
-                    appSettings.external_link_color,
-                entry_header:
-                    newSettings.entry_header ?? appSettings.entry_header,
-                show_note_paths:
-                    newSettings.show_note_paths ?? appSettings.show_note_paths,
-                autocomplete_results:
-                    newSettings.autocomplete_results ??
-                    appSettings.autocomplete_results,
-                save_to_daily_shortcut:
-                    newSettings.save_to_daily_shortcut ??
-                    appSettings.save_to_daily_shortcut,
-                save_as_note_shortcut:
-                    newSettings.save_as_note_shortcut ??
-                    appSettings.save_as_note_shortcut,
-                append_to_note_shortcut:
-                    newSettings.append_to_note_shortcut ??
-                    appSettings.append_to_note_shortcut,
-                show_capture_action_bar:
-                    newSettings.show_capture_action_bar ??
-                    appSettings.show_capture_action_bar,
-            };
+            appSettings = applySettingsUpdate(appSettings, event.payload);
             applyColorSettings(appSettings);
         });
     }
@@ -327,56 +255,6 @@
         const currentWindow = await getCurrentWindow();
         unlistenDragDrop =
             await currentWindow.onDragDropEvent(handleDragDropEvent);
-    }
-
-    async function loadInitialSettings() {
-        try {
-            const settings = await invoke("load_settings");
-            appSettings = {
-                overlay_color: settings.overlay_color,
-                font_family: settings.font_family,
-                font_size: settings.font_size,
-                border_radius: settings.border_radius,
-                overlay_strength:
-                    settings.overlay_strength ??
-                    defaultSettings.overlay_strength,
-                window_blur:
-                    settings.window_blur ?? defaultSettings.window_blur,
-                window_saturation:
-                    settings.window_saturation ??
-                    defaultSettings.window_saturation,
-                window_brightness:
-                    settings.window_brightness ??
-                    defaultSettings.window_brightness,
-                text_color: settings.text_color ?? defaultSettings.text_color,
-                accent_color:
-                    settings.accent_color ?? defaultSettings.accent_color,
-                internal_link_color:
-                    settings.internal_link_color ??
-                    defaultSettings.internal_link_color,
-                external_link_color:
-                    settings.external_link_color ??
-                    defaultSettings.external_link_color,
-                entry_header:
-                    settings.entry_header ?? defaultSettings.entry_header,
-                show_note_paths:
-                    settings.show_note_paths ?? defaultSettings.show_note_paths,
-                autocomplete_results:
-                    settings.autocomplete_results ??
-                    defaultSettings.autocomplete_results,
-                save_to_daily_shortcut:
-                    settings.save_to_daily_shortcut ?? "Cmd+Enter",
-                save_as_note_shortcut:
-                    settings.save_as_note_shortcut ?? "Cmd+Shift+Enter",
-                append_to_note_shortcut:
-                    settings.append_to_note_shortcut ?? "Cmd+Option+Enter",
-                show_capture_action_bar:
-                    settings.show_capture_action_bar ?? true,
-            };
-            applyColorSettings(appSettings);
-        } catch (e) {
-            console.error("Failed to load initial settings:", e);
-        }
     }
 
     function preloadVaultNotes() {
@@ -408,7 +286,12 @@
                 await setupCaptureWindowListeners();
                 await setupSettingsListener();
                 await setupTauriDragDrop();
-                await loadInitialSettings();
+                await loadInitialSettings({
+                    invoke,
+                    setAppSettings: (settings) => {
+                        appSettings = settings;
+                    },
+                });
                 preloadVaultNotes();
             } catch (e) {
                 console.error("Failed to listen to events:", e);
