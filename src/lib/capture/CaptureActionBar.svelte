@@ -1,16 +1,28 @@
 <script>
   import { createEventDispatcher } from "svelte";
 
-  /** @type {boolean} */
-  export let show = true;
-  /** @type {boolean} */
-  export let isLoading = false;
-  /** @type {string} */
-  export let saveToDailyShortcut = "";
-  /** @type {string} */
-  export let saveAsNoteShortcut = "";
-  /** @type {string} */
-  export let appendToNoteShortcut = "";
+  
+  
+  
+  
+  
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [show]
+   * @property {boolean} [isLoading]
+   * @property {string} [saveToDailyShortcut]
+   * @property {string} [saveAsNoteShortcut]
+   * @property {string} [appendToNoteShortcut]
+   */
+
+  /** @type {Props} */
+  let {
+    show = true,
+    isLoading = false,
+    saveToDailyShortcut = "",
+    saveAsNoteShortcut = "",
+    appendToNoteShortcut = ""
+  } = $props();
 
   const dispatch = createEventDispatcher();
 </script>
@@ -19,7 +31,7 @@
   <div class="action-bar">
     <button
       class="action-btn"
-      on:click={() => dispatch("daily")}
+      onclick={() => dispatch("daily")}
       disabled={isLoading}
       title={saveToDailyShortcut}
     >
@@ -27,7 +39,7 @@
     </button>
     <button
       class="action-btn"
-      on:click={() => dispatch("newNote")}
+      onclick={() => dispatch("newNote")}
       disabled={isLoading}
       title={saveAsNoteShortcut}
     >
@@ -35,7 +47,7 @@
     </button>
     <button
       class="action-btn"
-      on:click={() => dispatch("append")}
+      onclick={() => dispatch("append")}
       disabled={isLoading}
       title={appendToNoteShortcut}
     >

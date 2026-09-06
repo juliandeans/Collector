@@ -2,21 +2,34 @@
   import { createEventDispatcher } from "svelte";
   import WikilinkPicker from "../WikilinkPicker.svelte";
 
-  /** @type {boolean} */
-  export let open = false;
-  /** @type {Array} */
-  export let matches = [];
-  /** @type {number} */
-  export let selectedIndex = 0;
-  /** @type {{ left: number, top: number }} */
-  export let position = { left: 0, top: 0 };
-  /** @type {boolean} */
-  export let showPaths = true;
+  
+  
+  
+  
+  
 
   const dispatch = createEventDispatcher();
 
-  /** @type {(index: number) => void} */
-  export let onHover = () => {};
+  
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [open]
+   * @property {Array} [matches]
+   * @property {number} [selectedIndex]
+   * @property {{ left: number, top: number }} [position]
+   * @property {boolean} [showPaths]
+   * @property {(index: number) => void} [onHover]
+   */
+
+  /** @type {Props} */
+  let {
+    open = false,
+    matches = [],
+    selectedIndex = 0,
+    position = { left: 0, top: 0 },
+    showPaths = true,
+    onHover = () => {}
+  } = $props();
 
   function handleSelect(note) {
     dispatch("select", note);

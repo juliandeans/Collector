@@ -1,6 +1,12 @@
 <script>
-  /** @type {boolean} */
-  export let active = false;
+  
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [active]
+   */
+
+  /** @type {Props} */
+  let { active = false } = $props();
 </script>
 
 {#if active}

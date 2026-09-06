@@ -1,8 +1,17 @@
 <script>
+  import { createBubbler } from 'svelte/legacy';
+
+  const bubble = createBubbler();
   import { createEventDispatcher } from "svelte";
 
-  /** @type {Array} */
-  export let images = [];
+  
+  /**
+   * @typedef {Object} Props
+   * @property {Array} [images]
+   */
+
+  /** @type {Props} */
+  let { images = [] } = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -15,16 +24,16 @@
   <div
     class="image-gallery"
     role="presentation"
-    on:drop
-    on:dragover
-    on:dragenter
+    ondrop={bubble('drop')}
+    ondragover={bubble('dragover')}
+    ondragenter={bubble('dragenter')}
   >
     {#each images.filter((img) => img.preview) as image (image.id)}
       <div class="image-preview">
         <img src={image.preview} alt={image.filename} />
         <button
           class="remove-btn"
-          on:click={() => handleRemove(image.id)}
+          onclick={() => handleRemove(image.id)}
           title="Remove"
         >×</button>
         <div class="image-name">{image.filename}</div>

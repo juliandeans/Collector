@@ -1,27 +1,41 @@
 <script>
-  /** @type {string} */
-  export let content = "";
-  /** @type {boolean} */
-  export let isLoading = false;
-  /** @type {string} */
-  export let placeholder = "Enter note or drag image here...";
-  /** @type {HTMLTextAreaElement|null} */
-  export let textareaRef = null;
+  import { createBubbler } from 'svelte/legacy';
+
+  const bubble = createBubbler();
+  
+  
+  
+  
+  /**
+   * @typedef {Object} Props
+   * @property {string} [content]
+   * @property {boolean} [isLoading]
+   * @property {string} [placeholder]
+   * @property {HTMLTextAreaElement|null} [textareaRef]
+   */
+
+  /** @type {Props} */
+  let {
+    content = $bindable(""),
+    isLoading = false,
+    placeholder = "Enter note or drag image here...",
+    textareaRef = $bindable(null)
+  } = $props();
 </script>
 
 <div
   class="content-area"
   role="presentation"
-  on:drop
-  on:dragover
-  on:dragenter
+  ondrop={bubble('drop')}
+  ondragover={bubble('dragover')}
+  ondragenter={bubble('dragenter')}
 >
   <textarea
     bind:this={textareaRef}
     bind:value={content}
-    on:keydown
-    on:input
-    on:blur
+    onkeydown={bubble('keydown')}
+    oninput={bubble('input')}
+    onblur={bubble('blur')}
     {placeholder}
     disabled={isLoading}
     spellcheck="false"

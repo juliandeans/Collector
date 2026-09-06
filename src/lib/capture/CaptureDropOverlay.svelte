@@ -1,6 +1,12 @@
 <script>
-  /** @type {boolean} */
-  export let show = false;
+  
+  /**
+   * @typedef {Object} Props
+   * @property {boolean} [show]
+   */
+
+  /** @type {Props} */
+  let { show = false } = $props();
 </script>
 
 {#if show}
