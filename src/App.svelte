@@ -609,12 +609,12 @@
             bind:content
             bind:textareaRef
             {isLoading}
-            on:keydown={handleKeydown}
-            on:input={handleWikiInput}
-            on:blur={closeWikiAutocomplete}
-            on:drop={handleDrop}
-            on:dragover={handleDragOver}
-            on:dragenter={handleDragEnter}
+            onKeydown={handleKeydown}
+            onInput={handleWikiInput}
+            onBlur={closeWikiAutocomplete}
+            onDrop={handleDrop}
+            onDragover={handleDragOver}
+            onDragenter={handleDragEnter}
         />
     </div>
 

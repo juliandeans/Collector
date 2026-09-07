@@ -1,17 +1,16 @@
 <script>
-  import { createBubbler } from 'svelte/legacy';
-
-  const bubble = createBubbler();
-
-
-
-
   /**
    * @typedef {Object} Props
    * @property {string} [content]
    * @property {boolean} [isLoading]
    * @property {string} [placeholder]
    * @property {HTMLTextAreaElement|null} [textareaRef]
+   * @property {(event: KeyboardEvent) => void} [onKeydown]
+   * @property {(event: InputEvent) => void} [onInput]
+   * @property {(event: FocusEvent) => void} [onBlur]
+   * @property {(event: DragEvent) => void} [onDrop]
+   * @property {(event: DragEvent) => void} [onDragover]
+   * @property {(event: DragEvent) => void} [onDragenter]
    */
 
   /** @type {Props} */
@@ -19,23 +18,29 @@
     content = $bindable(""),
     isLoading = false,
     placeholder = "Enter note or drag image here...",
-    textareaRef = $bindable(null)
+    textareaRef = $bindable(),
+    onKeydown,
+    onInput,
+    onBlur,
+    onDrop,
+    onDragover,
+    onDragenter
   } = $props();
 </script>
 
 <div
   class="content-area"
   role="presentation"
-  ondrop={bubble('drop')}
-  ondragover={bubble('dragover')}
-  ondragenter={bubble('dragenter')}
+  ondrop={(event) => onDrop?.(event)}
+  ondragover={(event) => onDragover?.(event)}
+  ondragenter={(event) => onDragenter?.(event)}
 >
   <textarea
     bind:this={textareaRef}
     bind:value={content}
-    onkeydown={bubble('keydown')}
-    oninput={bubble('input')}
-    onblur={bubble('blur')}
+    onkeydown={(event) => onKeydown?.(event)}
+    oninput={(event) => onInput?.(event)}
+    onblur={(event) => onBlur?.(event)}
     {placeholder}
     disabled={isLoading}
     spellcheck="false"
