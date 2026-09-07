@@ -58,6 +58,7 @@
     getOpenVaultNoteIntent,
   } from "./lib/reader/paletteLogic.js";
   import { defaultSettings } from "./lib/stores.js";
+  import { normalizeError, isFileMissingError, getMissingState } from "./lib/reader/errorHandling.js";
 
   let tabs = $state([]);
   let activeTabIndex = $state(0);
@@ -115,21 +116,6 @@
     }
   });
   let brightnessFilter = $derived(computeBrightnessFilter(appSettings.window_brightness));
-
-  function normalizeError(error) {
-    return typeof error === "string"
-      ? error
-      : error?.message || error?.toString?.() || "Unknown error";
-  }
-
-  function isFileMissingError(error) {
-    const text = normalizeError(error).toLowerCase();
-    return (
-      text.includes("no such file") ||
-      text.includes("not found") ||
-      text.includes("cannot find")
-    );
-  }
 
   function showStatus(message, type = "success", duration = 1500) {
     clearTimeout(statusTimeout);
@@ -326,17 +312,6 @@
     } catch (error) {
       showStatus("Failed to open link", "error", 2200);
     }
-  }
-
-  // TODO: extract the tab load/save orchestration once Reader tab state is isolated from editor state.
-  function getMissingState(error) {
-    const message = normalizeError(error);
-    const missing = isFileMissingError(error);
-    return {
-      message,
-      missing,
-      missingMessage: missing ? "File not found - will be created on first save" : message,
-    };
   }
 
   function setLoadedTabState(index, content) {
