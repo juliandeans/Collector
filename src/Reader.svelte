@@ -32,7 +32,7 @@
   import { getDailyNotePath } from "./lib/reader/tabIO.js";
   import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
   import { defaultSettings } from "./lib/stores.js";
-  import { normalizeError, isFileMissingError } from "./lib/reader/errorHandling.js";
+  import { normalizeError } from "./lib/reader/errorHandling.js";
 
   let tabs = $state([]);
   let activeTabIndex = $state(0);
@@ -209,10 +209,6 @@
     searchInputRef?.select();
   }
 
-  function getCurrentMarkdown() {
-    return editorBridge.getCurrentMarkdown(editorBridgeBag());
-  }
-
   async function renderContentToEditor(raw = "") {
     await editorBridge.renderContentToEditor(raw, editorBridgeBag());
   }
@@ -224,13 +220,6 @@
   function saveScrollPosition() {
     tabLifecycle.saveScrollPosition({
       getActiveTab: () => activeTab,
-      getEditorComponent: () => editorComponent,
-      scrollPositions,
-    });
-  }
-
-  async function restoreScrollPosition(path) {
-    await tabLifecycle.restoreScrollPosition(path, {
       getEditorComponent: () => editorComponent,
       scrollPositions,
     });
