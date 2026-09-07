@@ -582,8 +582,8 @@
     open={tabContextMenu.open}
     x={tabContextMenu.x}
     y={tabContextMenu.y}
-    on:close={closeTabContextMenu}
-    on:closeTab={() => closeTabByIndex(tabContextMenu.tabIndex)}
+    onClose={closeTabContextMenu}
+    onCloseTab={() => closeTabByIndex(tabContextMenu.tabIndex)}
   />
 
   <ReaderEditor
