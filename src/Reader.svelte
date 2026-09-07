@@ -14,14 +14,9 @@
   import SearchBar from "./lib/reader/SearchBar.svelte";
   import StatusToast from "./lib/reader/StatusToast.svelte";
   import TabContextMenu from "./lib/reader/TabContextMenu.svelte";
-  import {
-    imagePathCache,
-    normalizeNewlines,
-    preprocessContent,
-    warmImagesInText,
-  } from "./lib/reader/contentProcessing.js";
-  import { getAutocompleteResults } from "./lib/reader/autocomplete.js";
+  import { imagePathCache, normalizeNewlines, warmImagesInText } from "./lib/reader/contentProcessing.js";
   import { composeContentFromMarkdown } from "./lib/reader/editorSerialization.js";
+  import * as editorBridge from "./lib/reader/editorBridge.js";
   import { setupListeners } from "./lib/reader/lifecycleSetup.js";
   import {
     ensureVaultNotes,
@@ -140,6 +135,30 @@
     editorComponent?.clearAutocomplete?.();
   }
 
+  function editorBridgeBag() {
+    return {
+      getEditorComponent: () => editorComponent,
+      getRawContent: () => rawContent,
+      setRawContent: (value) => { rawContent = value; },
+      getAppSettings: () => appSettings,
+      codeblockMap,
+      hiddenBlockMap,
+      getStrippedFrontmatter: () => strippedFrontmatter,
+      setStrippedFrontmatter: (value) => { strippedFrontmatter = value; },
+      closeAutocomplete,
+      closeSearch,
+      getVaultNotes: () => vaultNotes,
+      getAutocompleteResultLimit: () => autocompleteResultLimit,
+      setShowAutocomplete: (value) => { showAutocomplete = value; },
+      setAutocompleteResults: (value) => { autocompleteResults = value; },
+      setAutocompleteRange: (value) => { autocompleteRange = value; },
+      setAutocompleteIndex: (value) => { autocompleteIndex = value; },
+      updateActiveTabContent,
+      scheduleSave,
+      forceSave,
+    };
+  }
+
   function clearHighlights() {
     clearSearchHighlights();
   }
@@ -228,42 +247,15 @@
   }
 
   function getCurrentMarkdown() {
-    if (!editorComponent) {
-      return preprocessContent(rawContent, {
-        appSettings,
-        codeblockMap,
-        hiddenBlockMap,
-        setStrippedFrontmatter: (value) => {
-          strippedFrontmatter = value;
-        },
-      });
-    }
-
-    return editorComponent.getMarkdown();
+    return editorBridge.getCurrentMarkdown(editorBridgeBag());
   }
 
   async function renderContentToEditor(raw = "") {
-    preprocessContent(raw, {
-      appSettings,
-      codeblockMap,
-      hiddenBlockMap,
-      setStrippedFrontmatter: (value) => {
-        strippedFrontmatter = value;
-      },
-    });
-
-    if (!editorComponent) return;
-    await tick();
-    await editorComponent.renderContent(raw);
+    await editorBridge.renderContentToEditor(raw, editorBridgeBag());
   }
 
-  // TODO: keep this in Reader until editor load/reset state can be passed via a dedicated pipeline object.
   async function loadEditorContent(raw = "") {
-    editorComponent?.finalizeBlock?.();
-    closeAutocomplete();
-    closeSearch();
-    rawContent = normalizeNewlines(raw);
-    await renderContentToEditor(rawContent);
+    await editorBridge.loadEditorContent(raw, editorBridgeBag());
   }
 
   function saveScrollPosition() {
@@ -278,32 +270,15 @@
   }
 
   function handleEditorChange() {
-    const markdown = getCurrentMarkdown();
-    const content = composeContentFromMarkdown(markdown, {
-      strippedFrontmatter,
-      hiddenBlockMap,
-      codeblockMap,
-    });
-    rawContent = content;
-    updateActiveTabContent(content);
-    scheduleSave(content);
+    editorBridge.handleEditorChange(editorBridgeBag());
   }
 
   async function handleEditorSaveRequest() {
-    await forceSave();
+    await editorBridge.handleEditorSaveRequest(editorBridgeBag());
   }
 
   function handleEditorAutocompleteChange(event) {
-    showAutocomplete = event.detail.open;
-    autocompleteResults =
-      event.detail.results ??
-      getAutocompleteResults(
-        event.detail.query,
-        vaultNotes,
-        autocompleteResultLimit,
-      );
-    autocompleteRange = event.detail.range;
-    autocompleteIndex = event.detail.index ?? 0;
+    editorBridge.handleEditorAutocompleteChange(event, editorBridgeBag());
   }
 
   async function openExternalUrl(url) {
