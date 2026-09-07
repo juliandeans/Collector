@@ -1,6 +1,4 @@
 <script>
-    import { run, preventDefault } from 'svelte/legacy';
-
     import { tick } from "svelte";
 
     /**
@@ -71,7 +69,7 @@
 
         onHover(index);
     }
-    run(() => {
+    $effect.pre(() => {
         selectedIndex;
         notes;
         scrollSelectedIntoView();
@@ -84,7 +82,10 @@
             class="wikilink-picker-item"
             class:selected={index === selectedIndex}
             type="button"
-            onmousedown={preventDefault(() => onSelect(note))}
+            onmousedown={(event) => {
+                event.preventDefault();
+                onSelect(note);
+            }}
             onpointermove={(event) => handlePointerMove(index, event)}
         >
             <span class="wikilink-picker-name">{note.name}</span>
