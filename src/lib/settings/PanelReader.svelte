@@ -1,7 +1,4 @@
 <script>
-    import { run, createBubbler, stopPropagation } from 'svelte/legacy';
-
-    const bubble = createBubbler();
     import { tick } from "svelte";
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
@@ -53,7 +50,7 @@
         }
     }
 
-    run(() => {
+    $effect.pre(() => {
         if (notePickerOpen && filteredPickerNotes.length > 0 && pickerIndex >= 0) {
             void tick().then(ensurePickerItemVisible);
         }
@@ -65,7 +62,7 @@
         notePickerOpen = true;
     }
 
-    run(() => {
+    $effect.pre(() => {
         if (notePickerOpen) {
             void tick().then(() => pickerInputRef?.focus());
         }
@@ -242,7 +239,7 @@
                 class="picker-panel"
                 role="dialog"
                 aria-modal="true"
-                onclick={stopPropagation(bubble('click'))}
+                onclick={(event) => event.stopPropagation()}
                 onkeydown={handlePickerKeydown}
             >
                 <input
