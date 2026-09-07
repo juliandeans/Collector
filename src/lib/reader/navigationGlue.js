@@ -75,7 +75,8 @@ export async function handleNavigateToWikilink(target, forceNewTab = false, bag)
 
   if (intent.action === "replaceCurrent") {
     await forceSave(false);
-    setTabs(applyTabUpdate(getTabs(), activeTabIndex, {
+    const freshActiveTabIndex = getActiveTabIndex();
+    setTabs(applyTabUpdate(getTabs(), freshActiveTabIndex, {
       path: getVaultNoteTabPath(intent.note),
       label: intent.note.name,
       content: "",
@@ -85,7 +86,7 @@ export async function handleNavigateToWikilink(target, forceNewTab = false, bag)
       history: intent.history,
       isPinned: false,
     }));
-    await loadTab(activeTabIndex, true);
+    await loadTab(freshActiveTabIndex, true);
   }
 }
 
@@ -101,7 +102,8 @@ export async function navigateBack(bag) {
   const previousPath = currentTab.history[currentTab.history.length - 1];
   const note = getVaultNotes().find((entry) => getVaultNoteTabPath(entry) === previousPath);
 
-  setTabs(applyTabUpdate(getTabs(), activeTabIndex, {
+  const freshActiveTabIndex = getActiveTabIndex();
+  setTabs(applyTabUpdate(getTabs(), freshActiveTabIndex, {
     path: previousPath,
     label: note?.name ?? fileLabel(previousPath),
     content: "",
@@ -111,7 +113,7 @@ export async function navigateBack(bag) {
     history: currentTab.history.slice(0, -1),
     isPinned: false,
   }));
-  await loadTab(activeTabIndex, true);
+  await loadTab(freshActiveTabIndex, true);
 }
 
 export function openPalette(bag) {

@@ -32,7 +32,7 @@ export async function renderContentToEditor(raw = "", bag) {
   await editorComponent.renderContent(raw);
 }
 
-// TODO: keep this in Reader until editor load/reset state can be passed via a dedicated pipeline object.
+// TODO: still needs a dedicated pipeline object for editor load/reset state.
 export async function loadEditorContent(raw = "", bag) {
   const { getEditorComponent, setRawContent, closeAutocomplete, closeSearch } = bag;
   getEditorComponent()?.finalizeBlock?.();

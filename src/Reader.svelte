@@ -129,6 +129,7 @@
       setAutocompleteRange: (value) => { autocompleteRange = value; },
       setAutocompleteIndex: (value) => { autocompleteIndex = value; },
       updateActiveTabContent: (content) => {
+        if (!activeTab) return;
         tabs = tabLifecycle.applyTabUpdate(tabs, activeTabIndex, { content, loaded: true });
       },
       scheduleSave: (content) => tabLifecycle.scheduleSave(content, tabLifecycleBag()),
@@ -207,14 +208,6 @@
     await tick();
     searchInputRef?.focus();
     searchInputRef?.select();
-  }
-
-  async function renderContentToEditor(raw = "") {
-    await editorBridge.renderContentToEditor(raw, editorBridgeBag());
-  }
-
-  async function loadEditorContent(raw = "") {
-    await editorBridge.loadEditorContent(raw, editorBridgeBag());
   }
 
   function saveScrollPosition() {
@@ -309,20 +302,12 @@
     };
   }
 
-  async function loadTab(index, forceReload = false) {
-    await tabLifecycle.loadTab(index, forceReload, tabLifecycleBag());
-  }
-
   async function syncTabWithDisk(index) {
     await tabLifecycle.syncTabWithDisk(index, tabLifecycleBag());
   }
 
   async function activateTab(index, forceReload = false) {
     await tabLifecycle.activateTab(index, forceReload, tabLifecycleBag());
-  }
-
-  function scheduleSave(content = rawContent) {
-    tabLifecycle.scheduleSave(content, tabLifecycleBag());
   }
 
   async function flushPendingSave(showConfirmation = false) {
