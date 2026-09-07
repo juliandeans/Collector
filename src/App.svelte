@@ -596,25 +596,25 @@
     >
         <CaptureImageGallery
             images={uploadedImages}
-            on:remove={(event) => removeImage(event.detail)}
-            on:drop={(e) => handleDrop(e)}
-            on:dragover={(e) => {
+            onRemove={(id) => removeImage(id)}
+            onDrop={(e) => handleDrop(e)}
+            onDragover={(e) => {
                 e.preventDefault();
                 handleDragOver(e);
             }}
-            on:dragenter={(e) => handleDragEnter(e)}
+            onDragenter={(e) => handleDragEnter(e)}
         />
 
         <CaptureEditor
             bind:content
             bind:textareaRef
             {isLoading}
-            on:keydown={handleKeydown}
-            on:input={handleWikiInput}
-            on:blur={closeWikiAutocomplete}
-            on:drop={handleDrop}
-            on:dragover={handleDragOver}
-            on:dragenter={handleDragEnter}
+            onKeydown={handleKeydown}
+            onInput={handleWikiInput}
+            onBlur={closeWikiAutocomplete}
+            onDrop={handleDrop}
+            onDragover={handleDragOver}
+            onDragenter={handleDragEnter}
         />
     </div>
 
@@ -624,9 +624,9 @@
         saveToDailyShortcut={appSettings.save_to_daily_shortcut}
         saveAsNoteShortcut={appSettings.save_as_note_shortcut}
         appendToNoteShortcut={appSettings.append_to_note_shortcut}
-        on:daily={handleAppendToDaily}
-        on:newNote={handleSaveAsNote}
-        on:append={openAppendPicker}
+        onDaily={handleAppendToDaily}
+        onNewNote={handleSaveAsNote}
+        onAppend={openAppendPicker}
     />
 
     <CaptureResizeHandle />
@@ -641,7 +641,7 @@
         selectedIndex={wikiAutocompleteIndex}
         position={wikiAutocompletePosition}
         showPaths={showNotePaths}
-        on:select={(event) => insertWikilink(event.detail)}
+        onSelect={(note) => insertWikilink(note)}
         onHover={(index) => {
             wikiAutocompleteIndex = index;
         }}
