@@ -625,14 +625,14 @@
     selectedIndex={selectedPaletteIndex}
     showPaths={showNotePaths}
     bind:inputRef={paletteInputRef}
-    on:queryChange={(event) => {
-      paletteQuery = event.detail.currentTarget.value;
+    onQueryChange={(event) => {
+      paletteQuery = event.currentTarget.value;
     }}
-    on:selectIndex={(event) => {
-      selectedPaletteIndex = event.detail;
+    onSelectIndex={(index) => {
+      selectedPaletteIndex = index;
     }}
-    on:openNote={(event) => openVaultNote(event.detail)}
-    on:close={closePalette}
+    onOpenNote={(note) => openVaultNote(note)}
+    onClose={closePalette}
   />
 
   <!-- Bottom bar disabled. Re-enable when back navigation is needed. -->
