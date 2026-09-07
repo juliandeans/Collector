@@ -226,8 +226,8 @@
     await editorBridge.handleEditorSaveRequest(editorBridgeBag());
   }
 
-  function handleEditorAutocompleteChange(event) {
-    editorBridge.handleEditorAutocompleteChange(event, editorBridgeBag());
+  function handleEditorAutocompleteChange(detail) {
+    editorBridge.handleEditorAutocompleteChange({ detail }, editorBridgeBag());
   }
 
   async function openExternalUrl(url) {
@@ -602,21 +602,20 @@
     setStrippedFrontmatter={(value) => {
       strippedFrontmatter = value;
     }}
-    on:change={handleEditorChange}
-    on:saveRequest={handleEditorSaveRequest}
-    on:openSearchRequest={openSearch}
-    on:closeSearchRequest={closeSearch}
-    on:openPaletteRequest={openPalette}
-    on:openSettingsRequest={openSettings}
-    on:closeRequest={hideReader}
-    on:navigateWikilink={(event) =>
-      handleNavigateToWikilink(event.detail.target, event.detail.newTab)}
-    on:openExternalLink={(event) => openExternalUrl(event.detail)}
-    on:autocompleteChange={handleEditorAutocompleteChange}
-    on:autocompleteIndexChange={(event) => {
-      autocompleteIndex = event.detail;
+    onChange={handleEditorChange}
+    onSaveRequest={handleEditorSaveRequest}
+    onOpenSearchRequest={openSearch}
+    onCloseSearchRequest={closeSearch}
+    onOpenSettingsRequest={openSettings}
+    onCloseRequest={hideReader}
+    onNavigateWikilink={(detail) =>
+      handleNavigateToWikilink(detail.target, detail.newTab)}
+    onOpenExternalLink={(href) => openExternalUrl(href)}
+    onAutocompleteChange={handleEditorAutocompleteChange}
+    onAutocompleteIndexChange={(index) => {
+      autocompleteIndex = index;
     }}
-    on:scroll={saveScrollPosition}
+    onScroll={saveScrollPosition}
   />
 
   <CommandPalette
