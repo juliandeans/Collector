@@ -19,11 +19,8 @@
   import * as tabLifecycle from "./lib/reader/tabLifecycle.js";
   import * as tabSettingsSync from "./lib/reader/tabSettingsSync.js";
   import { setupListeners } from "./lib/reader/lifecycleSetup.js";
-  import {
-    ensureVaultNotes,
-    navigateToWikilink,
-    openInObsidian,
-  } from "./lib/reader/navigation.js";
+  import * as navigationGlue from "./lib/reader/navigationGlue.js";
+  import { ensureVaultNotes } from "./lib/reader/navigation.js";
   import { createDebouncedJob } from "./lib/reader/saveLoadPipeline.js";
   import { computeBrightnessFilter } from "./lib/reader/settingsBridge.js";
   import {
@@ -32,12 +29,8 @@
     runSearch as collectSearchMatches,
     stepSearch as getNextSearchIndex,
   } from "./lib/reader/searchLogic.js";
-  import { createTab, fileLabel } from "./lib/reader/tabState.js";
   import { getDailyNotePath } from "./lib/reader/tabIO.js";
-  import {
-    filterPaletteNotes,
-    getOpenVaultNoteIntent,
-  } from "./lib/reader/paletteLogic.js";
+  import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
   import { defaultSettings } from "./lib/stores.js";
   import { normalizeError, isFileMissingError } from "./lib/reader/errorHandling.js";
 
@@ -107,10 +100,6 @@
       statusMessage = "";
       statusType = "";
     }, duration);
-  }
-
-  function getVaultNoteTabPath(note = {}) {
-    return note.relative_path ?? note.path ?? "";
   }
 
   function closeAutocomplete() {
@@ -220,12 +209,6 @@
     searchInputRef?.select();
   }
 
-  function replaceTab(index, updates) {
-    tabs = tabs.map((tab, tabIndex) =>
-      tabIndex === index ? { ...tab, ...updates } : tab,
-    );
-  }
-
   function getCurrentMarkdown() {
     return editorBridge.getCurrentMarkdown(editorBridgeBag());
   }
@@ -312,6 +295,28 @@
       flushPendingSave: (confirm) => tabLifecycle.flushPendingSave(confirm, tabLifecycleBag()),
       setMissingFileMessage: (value) => { missingFileMessage = value; },
       invoke,
+    };
+  }
+
+  function navigationGlueBag() {
+    return {
+      getTabs: () => tabs,
+      setTabs: (value) => { tabs = value; },
+      getActiveTab: () => activeTab,
+      getActiveTabIndex: () => activeTabIndex,
+      getVaultNotes: () => vaultNotes,
+      setVaultNotes: (value) => { vaultNotes = value; },
+      getAppSettings: () => appSettings,
+      activateTab: (index, force) => tabLifecycle.activateTab(index, force, tabLifecycleBag()),
+      loadTab: (index, force) => tabLifecycle.loadTab(index, force, tabLifecycleBag()),
+      forceSave: (confirm) => tabLifecycle.forceSave(confirm, tabLifecycleBag()),
+      saveScrollPosition,
+      setShowPalette: (value) => { showPalette = value; },
+      setPaletteQuery: (value) => { paletteQuery = value; },
+      setSelectedPaletteIndex: (value) => { selectedPaletteIndex = value; },
+      focusPaletteInput: () => paletteInputRef?.focus(),
+      focusEditor: () => editorComponent?.focus(),
+      showStatus,
     };
   }
 
@@ -403,18 +408,7 @@
   }
 
   async function handleOpenInObsidian() {
-    const tab = tabs[activeTabIndex];
-    if (!tab?.path) return;
-
-    try {
-      await openInObsidian(
-        tab.path,
-        appSettings.vault_name ?? "Vault",
-        appSettings.vault_path ?? "",
-      );
-    } catch (error) {
-      showStatus("Failed to open in Obsidian", "error", 2200);
-    }
+    await navigationGlue.handleOpenInObsidian(navigationGlueBag());
   }
 
   function canCreateMissingDailyNote() {
@@ -443,142 +437,24 @@
     }
   }
 
-  function createOpenedNoteTab(note, history = []) {
-    return createTab({
-      kind: "opened",
-      path: getVaultNoteTabPath(note),
-      label: note.name,
-      isPinned: false,
-      history,
-    });
-  }
-
-  async function applyOpenVaultNoteIntent(intent) {
-    if (intent.action === "activateExisting") {
-      await activateTab(intent.index, true);
-      return true;
-    }
-
-    if (intent.action === "newTab") {
-      tabs = [...tabs, createOpenedNoteTab(intent.note)];
-      await activateTab(tabs.length - 1, true);
-      return true;
-    }
-
-    return false;
-  }
-
   async function handleNavigateToWikilink(target, forceNewTab = false) {
-    try {
-      vaultNotes = await ensureVaultNotes(vaultNotes);
-    } catch (error) {
-      showStatus(normalizeError(error), "error", 2200);
-      return;
-    }
-
-    const intent = navigateToWikilink(target, tabs, activeTabIndex, {
-      vaultNotes,
-      forceNewTab,
-    });
-
-    if (intent.action === "notFound") {
-      showStatus(`Note not found: [[${target}]]`, "error", 2200);
-      return;
-    }
-
-    if (intent.action === "openInObsidian") {
-      showStatus("Opening in Obsidian...", "success", 1200);
-
-      try {
-        await openInObsidian(
-          getVaultNoteTabPath(intent.note),
-          appSettings.vault_name ?? "Vault",
-          appSettings.vault_path ?? "",
-        );
-      } catch (error) {
-        showStatus("Failed to open in Obsidian", "error", 2200);
-      }
-
-      return;
-    }
-
-    if (intent.action === "noop") {
-      return;
-    }
-
-    saveScrollPosition();
-
-    if (await applyOpenVaultNoteIntent(intent)) {
-      return;
-    }
-
-    if (intent.action === "replaceCurrent") {
-      await forceSave(false);
-      replaceTab(activeTabIndex, {
-        path: getVaultNoteTabPath(intent.note),
-        label: intent.note.name,
-        content: "",
-        loaded: false,
-        missing: false,
-        missingMessage: "",
-        history: intent.history,
-        isPinned: false,
-      });
-      await loadTab(activeTabIndex, true);
-    }
+    await navigationGlue.handleNavigateToWikilink(target, forceNewTab, navigationGlueBag());
   }
 
   async function navigateBack() {
-    const currentTab = tabs[activeTabIndex];
-    if (!currentTab?.history?.length) return;
-
-    saveScrollPosition();
-    await forceSave(false);
-    const previousPath = currentTab.history[currentTab.history.length - 1];
-    const note = vaultNotes.find(
-      (entry) => getVaultNoteTabPath(entry) === previousPath,
-    );
-
-    replaceTab(activeTabIndex, {
-      path: previousPath,
-      label: note?.name ?? fileLabel(previousPath),
-      content: "",
-      loaded: false,
-      missing: false,
-      missingMessage: "",
-      history: currentTab.history.slice(0, -1),
-      isPinned: false,
-    });
-    await loadTab(activeTabIndex, true);
+    await navigationGlue.navigateBack(navigationGlueBag());
   }
 
   function openPalette() {
-    showPalette = true;
-    paletteQuery = "";
-    selectedPaletteIndex = 0;
-    paletteInputRef?.focus();
-
-    if (vaultNotes.length === 0) {
-      ensureVaultNotes(vaultNotes)
-        .then((notes) => {
-          vaultNotes = notes;
-        })
-        .catch((error) => {
-          showStatus(normalizeError(error), "error", 2200);
-        });
-    }
+    navigationGlue.openPalette(navigationGlueBag());
   }
 
   function closePalette() {
-    showPalette = false;
-    paletteQuery = "";
-    selectedPaletteIndex = 0;
-    editorComponent?.focus();
+    navigationGlue.closePalette(navigationGlueBag());
   }
 
   async function openVaultNote(note) {
-    closePalette();
-    await applyOpenVaultNoteIntent(getOpenVaultNoteIntent(note, tabs));
+    await navigationGlue.openVaultNote(note, navigationGlueBag());
   }
 
   async function handleShowReader() {
