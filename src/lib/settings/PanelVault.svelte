@@ -1,6 +1,4 @@
 <script>
-    import { run } from 'svelte/legacy';
-
     import Section from "./Section.svelte";
     import FieldIssue from "./FieldIssue.svelte";
     import { invoke } from "@tauri-apps/api/core";
@@ -8,17 +6,12 @@
 
     let {
         settings = $bindable(),
-        showStatus,
         validation = {},
         onChange = () => {}
     } = $props();
 
     let isIndexing = $state(false);
     let indexStatus = $state("");
-
-    run(() => {
-        void showStatus;
-    });
 
     async function pickVaultPath() {
         const selected = await open({

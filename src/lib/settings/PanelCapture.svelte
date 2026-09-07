@@ -1,17 +1,11 @@
 <script>
-    import { run } from 'svelte/legacy';
-
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
     import FieldIssue from "./FieldIssue.svelte";
 
-    let { settings = $bindable(), showStatus, validation = {} } = $props();
+    let { settings = $bindable(), validation = {} } = $props();
 
     let showTemplateEditor = $state(false);
-
-    run(() => {
-        void showStatus;
-    });
 </script>
 
 <div class="settings-panel">

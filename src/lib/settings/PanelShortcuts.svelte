@@ -1,20 +1,13 @@
 <script>
-    import { run } from 'svelte/legacy';
-
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
     import FieldIssue from "./FieldIssue.svelte";
 
     let {
         settings = $bindable(),
-        showStatus,
         validation = {},
         onChange = () => {}
     } = $props();
-
-    run(() => {
-        void showStatus;
-    });
 
     function handleShortcutKeyDown(event, field) {
         event.preventDefault();
