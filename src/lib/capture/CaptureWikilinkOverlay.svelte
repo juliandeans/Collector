@@ -1,14 +1,7 @@
 <script>
-  import { createEventDispatcher } from "svelte";
   import WikilinkPicker from "../WikilinkPicker.svelte";
 
 
-
-
-
-
-
-  const dispatch = createEventDispatcher();
 
 
   /**
@@ -19,6 +12,7 @@
    * @property {{ left: number, top: number }} [position]
    * @property {boolean} [showPaths]
    * @property {(index: number) => void} [onHover]
+   * @property {(note: any) => void} [onSelect]
    */
 
   /** @type {Props} */
@@ -28,11 +22,12 @@
     selectedIndex = 0,
     position = { left: 0, top: 0 },
     showPaths = true,
-    onHover = () => {}
+    onHover = () => {},
+    onSelect
   } = $props();
 
   function handleSelect(note) {
-    dispatch("select", note);
+    onSelect?.(note);
   }
 </script>
 

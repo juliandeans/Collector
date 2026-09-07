@@ -641,7 +641,7 @@
         selectedIndex={wikiAutocompleteIndex}
         position={wikiAutocompletePosition}
         showPaths={showNotePaths}
-        on:select={(event) => insertWikilink(event.detail)}
+        onSelect={(note) => insertWikilink(note)}
         onHover={(index) => {
             wikiAutocompleteIndex = index;
         }}
