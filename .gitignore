@@ -53,3 +53,12 @@ Thumbs.db
 
 # PDF files
 *.pdf
+
+# Private project documentation (local working notes, not for the public repo)
+HANDOFF.md
+KNOWN-ISSUES.md
+PROJECT_STATUS.md
+docs/
+
+# Local git worktrees
+.worktrees/
