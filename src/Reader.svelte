@@ -559,12 +559,12 @@
     {tabs}
     {activeTabIndex}
     canOpenInObsidian={Boolean(tabs[activeTabIndex]?.path)}
-    on:activateTab={(event) => activateTab(event.detail)}
-    on:newTab={openPalette}
-    on:openInObsidian={handleOpenInObsidian}
-    on:closeReader={hideReader}
-    on:closeTab={(event) => closeTabByIndex(event.detail)}
-    on:tabContextMenu={(event) => openTabContextMenu(event.detail)}
+    onActivateTab={(index) => activateTab(index)}
+    onNewTab={openPalette}
+    onOpenInObsidian={handleOpenInObsidian}
+    onCloseReader={hideReader}
+    onCloseTab={(index) => closeTabByIndex(index)}
+    onTabContextMenu={(detail) => openTabContextMenu(detail)}
   />
 
   <SearchBar

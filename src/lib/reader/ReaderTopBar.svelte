@@ -1,8 +1,4 @@
 <script>
-  import { createBubbler, stopPropagation } from 'svelte/legacy';
-
-  const bubble = createBubbler();
-  import { createEventDispatcher } from "svelte";
   import { getReaderIconComponent } from "../reader-icons.js";
 
   /**
@@ -10,12 +6,26 @@
    * @property {any} [tabs]
    * @property {number} [activeTabIndex]
    * @property {boolean} [canOpenInObsidian]
+   * @property {any} [onNewTab]
+   * @property {any} [onActivateTab]
+   * @property {any} [onTabContextMenu]
+   * @property {any} [onCloseTab]
+   * @property {any} [onOpenInObsidian]
+   * @property {any} [onCloseReader]
    */
 
   /** @type {Props} */
-  let { tabs = [], activeTabIndex = 0, canOpenInObsidian = false } = $props();
-
-  const dispatch = createEventDispatcher();
+  let {
+    tabs = [],
+    activeTabIndex = 0,
+    canOpenInObsidian = false,
+    onNewTab,
+    onActivateTab,
+    onTabContextMenu,
+    onCloseTab,
+    onOpenInObsidian,
+    onCloseReader
+  } = $props();
 
   function getTabIcon(tab) {
     return getReaderIconComponent(tab?.icon);
@@ -31,8 +41,11 @@
         class="tab-action"
         type="button"
         title="Open Command Palette"
-        onmousedown={stopPropagation(bubble('mousedown'))}
-        onclick={stopPropagation(() => dispatch("newTab"))}
+        onmousedown={(event) => event.stopPropagation()}
+        onclick={(event) => {
+          event.stopPropagation();
+          onNewTab?.();
+        }}
       >
         +
       </button>
@@ -46,14 +59,19 @@
               class:pinned={tab.isPinned}
               type="button"
               title={tab.path}
-              onmousedown={stopPropagation(bubble('mousedown'))}
-              onclick={stopPropagation(() => dispatch("activateTab", index))}
-              oncontextmenu={stopPropagation((event) =>
-                dispatch("tabContextMenu", {
+              onmousedown={(event) => event.stopPropagation()}
+              onclick={(event) => {
+                event.stopPropagation();
+                onActivateTab?.(index);
+              }}
+              oncontextmenu={(event) => {
+                event.stopPropagation();
+                onTabContextMenu?.({
                   index,
                   x: event.clientX,
                   y: event.clientY,
-                }))}
+                });
+              }}
             >
               {#if getTabIcon(tab)}
                 {@const SvelteComponent = getTabIcon(tab)}
@@ -72,8 +90,11 @@
                 type="button"
                 aria-label={`Close ${tab.label}`}
                 title="Close tab"
-                onmousedown={stopPropagation(bubble('mousedown'))}
-                onclick={stopPropagation(() => dispatch("closeTab", index))}
+                onmousedown={(event) => event.stopPropagation()}
+                onclick={(event) => {
+                  event.stopPropagation();
+                  onCloseTab?.(index);
+                }}
               >
                 ✕
               </button>
@@ -89,8 +110,11 @@
           class="topbar-btn obsidian-btn"
           type="button"
           title="Open in Obsidian"
-          onmousedown={stopPropagation(bubble('mousedown'))}
-          onclick={stopPropagation(() => dispatch("openInObsidian"))}
+          onmousedown={(event) => event.stopPropagation()}
+          onclick={(event) => {
+            event.stopPropagation();
+            onOpenInObsidian?.();
+          }}
         >
           <svg width="14" height="14" viewBox="0 0 100 100" fill="none">
             <path
@@ -111,8 +135,11 @@
         class="topbar-btn close-btn"
         type="button"
         title="Close Reader"
-        onmousedown={stopPropagation(bubble('mousedown'))}
-        onclick={stopPropagation(() => dispatch("closeReader"))}
+        onmousedown={(event) => event.stopPropagation()}
+        onclick={(event) => {
+          event.stopPropagation();
+          onCloseReader?.();
+        }}
       >
         ✕
       </button>
