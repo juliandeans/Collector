@@ -17,6 +17,7 @@
   import { imagePathCache } from "./lib/reader/contentProcessing.js";
   import * as editorBridge from "./lib/reader/editorBridge.js";
   import * as tabLifecycle from "./lib/reader/tabLifecycle.js";
+  import * as tabSettingsSync from "./lib/reader/tabSettingsSync.js";
   import { setupListeners } from "./lib/reader/lifecycleSetup.js";
   import {
     ensureVaultNotes,
@@ -24,25 +25,14 @@
     openInObsidian,
   } from "./lib/reader/navigation.js";
   import { createDebouncedJob } from "./lib/reader/saveLoadPipeline.js";
-  import {
-    applyColorSettings,
-    applySettings,
-    computeBrightnessFilter,
-    getReaderFilterSettings,
-    haveReaderFilterChanges,
-  } from "./lib/reader/settingsBridge.js";
+  import { computeBrightnessFilter } from "./lib/reader/settingsBridge.js";
   import {
     applySearchHighlights,
     clearSearchHighlights,
     runSearch as collectSearchMatches,
     stepSearch as getNextSearchIndex,
   } from "./lib/reader/searchLogic.js";
-  import {
-    createTab,
-    fileLabel,
-    getPinnedNotesSignature,
-    rebuildTabsFromSettings,
-  } from "./lib/reader/tabState.js";
+  import { createTab, fileLabel } from "./lib/reader/tabState.js";
   import { getDailyNotePath } from "./lib/reader/tabIO.js";
   import {
     filterPaletteNotes,
@@ -302,6 +292,26 @@
       setIsSaving: (value) => { isSaving = value; },
       showStatus,
       saveScheduler,
+    };
+  }
+
+  function tabSettingsSyncBag() {
+    return {
+      getTabs: () => tabs,
+      setTabs: (value) => { tabs = value; },
+      getActiveTab: () => activeTab,
+      getActiveTabIndex: () => activeTabIndex,
+      setActiveTabIndex: (value) => { activeTabIndex = value; },
+      getAppSettings: () => appSettings,
+      setAppSettings: (value) => { appSettings = value; },
+      getRawContent: () => rawContent,
+      getEditorComponent: () => editorComponent,
+      loadTab: (index, force) => tabLifecycle.loadTab(index, force, tabLifecycleBag()),
+      loadEditorContent: (raw) => editorBridge.loadEditorContent(raw, editorBridgeBag()),
+      renderContentToEditor: (raw) => editorBridge.renderContentToEditor(raw, editorBridgeBag()),
+      flushPendingSave: (confirm) => tabLifecycle.flushPendingSave(confirm, tabLifecycleBag()),
+      setMissingFileMessage: (value) => { missingFileMessage = value; },
+      invoke,
     };
   }
 
@@ -592,67 +602,16 @@
     }
   }
 
-  async function handleSettingsChanged(settings) {
-    const previousFilters = getReaderFilterSettings(appSettings);
-    const previousPinnedNotes = getPinnedNotesSignature(appSettings.pinned_notes);
-    appSettings = applySettings(appSettings, settings);
-    applyColorSettings(appSettings);
-    const nextFilters = getReaderFilterSettings(appSettings);
-    const nextPinnedNotes = getPinnedNotesSignature(appSettings.pinned_notes);
-    const filtersChanged = haveReaderFilterChanges(previousFilters, nextFilters);
-
-    if (previousPinnedNotes !== nextPinnedNotes) {
-      await flushPendingSave(false);
-      await applyTabSettings(settings, {
-        preserveOpened: true,
-        forceReloadActive: false,
-      });
-      return;
-    }
-
-    if (filtersChanged) {
-      editorComponent?.finalizeBlock?.();
-      imagePathCache.clear();
-      await renderContentToEditor(rawContent);
-    }
+  async function applyTabSettings(settings, options = {}) {
+    await tabSettingsSync.applyTabSettings(settings, options, tabSettingsSyncBag());
   }
 
-  async function applyTabSettings(
-    settings,
-    { preserveOpened = true, forceReloadActive = false } = {},
-  ) {
-    const dailyPath = await getDailyNotePath(settings);
-    const nextState = rebuildTabsFromSettings(settings, tabs, {
-      preserveOpened,
-      previousActivePath: activeTab?.path ?? null,
-      dailyPath,
-    });
-
-    tabs = nextState.tabs;
-    activeTabIndex = nextState.activeTabIndex;
-
-    const currentTab = tabs[activeTabIndex];
-    if (!currentTab) return;
-
-    if (forceReloadActive || !currentTab.loaded) {
-      await loadTab(activeTabIndex, true);
-      return;
-    }
-
-    await loadEditorContent(currentTab.content);
-    missingFileMessage = currentTab.missing
-      ? currentTab.missingMessage || ""
-      : "";
+  async function handleSettingsChanged(settings) {
+    await tabSettingsSync.handleSettingsChanged(settings, tabSettingsSyncBag());
   }
 
   async function buildInitialTabs() {
-    const settings = await invoke("load_settings");
-    appSettings = applySettings(appSettings, settings);
-    applyColorSettings(appSettings);
-    await applyTabSettings(settings, {
-      preserveOpened: false,
-      forceReloadActive: true,
-    });
+    await tabSettingsSync.buildInitialTabs(tabSettingsSyncBag());
   }
 
   // TODO: move to ReaderEditor once window-wide drag/drop can be preserved cleanly.
