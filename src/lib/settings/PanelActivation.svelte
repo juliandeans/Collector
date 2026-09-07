@@ -88,7 +88,7 @@
                     <div class="modifier-checkbox">
                         <Checkbox
                             checked={settings.edge_modifier_keys?.includes(mod)}
-                            on:change={() =>
+                            onChange={() =>
                                 toggleModifier("edge_modifier_keys", mod)}
                         >
                             {modifierLabel(mod)}
@@ -153,7 +153,7 @@
                             checked={settings.reader_edge_modifier_keys?.includes(
                                 mod,
                             )}
-                            on:change={() =>
+                            onChange={() =>
                                 toggleModifier(
                                     "reader_edge_modifier_keys",
                                     mod,
