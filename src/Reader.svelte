@@ -14,9 +14,9 @@
   import SearchBar from "./lib/reader/SearchBar.svelte";
   import StatusToast from "./lib/reader/StatusToast.svelte";
   import TabContextMenu from "./lib/reader/TabContextMenu.svelte";
-  import { imagePathCache, normalizeNewlines, warmImagesInText } from "./lib/reader/contentProcessing.js";
-  import { composeContentFromMarkdown } from "./lib/reader/editorSerialization.js";
+  import { imagePathCache } from "./lib/reader/contentProcessing.js";
   import * as editorBridge from "./lib/reader/editorBridge.js";
+  import * as tabLifecycle from "./lib/reader/tabLifecycle.js";
   import { setupListeners } from "./lib/reader/lifecycleSetup.js";
   import {
     ensureVaultNotes,
@@ -43,17 +43,13 @@
     getPinnedNotesSignature,
     rebuildTabsFromSettings,
   } from "./lib/reader/tabState.js";
-  import {
-    getDailyNotePath,
-    loadTabContent,
-    saveTabContent,
-  } from "./lib/reader/tabIO.js";
+  import { getDailyNotePath } from "./lib/reader/tabIO.js";
   import {
     filterPaletteNotes,
     getOpenVaultNoteIntent,
   } from "./lib/reader/paletteLogic.js";
   import { defaultSettings } from "./lib/stores.js";
-  import { normalizeError, isFileMissingError, getMissingState } from "./lib/reader/errorHandling.js";
+  import { normalizeError, isFileMissingError } from "./lib/reader/errorHandling.js";
 
   let tabs = $state([]);
   let activeTabIndex = $state(0);
@@ -153,9 +149,11 @@
       setAutocompleteResults: (value) => { autocompleteResults = value; },
       setAutocompleteRange: (value) => { autocompleteRange = value; },
       setAutocompleteIndex: (value) => { autocompleteIndex = value; },
-      updateActiveTabContent,
-      scheduleSave,
-      forceSave,
+      updateActiveTabContent: (content) => {
+        tabs = tabLifecycle.applyTabUpdate(tabs, activeTabIndex, { content, loaded: true });
+      },
+      scheduleSave: (content) => tabLifecycle.scheduleSave(content, tabLifecycleBag()),
+      forceSave: () => tabLifecycle.forceSave(true, tabLifecycleBag()),
     };
   }
 
@@ -238,14 +236,6 @@
     );
   }
 
-  function updateActiveTabContent(nextContent) {
-    if (!activeTab) return;
-    replaceTab(activeTabIndex, {
-      content: nextContent,
-      loaded: true,
-    });
-  }
-
   function getCurrentMarkdown() {
     return editorBridge.getCurrentMarkdown(editorBridgeBag());
   }
@@ -259,14 +249,18 @@
   }
 
   function saveScrollPosition() {
-    const currentTab = tabs[activeTabIndex];
-    if (!currentTab || !editorComponent) return;
-    scrollPositions.set(currentTab.path, editorComponent.getScrollTop());
+    tabLifecycle.saveScrollPosition({
+      getActiveTab: () => activeTab,
+      getEditorComponent: () => editorComponent,
+      scrollPositions,
+    });
   }
 
   async function restoreScrollPosition(path) {
-    if (!editorComponent) return;
-    await editorComponent.restoreScroll(path, scrollPositions);
+    await tabLifecycle.restoreScrollPosition(path, {
+      getEditorComponent: () => editorComponent,
+      scrollPositions,
+    });
   }
 
   function handleEditorChange() {
@@ -289,174 +283,50 @@
     }
   }
 
-  function setLoadedTabState(index, content) {
-    replaceTab(index, {
-      content,
-      loaded: true,
-      missing: false,
-      missingMessage: "",
-    });
-  }
-
-  function setMissingTabState(index, missingState) {
-    replaceTab(index, {
-      content: "",
-      loaded: true,
-      missing: missingState.missing,
-      missingMessage: missingState.missingMessage,
-    });
-  }
-
-  async function syncActiveTabView(index, path, content, missingMessage = "") {
-    if (index !== activeTabIndex) return;
-    await loadEditorContent(content);
-    missingFileMessage = missingMessage;
-    await restoreScrollPosition(path);
+  function tabLifecycleBag() {
+    return {
+      getTabs: () => tabs,
+      setTabs: (value) => { tabs = value; },
+      getActiveTab: () => activeTab,
+      getActiveTabIndex: () => activeTabIndex,
+      setActiveTabIndex: (value) => { activeTabIndex = value; },
+      getEditorComponent: () => editorComponent,
+      scrollPositions,
+      closeSearch,
+      closeTabContextMenu,
+      loadEditorContent: (raw) => editorBridge.loadEditorContent(raw, editorBridgeBag()),
+      renderContentToEditor: (raw) => editorBridge.renderContentToEditor(raw, editorBridgeBag()),
+      getCurrentSaveContent: () => editorBridge.getCurrentSaveContent(editorBridgeBag()),
+      setRawContent: (value) => { rawContent = value; },
+      setMissingFileMessage: (value) => { missingFileMessage = value; },
+      setIsSaving: (value) => { isSaving = value; },
+      showStatus,
+      saveScheduler,
+    };
   }
 
   async function loadTab(index, forceReload = false) {
-    const tab = tabs[index];
-    if (!tab) return;
-
-    if (!forceReload && tab.loaded) {
-      await syncActiveTabView(
-        index,
-        tab.path,
-        tab.content,
-        tab.missing ? tab.missingMessage || "" : "",
-      );
-      return;
-    }
-
-    try {
-      const content = await loadTabContent(tab.path);
-      setLoadedTabState(index, content);
-      await syncActiveTabView(index, tab.path, content);
-    } catch (error) {
-      const missingState = getMissingState(error);
-      setMissingTabState(index, missingState);
-      await syncActiveTabView(index, tab.path, "", missingState.missingMessage);
-      if (!missingState.missing) showStatus(missingState.message, "error", 2200);
-    }
+    await tabLifecycle.loadTab(index, forceReload, tabLifecycleBag());
   }
 
   async function syncTabWithDisk(index) {
-    const tab = tabs[index];
-    if (!tab) return;
-
-    if (!tab.loaded) {
-      await loadTab(index, true);
-      return;
-    }
-
-    try {
-      const content = normalizeNewlines(await loadTabContent(tab.path));
-      const currentContent = normalizeNewlines(tab.content ?? "");
-
-      if (!tab.missing && content === currentContent) {
-        if (index === activeTabIndex) {
-          missingFileMessage = "";
-          const hasNewImages = await warmImagesInText(content);
-          if (hasNewImages) {
-            await renderContentToEditor(content);
-          }
-        }
-        return;
-      }
-
-      setLoadedTabState(index, content);
-      await syncActiveTabView(index, tab.path, content);
-    } catch (error) {
-      const missingState = getMissingState(error);
-      const isUnchangedMissingState =
-        missingState.missing &&
-        tab.missing &&
-        normalizeNewlines(tab.content ?? "") === "" &&
-        (tab.missingMessage || "") === missingState.missingMessage;
-
-      if (isUnchangedMissingState) {
-        if (index === activeTabIndex) missingFileMessage = missingState.missingMessage;
-        return;
-      }
-
-      setMissingTabState(index, missingState);
-      await syncActiveTabView(index, tab.path, "", missingState.missingMessage);
-      if (!missingState.missing) showStatus(missingState.message, "error", 2200);
-    }
+    await tabLifecycle.syncTabWithDisk(index, tabLifecycleBag());
   }
 
   async function activateTab(index, forceReload = false) {
-    saveScrollPosition();
-    closeSearch();
-    if (index !== activeTabIndex) {
-      editorComponent?.finalizeBlock?.();
-      await flushPendingSave(false);
-    }
-
-    activeTabIndex = index;
-    await loadTab(index, forceReload);
-  }
-
-  async function saveTabByIndex(index, content, showConfirmation = true) {
-    const tab = tabs[index];
-    if (!tab) return;
-
-    isSaving = true;
-
-    try {
-      await saveTabContent(tab.path, content);
-
-      replaceTab(index, {
-        content,
-        missing: false,
-        missingMessage: "",
-        loaded: true,
-      });
-
-      if (index === activeTabIndex) {
-        missingFileMessage = "";
-      }
-
-      // Save completed — no visual feedback needed.
-    } catch (error) {
-      showStatus(normalizeError(error), "error", 2200);
-    } finally {
-      isSaving = false;
-    }
+    await tabLifecycle.activateTab(index, forceReload, tabLifecycleBag());
   }
 
   function scheduleSave(content = rawContent) {
-    saveScheduler.schedule(
-      {
-        index: activeTabIndex,
-        content,
-      },
-      (job) => {
-        saveTabByIndex(job.index, job.content);
-      },
-    );
+    tabLifecycle.scheduleSave(content, tabLifecycleBag());
   }
 
   async function flushPendingSave(showConfirmation = false) {
-    const job = saveScheduler.flush();
-    if (!job) return;
-    await saveTabByIndex(job.index, job.content, showConfirmation);
+    await tabLifecycle.flushPendingSave(showConfirmation, tabLifecycleBag());
   }
 
   async function forceSave(showConfirmation = true) {
-    if (!activeTab) return;
-
-    saveScheduler.clear();
-
-    const markdown = getCurrentMarkdown();
-    const content = composeContentFromMarkdown(markdown, {
-      strippedFrontmatter,
-      hiddenBlockMap,
-      codeblockMap,
-    });
-    rawContent = content;
-    updateActiveTabContent(content);
-    await saveTabByIndex(activeTabIndex, content, showConfirmation);
+    await tabLifecycle.forceSave(showConfirmation, tabLifecycleBag());
   }
 
   function closeTabContextMenu() {
@@ -491,40 +361,11 @@
   }
 
   async function closeActiveTab() {
-    if (!activeTab || activeTab.kind !== "opened" || activeTab.isPinned) return;
-
-    saveScrollPosition();
-    await flushPendingSave(false);
-    scrollPositions.delete(activeTab.path);
-
-    const nextTabs = tabs.filter((_, index) => index !== activeTabIndex);
-    const nextIndex = Math.max(activeTabIndex - 1, 0);
-    tabs = nextTabs;
-    activeTabIndex = nextIndex;
-    await loadTab(nextIndex);
+    await tabLifecycle.closeActiveTab(tabLifecycleBag());
   }
 
   async function closeTabByIndex(index) {
-    const tab = tabs[index];
-    if (!tab || tab.kind !== "opened") return;
-
-    closeTabContextMenu();
-    saveScrollPosition();
-    await flushPendingSave(false);
-    scrollPositions.delete(tab.path);
-
-    const nextTabs = tabs.filter((_, tabIndex) => tabIndex !== index);
-    const nextIndex =
-      activeTabIndex > index
-        ? activeTabIndex - 1
-        : Math.min(activeTabIndex, nextTabs.length - 1);
-
-    tabs = nextTabs;
-    activeTabIndex = Math.max(nextIndex, 0);
-
-    if (tabs[activeTabIndex]) {
-      await loadTab(activeTabIndex);
-    }
+    await tabLifecycle.closeTabByIndex(index, tabLifecycleBag());
   }
 
   async function hideReader() {
