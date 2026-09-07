@@ -1,24 +1,17 @@
 <script>
-  import { run, createBubbler, stopPropagation } from 'svelte/legacy';
-
-  const bubble = createBubbler();
   import { invoke } from "@tauri-apps/api/core";
-  import { createEventDispatcher, tick } from "svelte";
-
-
-
+  import { tick } from "svelte";
 
   /**
    * @typedef {Object} Props
    * @property {boolean} [show]
    * @property {string[]} [excludedApps]
-   * @property {() => void} [onAdd]
+   * @property {(app: string) => void} [onAdd]
+   * @property {() => void} [onClose]
    */
 
   /** @type {Props} */
-  let { show = false, excludedApps = [], onAdd = () => {} } = $props();
-
-  const dispatch = createEventDispatcher();
+  let { show = false, excludedApps = [], onAdd, onClose } = $props();
 
   let allApps = $state([]);
   let runningSet = $state(new Set());
@@ -48,8 +41,7 @@
 
   function addApp(app) {
     if (excludedApps.includes(app)) return;
-    dispatch("add", app);
-    onAdd();
+    onAdd?.(app);
   }
 
   function chooseApp() {
@@ -81,7 +73,7 @@
   }
 
   function close() {
-    dispatch("close");
+    onClose?.();
   }
 
 
@@ -90,14 +82,14 @@
         app.toLowerCase().includes(query.trim().toLowerCase()),
       )
     : allApps);
-  run(() => {
+  $effect.pre(() => {
     if (show) {
       void tick().then(() => {
         inputRef?.focus();
       });
     }
   });
-  run(() => {
+  $effect.pre(() => {
     if (show && !loadedAll) {
       loadAllApps();
     }
@@ -111,7 +103,7 @@
       class="picker-panel"
       role="dialog"
       aria-modal="true"
-      onclick={stopPropagation(bubble('click'))}
+      onclick={(event) => event.stopPropagation()}
       onkeydown={handleKeydown}
     >
       <div class="picker-search-row">

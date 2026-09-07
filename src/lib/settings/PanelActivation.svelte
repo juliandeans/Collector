@@ -259,8 +259,8 @@
             <AppPicker
                 show={showAppPicker}
                 excludedApps={settings.edge_excluded_apps ?? []}
-                on:add={(event) => addExcludedApp(event.detail)}
-                on:close={() => {
+                onAdd={(app) => addExcludedApp(app)}
+                onClose={() => {
                     showAppPicker = false;
                 }}
             />
