@@ -1,6 +1,4 @@
 <script>
-  import { run, preventDefault } from 'svelte/legacy';
-
   import { ENABLE_DEMO_FAKE_BG } from "./lib/demo-fake-bg.js";
   const DEMO_FAKE_BG = import.meta.env.DEV && ENABLE_DEMO_FAKE_BG;
 
@@ -84,7 +82,7 @@
     paletteQuery,
     autocompleteResultLimit,
   ));
-  run(() => {
+  $effect.pre(() => {
     if (selectedPaletteIndex >= filteredVaultNotes.length) {
       selectedPaletteIndex = Math.max(filteredVaultNotes.length - 1, 0);
     }
@@ -650,8 +648,10 @@
         class="autocomplete-item"
         class:selected={index === autocompleteIndex}
         type="button"
-        onmousedown={preventDefault(() =>
-          editorComponent?.insertAutocompleteResult?.(note))}
+        onmousedown={(event) => {
+          event.preventDefault();
+          editorComponent?.insertAutocompleteResult?.(note);
+        }}
         onmouseenter={() => (autocompleteIndex = index)}
       >
         <span class="autocomplete-name">{note.name}</span>
