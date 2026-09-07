@@ -596,13 +596,13 @@
     >
         <CaptureImageGallery
             images={uploadedImages}
-            on:remove={(event) => removeImage(event.detail)}
-            on:drop={(e) => handleDrop(e)}
-            on:dragover={(e) => {
+            onRemove={(id) => removeImage(id)}
+            onDrop={(e) => handleDrop(e)}
+            onDragover={(e) => {
                 e.preventDefault();
                 handleDragOver(e);
             }}
-            on:dragenter={(e) => handleDragEnter(e)}
+            onDragenter={(e) => handleDragEnter(e)}
         />
 
         <CaptureEditor
