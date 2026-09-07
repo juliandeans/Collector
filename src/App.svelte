@@ -624,9 +624,9 @@
         saveToDailyShortcut={appSettings.save_to_daily_shortcut}
         saveAsNoteShortcut={appSettings.save_as_note_shortcut}
         appendToNoteShortcut={appSettings.append_to_note_shortcut}
-        on:daily={handleAppendToDaily}
-        on:newNote={handleSaveAsNote}
-        on:append={openAppendPicker}
+        onDaily={handleAppendToDaily}
+        onNewNote={handleSaveAsNote}
+        onAppend={openAppendPicker}
     />
 
     <CaptureResizeHandle />

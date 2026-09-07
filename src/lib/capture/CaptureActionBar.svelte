@@ -1,5 +1,4 @@
 <script>
-  import { createEventDispatcher } from "svelte";
 
 
 
@@ -13,6 +12,9 @@
    * @property {string} [saveToDailyShortcut]
    * @property {string} [saveAsNoteShortcut]
    * @property {string} [appendToNoteShortcut]
+   * @property {() => void} [onDaily]
+   * @property {() => void} [onNewNote]
+   * @property {() => void} [onAppend]
    */
 
   /** @type {Props} */
@@ -21,17 +23,18 @@
     isLoading = false,
     saveToDailyShortcut = "",
     saveAsNoteShortcut = "",
-    appendToNoteShortcut = ""
+    appendToNoteShortcut = "",
+    onDaily,
+    onNewNote,
+    onAppend
   } = $props();
-
-  const dispatch = createEventDispatcher();
 </script>
 
 {#if show}
   <div class="action-bar">
     <button
       class="action-btn"
-      onclick={() => dispatch("daily")}
+      onclick={() => onDaily?.()}
       disabled={isLoading}
       title={saveToDailyShortcut}
     >
@@ -39,7 +42,7 @@
     </button>
     <button
       class="action-btn"
-      onclick={() => dispatch("newNote")}
+      onclick={() => onNewNote?.()}
       disabled={isLoading}
       title={saveAsNoteShortcut}
     >
@@ -47,7 +50,7 @@
     </button>
     <button
       class="action-btn"
-      onclick={() => dispatch("append")}
+      onclick={() => onAppend?.()}
       disabled={isLoading}
       title={appendToNoteShortcut}
     >
