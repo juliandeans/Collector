@@ -101,7 +101,7 @@ export async function navigateBack(bag) {
   const previousPath = currentTab.history[currentTab.history.length - 1];
   const note = getVaultNotes().find((entry) => getVaultNoteTabPath(entry) === previousPath);
 
-  setTabs(applyTabUpdate(tabs, activeTabIndex, {
+  setTabs(applyTabUpdate(getTabs(), activeTabIndex, {
     path: previousPath,
     label: note?.name ?? fileLabel(previousPath),
     content: "",
