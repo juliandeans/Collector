@@ -573,9 +573,9 @@
     matchCount={searchMatches.length}
     activeIndex={searchIndex}
     bind:inputRef={searchInputRef}
-    on:queryChange={(event) => runSearch(event.detail)}
-    on:step={(event) => stepSearch(event.detail)}
-    on:close={closeSearch}
+    onQueryChange={(event) => runSearch(event)}
+    onStep={(direction) => stepSearch(direction)}
+    onClose={closeSearch}
   />
 
   <TabContextMenu

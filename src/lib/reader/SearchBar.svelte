@@ -1,6 +1,4 @@
 <script>
-  import { createEventDispatcher } from "svelte";
-
   /**
    * @typedef {Object} Props
    * @property {boolean} [open]
@@ -8,6 +6,9 @@
    * @property {number} [matchCount]
    * @property {number} [activeIndex]
    * @property {any} inputRef
+   * @property {any} [onStep]
+   * @property {any} [onClose]
+   * @property {any} [onQueryChange]
    */
 
   /** @type {Props} */
@@ -16,21 +17,22 @@
     query = "",
     matchCount = 0,
     activeIndex = 0,
-    inputRef = $bindable()
+    inputRef = $bindable(),
+    onStep,
+    onClose,
+    onQueryChange
   } = $props();
-
-  const dispatch = createEventDispatcher();
 
   function handleKeydown(event) {
     if (event.key === "Enter") {
       event.preventDefault();
-      dispatch("step", event.shiftKey ? -1 : 1);
+      onStep?.(event.shiftKey ? -1 : 1);
       return;
     }
 
     if (event.key === "Escape") {
       event.preventDefault();
-      dispatch("close");
+      onClose?.();
     }
   }
 </script>
@@ -42,7 +44,7 @@
       value={query}
       class="search-input"
       placeholder="Search…"
-      oninput={(event) => dispatch("queryChange", event)}
+      oninput={(event) => onQueryChange?.(event)}
       onkeydown={handleKeydown}
     />
     <span class="search-count">
@@ -52,13 +54,13 @@
           ? "0 results"
           : ""}
     </span>
-    <button class="search-nav" type="button" onclick={() => dispatch("step", -1)}
+    <button class="search-nav" type="button" onclick={() => onStep?.(-1)}
       >↑</button
     >
-    <button class="search-nav" type="button" onclick={() => dispatch("step", 1)}
+    <button class="search-nav" type="button" onclick={() => onStep?.(1)}
       >↓</button
     >
-    <button class="search-close" type="button" onclick={() => dispatch("close")}
+    <button class="search-close" type="button" onclick={() => onClose?.()}
       >✕</button
     >
   </div>
