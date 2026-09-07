@@ -19,7 +19,7 @@
     content = $bindable(""),
     isLoading = false,
     placeholder = "Enter note or drag image here...",
-    textareaRef = $bindable(null)
+    textareaRef = $bindable()
   } = $props();
 </script>
 
