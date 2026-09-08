@@ -22,6 +22,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   off-screen and become invisible when opened near the right edge of the
   window. It now stays within the window, matching how the Capture
   window's popup already behaved.
+- Rounded window corners showed gray, unrounded artifacts in the bottom
+  corners of the Capture and Reader windows on macOS 26 (Tahoe). The corner
+  radius is now applied directly to the WKWebView's own layer instead of
+  reaching into WebKit's internal sublayers, which macOS 26 can replace
+  out from under the app.
 
 ## [1.2.5] - 2026-06-09
 

@@ -109,18 +109,6 @@ fn configure_macos_window(window: &tauri::WebviewWindow, corner_radius: f64) {
         let _: () = msg_send![layer, setCornerRadius: corner_radius];
         let _: () = msg_send![layer, setMasksToBounds: YES];
 
-        let sublayers: id = msg_send![layer, sublayers];
-        if !sublayers.is_null() {
-            let count: usize = msg_send![sublayers, count];
-            for i in 0..count {
-                let sublayer: id = msg_send![sublayers, objectAtIndex: i];
-                if !sublayer.is_null() {
-                    let _: () = msg_send![sublayer, setCornerRadius: corner_radius];
-                    let _: () = msg_send![sublayer, setMasksToBounds: YES];
-                }
-            }
-        }
-
         let _: () = msg_send![ns_window, setOpaque: BOOL::from(false)];
 
         let clear_color: id = msg_send![class!(NSColor), clearColor];
@@ -129,6 +117,26 @@ fn configure_macos_window(window: &tauri::WebviewWindow, corner_radius: f64) {
         let _: () = msg_send![ns_window, setHasShadow: YES];
 
         let _: () = msg_send![ns_window, invalidateShadow];
+    }
+
+    // Clip the WKWebView's own layer directly instead of reaching into
+    // WebKit-internal sublayers, which the WebContent/GPU process can
+    // replace out from under us (e.g. on compositing changes).
+    if let Err(e) = window.with_webview(move |platform_webview| unsafe {
+        let webview: id = platform_webview.inner() as id;
+        if webview.is_null() {
+            return;
+        }
+
+        let _: () = msg_send![webview, setWantsLayer: YES];
+
+        let webview_layer: id = msg_send![webview, layer];
+        if !webview_layer.is_null() {
+            let _: () = msg_send![webview_layer, setCornerRadius: corner_radius];
+            let _: () = msg_send![webview_layer, setMasksToBounds: YES];
+        }
+    }) {
+        log::warn!("Failed to clip WKWebView layer: {}", e);
     }
 }
 
