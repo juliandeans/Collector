@@ -6,6 +6,12 @@
     let { settings = $bindable(), validation = {} } = $props();
 
     const systemFonts = getSystemFonts();
+
+    const BLUR_LOOK_NAMES = ["Max", "Light", "Medium", "Strong"];
+    function blurLookName(value) {
+        const step = Math.round((value ?? 50) / 50);
+        return BLUR_LOOK_NAMES[Math.min(Math.max(step, 0), 3)];
+    }
 </script>
 
 <div class="settings-panel">
@@ -22,16 +28,22 @@
             <FieldIssue issue={validation.border_radius} />
         </div>
         <div class="field">
-            <label for="window_blur">Background Blur: {settings.window_blur ?? 80}px</label>
+            <label for="window_blur"
+                >Background Blur: {blurLookName(settings.window_blur)}</label
+            >
             <input
                 type="range"
                 id="window_blur"
                 bind:value={settings.window_blur}
                 min="0"
-                max="200"
+                max="150"
+                step="50"
             />
             <FieldIssue issue={validation.window_blur} />
-            <small>Blurs what is behind the window.</small>
+            <small
+                >Blurs what is behind the window. macOS only offers a few
+                fixed blur looks, not a stepless amount.</small
+            >
         </div>
         <div class="field">
             <label for="window_saturation"

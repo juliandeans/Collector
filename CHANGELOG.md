@@ -14,6 +14,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   (note paths, headings, quotes, list markers) now derives automatically
   from your chosen Text Color setting instead of being a fixed color —
   adapts correctly to both dark and light text setups.
+- The "Background Blur" setting is now four fixed strengths (Max/Light/
+  Medium/Strong) instead of a freely adjustable 0–200 value — macOS's
+  native window blur only offers a handful of built-in looks, not a
+  continuous amount.
 
 ### Fixed
 - Wikilink suggestion path text in the Reader rendered in black instead of
@@ -27,6 +31,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   radius is now applied directly to the WKWebView's own layer instead of
   reaching into WebKit's internal sublayers, which macOS 26 can replace
   out from under the app.
+- Background Blur left a hard, unblurred strip along the screen edge when
+  the Capture or Reader window was docked flush against it, especially at
+  high blur values. The blur now uses macOS's native window-background
+  blur instead of a CSS effect, which handles screen edges correctly.
 
 ## [1.2.5] - 2026-06-09
 
