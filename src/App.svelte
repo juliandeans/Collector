@@ -709,10 +709,10 @@
             var(--app-background, #1e1e2e) var(--app-transparency, 55%),
             transparent
         );
-        backdrop-filter: blur(var(--app-blur, 80px))
-            saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
-        -webkit-backdrop-filter: blur(var(--app-blur, 80px))
-            saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
+        backdrop-filter: saturate(var(--app-saturation, 200%))
+            var(--app-brightness-filter);
+        -webkit-backdrop-filter: saturate(var(--app-saturation, 200%))
+            var(--app-brightness-filter);
         border-radius: var(--app-border-radius, 12px);
         border: 0.5px solid rgba(0, 0, 0, 0.08);
         box-shadow:

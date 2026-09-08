@@ -25,10 +25,10 @@ body {
   color: var(--app-text-color, #ffffff);
   font-family: var(--app-font-family, var(--font-family));
   font-size: var(--app-font-size, 15px);
-  backdrop-filter: blur(var(--app-blur, 80px))
-    saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
-  -webkit-backdrop-filter: blur(var(--app-blur, 80px))
-    saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
+  backdrop-filter: saturate(var(--app-saturation, 200%))
+    var(--app-brightness-filter);
+  -webkit-backdrop-filter: saturate(var(--app-saturation, 200%))
+    var(--app-brightness-filter);
   border-radius: var(--app-border-radius, 12px);
   border: 0.5px solid rgba(0, 0, 0, 0.08);
   box-shadow: var(--shadow-md), 0 2px 8px var(--shadow-sm);
