@@ -50,6 +50,7 @@ async fn show_capture_internal(app: &AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("capture") {
         let settings = state.settings.read().await;
         position_window_logical(&window, &settings)?;
+        configure_macos_window(&window, settings.border_radius as f64);
         warn_if_failed(window.show(), "Failed to show capture window");
         warn_if_failed(window.set_focus(), "Failed to focus capture window");
     }
@@ -236,6 +237,7 @@ fn show_capture_window(app: &AppHandle, settings: &Settings) {
             position_window_logical(&window, settings),
             "Failed to position capture window",
         );
+        configure_macos_window(&window, settings.border_radius as f64);
         warn_if_failed(window.show(), "Failed to show capture window");
         warn_if_failed(window.set_focus(), "Failed to focus capture window");
         warn_if_failed(app.emit("reset_capture", ()), "Failed to emit reset_capture");

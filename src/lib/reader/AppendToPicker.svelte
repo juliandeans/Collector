@@ -170,10 +170,10 @@
         {selectedIndex}
         showPaths={showPaths}
         bind:inputRef
-        on:queryChange={(event) => dispatch("queryChange", event.detail)}
-        on:selectIndex={(event) => dispatch("selectIndex", event.detail)}
-        on:openNote={(event) => dispatch("selectNote", event.detail)}
-        on:close={() => dispatch("close")}
+        onQueryChange={(event) => dispatch("queryChange", event)}
+        onSelectIndex={(index) => dispatch("selectIndex", index)}
+        onOpenNote={(note) => dispatch("selectNote", note)}
+        onClose={() => dispatch("close")}
     />
 
     <div

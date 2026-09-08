@@ -1,5 +1,5 @@
 <script>
-    import { createEventDispatcher, onMount, onDestroy, tick } from "svelte";
+    import { onMount, onDestroy, tick } from "svelte";
     import {
         getCachedImageSrc,
         markdownLineToHtml,
@@ -28,6 +28,18 @@
      * @property {any} [codeblockMap]
      * @property {any} [hiddenBlockMap]
      * @property {any} [setStrippedFrontmatter]
+     * @property {any} [onChange]
+     * @property {any} [onAutocompleteChange]
+     * @property {any} [onAutocompleteIndexChange]
+     * @property {any} [onOpenSearchRequest]
+     * @property {any} [onOpenSettingsRequest]
+     * @property {any} [onCloseSearchRequest]
+     * @property {any} [onCloseRequest]
+     * @property {any} [onSaveRequest]
+     * @property {any} [onNavigateWikilink]
+     * @property {any} [onOpenExternalLink]
+     * @property {any} [onSelectionChange]
+     * @property {any} [onScroll]
      */
 
     /** @type {Props} */
@@ -43,10 +55,20 @@
         autocompleteIndex = 0,
         codeblockMap = new Map(),
         hiddenBlockMap = new Map(),
-        setStrippedFrontmatter = () => {}
+        setStrippedFrontmatter = () => {},
+        onChange,
+        onAutocompleteChange,
+        onAutocompleteIndexChange,
+        onOpenSearchRequest,
+        onOpenSettingsRequest,
+        onCloseSearchRequest,
+        onCloseRequest,
+        onSaveRequest,
+        onNavigateWikilink,
+        onOpenExternalLink,
+        onSelectionChange,
+        onScroll
     } = $props();
-
-    const dispatch = createEventDispatcher();
 
     let editorRef = $state();
     let scrollRef = $state();
@@ -91,7 +113,7 @@
         index = 0,
     } = {}) {
         autocompleteRange = range;
-        dispatch("autocompleteChange", {
+        onAutocompleteChange?.({
             open,
             query,
             results,
@@ -188,7 +210,7 @@
         selection.addRange(afterRange);
 
         closeAutocompleteInternal();
-        dispatch("change");
+        onChange?.();
     }
 
     function handleAutocompleteKeydown(event) {
@@ -196,8 +218,7 @@
 
         if (event.key === "ArrowDown") {
             event.preventDefault();
-            dispatch(
-                "autocompleteIndexChange",
+            onAutocompleteIndexChange?.(
                 Math.min(autocompleteIndex + 1, autocompleteResults.length - 1),
             );
             return true;
@@ -205,8 +226,7 @@
 
         if (event.key === "ArrowUp") {
             event.preventDefault();
-            dispatch(
-                "autocompleteIndexChange",
+            onAutocompleteIndexChange?.(
                 Math.max(autocompleteIndex - 1, 0),
             );
             return true;
@@ -320,7 +340,7 @@
 
         switchActiveBlock(el);
         checkAutocomplete();
-        dispatch("selectionChange");
+        onSelectionChange?.();
     }
 
     function handleEditorBlur(event) {
@@ -420,7 +440,7 @@
 
     function handleInput() {
         if (isComposing || isRenderingContent || !editorRef) return;
-        dispatch("change");
+        onChange?.();
         checkAutocomplete();
     }
 
@@ -430,7 +450,7 @@
 
     function handleCompositionEnd() {
         isComposing = false;
-        dispatch("change");
+        onChange?.();
         checkAutocomplete();
     }
 
@@ -445,14 +465,14 @@
         if ((event.metaKey || event.ctrlKey) && key === "f") {
             event.preventDefault();
             event.stopPropagation();
-            dispatch("openSearchRequest");
+            onOpenSearchRequest?.();
             return;
         }
 
         if ((event.metaKey || event.ctrlKey) && key === ",") {
             event.preventDefault();
             event.stopPropagation();
-            dispatch("openSettingsRequest");
+            onOpenSettingsRequest?.();
             return;
         }
 
@@ -464,17 +484,17 @@
                 return;
             }
             if (showSearch) {
-                dispatch("closeSearchRequest");
+                onCloseSearchRequest?.();
                 return;
             }
-            dispatch("closeRequest");
+            onCloseRequest?.();
             return;
         }
 
         if ((event.metaKey || event.ctrlKey) && key === "s") {
             event.preventDefault();
             event.stopPropagation();
-            dispatch("saveRequest");
+            onSaveRequest?.();
             return;
         }
 
@@ -490,7 +510,7 @@
             const target = wikilink.dataset.target;
             if (!target) return;
 
-            dispatch("navigateWikilink", {
+            onNavigateWikilink?.({
                 target,
                 newTab: event.metaKey || event.ctrlKey,
             });
@@ -504,7 +524,7 @@
         if (href && /^(https?:\/\/|obsidian:\/\/)/i.test(href)) {
             event.preventDefault();
             event.stopPropagation();
-            dispatch("openExternalLink", href);
+            onOpenExternalLink?.(href);
         }
     }
 
@@ -550,7 +570,7 @@
 
         if (!insertPlainTextAtSelection(plainText)) return;
 
-        dispatch("change");
+        onChange?.();
         checkAutocomplete();
     }
 
@@ -566,7 +586,7 @@
 <div
     class="editor-scroll"
     bind:this={scrollRef}
-    onscroll={() => dispatch("scroll")}
+    onscroll={() => onScroll?.()}
 >
     {#if missingFileBannerMessage.trim()}
         <div class="missing-file-banner">{missingFileBannerMessage}</div>

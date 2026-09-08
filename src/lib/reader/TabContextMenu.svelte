@@ -1,27 +1,26 @@
 <script>
-  import { preventDefault } from 'svelte/legacy';
-
-  import { createEventDispatcher } from "svelte";
-
   /**
    * @typedef {Object} Props
    * @property {boolean} [open]
    * @property {number} [x]
    * @property {number} [y]
+   * @property {any} [onClose]
+   * @property {any} [onCloseTab]
    */
 
   /** @type {Props} */
-  let { open = false, x = 0, y = 0 } = $props();
-
-  const dispatch = createEventDispatcher();
+  let { open = false, x = 0, y = 0, onClose, onCloseTab } = $props();
 </script>
 
 {#if open}
   <div
     class="tab-context-backdrop"
     role="presentation"
-    onclick={() => dispatch("close")}
-    oncontextmenu={preventDefault(() => dispatch("close"))}
+    onclick={() => onClose?.()}
+    oncontextmenu={(event) => {
+      event.preventDefault();
+      onClose?.();
+    }}
   >
     <div
       class="tab-context-menu"
@@ -32,7 +31,7 @@
         class="tab-context-item"
         type="button"
         role="menuitem"
-        onclick={() => dispatch("closeTab")}
+        onclick={() => onCloseTab?.()}
       >
         Close
       </button>

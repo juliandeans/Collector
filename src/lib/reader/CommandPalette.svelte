@@ -1,7 +1,5 @@
 <script>
-  import { run } from 'svelte/legacy';
-
-  import { createEventDispatcher, tick } from "svelte";
+  import { tick } from "svelte";
 
   /**
    * @typedef {Object} Props
@@ -11,6 +9,10 @@
    * @property {number} [selectedIndex]
    * @property {boolean} [showPaths]
    * @property {any} inputRef
+   * @property {any} [onSelectIndex]
+   * @property {any} [onQueryChange]
+   * @property {any} [onOpenNote]
+   * @property {any} [onClose]
    */
 
   /** @type {Props} */
@@ -20,10 +22,13 @@
     notes = [],
     selectedIndex = 0,
     showPaths = true,
-    inputRef = $bindable()
+    inputRef = $bindable(),
+    onSelectIndex,
+    onQueryChange,
+    onOpenNote,
+    onClose
   } = $props();
 
-  const dispatch = createEventDispatcher();
   let resultsRef = $state();
   let suppressPointerUntil = 0;
   let lastPointerX = null;
@@ -76,10 +81,10 @@
     if (index === selectedIndex) return;
     if (performance.now() < suppressPointerUntil) return;
 
-    dispatch("selectIndex", index);
+    onSelectIndex?.(index);
   }
 
-  run(() => {
+  $effect.pre(() => {
     if (open && notes.length > 0 && selectedIndex >= 0) {
       void tick().then(() => {
         ensureSelectedItemVisible();
@@ -88,7 +93,7 @@
   });
 
   function handleInput(event) {
-    dispatch("queryChange", event);
+    onQueryChange?.(event);
   }
 
   function handleKeydown(event) {
@@ -98,7 +103,7 @@
       event.preventDefault();
       if (notes.length > 0) {
         suppressPointerSelection();
-        dispatch("selectIndex", Math.min(selectedIndex + 1, notes.length - 1));
+        onSelectIndex?.(Math.min(selectedIndex + 1, notes.length - 1));
       }
       return;
     }
@@ -106,7 +111,7 @@
     if (event.key === "ArrowUp") {
       event.preventDefault();
       suppressPointerSelection();
-      dispatch("selectIndex", Math.max(selectedIndex - 1, 0));
+      onSelectIndex?.(Math.max(selectedIndex - 1, 0));
       return;
     }
 
@@ -114,14 +119,14 @@
       event.preventDefault();
       const note = notes[selectedIndex];
       if (note) {
-        dispatch("openNote", note);
+        onOpenNote?.(note);
       }
       return;
     }
 
     if (event.key === "Escape") {
       event.preventDefault();
-      dispatch("close");
+      onClose?.();
     }
   }
 </script>
@@ -136,8 +141,8 @@
     class="palette-backdrop"
     aria-label="Close palette"
     tabindex="-1"
-    onmousedown={() => dispatch("close")}
-></button>
+    onmousedown={() => onClose?.()}
+  ></button>
 
   <div class="palette" role="dialog" aria-modal="true">
     <input
@@ -160,7 +165,7 @@
             class:selected={index === selectedIndex}
             type="button"
             onpointermove={(event) => handlePointerMove(index, event)}
-            onclick={() => dispatch("openNote", note)}
+            onclick={() => onOpenNote?.(note)}
           >
             <span class="palette-name">{note.name}</span>
             {#if showPaths}
