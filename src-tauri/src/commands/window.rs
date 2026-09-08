@@ -57,7 +57,11 @@ pub(crate) async fn save_settings(
             log::warn!("Failed to update window position: {}", e);
         }
 
-        configure_macos_window(&window, new_settings.border_radius as f64);
+        configure_macos_window(
+            &window,
+            new_settings.border_radius as f64,
+            new_settings.window_blur as i64,
+        );
     }
 
     if let Some(reader_window) = app.get_webview_window("reader") {
@@ -65,7 +69,11 @@ pub(crate) async fn save_settings(
             log::warn!("Failed to update reader window position: {}", e);
         }
 
-        configure_macos_window(&reader_window, new_settings.border_radius as f64);
+        configure_macos_window(
+            &reader_window,
+            new_settings.border_radius as f64,
+            new_settings.window_blur as i64,
+        );
     }
 
     // Emit settings_changed before shortcuts so visual changes apply even if shortcuts fail.

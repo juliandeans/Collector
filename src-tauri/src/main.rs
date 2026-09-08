@@ -30,7 +30,25 @@ use tokio::sync::RwLock;
 #[cfg(target_os = "macos")]
 use cocoa::base::{id, BOOL, YES};
 #[cfg(target_os = "macos")]
+use cocoa::foundation::NSInteger;
+#[cfg(target_os = "macos")]
 use objc::{class, msg_send, sel, sel_impl};
+
+// Private WindowServer API for a native window-background blur — the same
+// mechanism macOS's own menu bar/Dock use, and the established approach in
+// Terminal.app, iTerm2, Warp, WezTerm, and Neovide for exactly this effect.
+// Confirmed real (not dlopen'd): it's part of the public CoreGraphics
+// framework's link path even though the symbols are undocumented.
+#[cfg(target_os = "macos")]
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGSMainConnectionID() -> id;
+    fn CGSSetWindowBackgroundBlurRadius(
+        connection_id: id,
+        window_id: NSInteger,
+        radius: i64,
+    ) -> i32;
+}
 
 use crate::app_state::AppState;
 use crate::edge_detect::EdgeDetector;
@@ -50,7 +68,11 @@ async fn show_capture_internal(app: &AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("capture") {
         let settings = state.settings.read().await;
         position_window_logical(&window, &settings)?;
-        configure_macos_window(&window, settings.border_radius as f64);
+        configure_macos_window(
+            &window,
+            settings.border_radius as f64,
+            settings.window_blur as i64,
+        );
         warn_if_failed(window.show(), "Failed to show capture window");
         warn_if_failed(window.set_focus(), "Failed to focus capture window");
     }
@@ -63,7 +85,11 @@ pub(crate) async fn show_reader_internal(app: &AppHandle) -> Result<(), String> 
     if let Some(window) = app.get_webview_window("reader") {
         let settings = state.settings.read().await;
         position_reader_window_logical(&window, &settings)?;
-        configure_macos_window(&window, settings.border_radius as f64);
+        configure_macos_window(
+            &window,
+            settings.border_radius as f64,
+            settings.window_blur as i64,
+        );
         warn_if_failed(window.show(), "Failed to show reader window");
         warn_if_failed(window.set_focus(), "Failed to focus reader window");
     }
@@ -72,7 +98,11 @@ pub(crate) async fn show_reader_internal(app: &AppHandle) -> Result<(), String> 
 }
 
 #[cfg(target_os = "macos")]
-fn configure_macos_window(window: &tauri::WebviewWindow, corner_radius: f64) {
+fn configure_macos_window(
+    window: &tauri::WebviewWindow,
+    corner_radius: f64,
+    background_blur_radius: i64,
+) {
     let ns_window_ptr = match window.ns_window() {
         Ok(ptr) => ptr,
         Err(e) => {
@@ -117,6 +147,18 @@ fn configure_macos_window(window: &tauri::WebviewWindow, corner_radius: f64) {
         let _: () = msg_send![ns_window, setHasShadow: YES];
 
         let _: () = msg_send![ns_window, invalidateShadow];
+
+        // Native window-level background blur (WindowServer-composited,
+        // unlike CSS backdrop-filter which is bounded by the WKWebView's
+        // own render surface and produces a hard unblurred strip when the
+        // window sits flush against the physical screen edge — there are
+        // no pixels beyond the display for WebKit to sample there).
+        let window_number: NSInteger = msg_send![ns_window, windowNumber];
+        CGSSetWindowBackgroundBlurRadius(
+            CGSMainConnectionID(),
+            window_number,
+            background_blur_radius,
+        );
     }
 
     // Clip the WKWebView's own layer directly instead of reaching into
@@ -141,7 +183,12 @@ fn configure_macos_window(window: &tauri::WebviewWindow, corner_radius: f64) {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn configure_macos_window(_window: &tauri::WebviewWindow, _corner_radius: f64) {}
+fn configure_macos_window(
+    _window: &tauri::WebviewWindow,
+    _corner_radius: f64,
+    _background_blur_radius: i64,
+) {
+}
 
 fn position_window_logical(
     window: &tauri::WebviewWindow,
@@ -245,7 +292,11 @@ fn show_capture_window(app: &AppHandle, settings: &Settings) {
             position_window_logical(&window, settings),
             "Failed to position capture window",
         );
-        configure_macos_window(&window, settings.border_radius as f64);
+        configure_macos_window(
+            &window,
+            settings.border_radius as f64,
+            settings.window_blur as i64,
+        );
         warn_if_failed(window.show(), "Failed to show capture window");
         warn_if_failed(window.set_focus(), "Failed to focus capture window");
         warn_if_failed(app.emit("reset_capture", ()), "Failed to emit reset_capture");
@@ -482,10 +533,11 @@ fn main() {
 
                 let window_clone = window.clone();
                 let border_radius = settings.border_radius;
+                let window_blur = settings.window_blur;
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(tokio::time::Duration::from_millis(WINDOW_INIT_DELAY_MS))
                         .await;
-                    configure_macos_window(&window_clone, border_radius as f64);
+                    configure_macos_window(&window_clone, border_radius as f64, window_blur as i64);
                 });
             }
 
@@ -497,10 +549,11 @@ fn main() {
 
                 let window_clone = window.clone();
                 let border_radius = settings.border_radius;
+                let window_blur = settings.window_blur;
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(tokio::time::Duration::from_millis(WINDOW_INIT_DELAY_MS))
                         .await;
-                    configure_macos_window(&window_clone, border_radius as f64);
+                    configure_macos_window(&window_clone, border_radius as f64, window_blur as i64);
                 });
             }
 
