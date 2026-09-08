@@ -3,6 +3,7 @@
 
     import { createEventDispatcher, tick } from "svelte";
     import CommandPalette from "./CommandPalette.svelte";
+    import "../overlay.css";
 
     /**
      * @typedef {Object} Props
@@ -189,12 +190,12 @@
             onmousedown={() => dispatch("close")}
 ></button>
 
-        <div class="heading-picker-panel" role="dialog" aria-modal="true">
+        <div class="heading-picker-panel overlay-panel" role="dialog" aria-modal="true">
             <div class="heading-picker-note-name">
                 {selectedNote?.name ?? "Selected note"}
             </div>
             {#if showPaths}
-                <div class="heading-picker-note-path">
+                <div class="heading-picker-note-path overlay-path">
                     {selectedNote?.relative_path ?? ""}
                 </div>
             {/if}
@@ -209,14 +210,14 @@
             >
                 <button
                     type="button"
-                    class="heading-picker-item heading-picker-end-item"
+                    class="heading-picker-item heading-picker-end-item overlay-item"
                     class:selected={headingIndex === 0}
                     onpointermove={(event) =>
                         handleHeadingPointerMove(0, event)}
                     onclick={() => dispatch("selectHeading", null)}
                 >
-                    <span class="heading-picker-label">Append at end</span>
-                    <span class="heading-picker-meta">
+                    <span class="heading-picker-label overlay-name">Append at end</span>
+                    <span class="heading-picker-meta overlay-path">
                         Use the existing append behavior
                     </span>
                 </button>
@@ -224,16 +225,16 @@
                 {#each headings as heading, index (`${heading.lineIndex}-${heading.display}`)}
                     <button
                         type="button"
-                        class="heading-picker-item"
+                        class="heading-picker-item overlay-item"
                         class:selected={headingIndex === index + 1}
                         onpointermove={(event) =>
                             handleHeadingPointerMove(index + 1, event)}
                         onclick={() => dispatch("selectHeading", heading)}
                     >
-                        <span class="heading-picker-label"
+                        <span class="heading-picker-label overlay-name"
                             >{heading.display}</span
                         >
-                        <span class="heading-picker-meta">
+                        <span class="heading-picker-meta overlay-path">
                             Insert after this section
                         </span>
                     </button>
@@ -283,37 +284,7 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        border-radius: var(--app-border-radius, 12px);
-        background: color-mix(
-            in srgb,
-            var(--app-background, #1e1e2e) var(--app-transparency, 85%),
-            transparent
-        );
-        backdrop-filter: blur(40px);
-        -webkit-backdrop-filter: blur(40px);
-        color: var(--app-text-color, #ffffff);
-        font-family: var(--app-font-family, var(--font-family));
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: var(--overlay-shadow);
         transform: translateX(-50%);
-        z-index: 1;
-    }
-
-    .heading-picker-panel::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: linear-gradient(
-            90deg,
-            color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
-            color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
-            color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
-        );
-        background-size: 200% 100%;
-        animation: shimmer 3s linear infinite;
         z-index: 1;
     }
 
@@ -326,7 +297,6 @@
 
     .heading-picker-note-path {
         padding: 4px 16px 12px;
-        color: rgba(255, 255, 255, 0.58);
         font-size: 12px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     }
@@ -355,29 +325,12 @@
         transition: background 0.12s ease;
     }
 
-    .heading-picker-item:hover,
-    .heading-picker-item.selected {
-        background: color-mix(
-            in srgb,
-            var(--accent-color, #8b5cf6) 14%,
-            transparent
-        );
-    }
-
     .heading-picker-end-item .heading-picker-label {
         color: rgba(255, 255, 255, 0.82);
     }
 
-    .heading-picker-label {
-        color: var(--app-text-color, #ffffff);
-        font-weight: 500;
-        font-size: 13px;
-    }
-
     .heading-picker-meta {
         margin-top: 2px;
-        color: var(--text-secondary);
-        font-size: 10px;
     }
 
     .heading-picker-results::-webkit-scrollbar {
@@ -391,15 +344,5 @@
     .heading-picker-results::-webkit-scrollbar-thumb {
         background: rgba(0, 0, 0, 0.12);
         border-radius: 3px;
-    }
-
-    @keyframes shimmer {
-        0% {
-            background-position: 200% 0;
-        }
-
-        100% {
-            background-position: -200% 0;
-        }
     }
 </style>

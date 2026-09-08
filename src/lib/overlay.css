@@ -1,0 +1,73 @@
+/*
+ * Shared visual chrome for floating "picker" overlays (wikilink suggestions,
+ * command palette, append-to-note picker): background, border, blur,
+ * shimmer accent line, and name/path text colors.
+ *
+ * Layout, keyboard handling, and anything specific to one picker's content
+ * stays in that component's own <style> block. Only import what you use.
+ */
+
+.overlay-panel {
+  border-radius: var(--app-border-radius, 12px);
+  background: color-mix(
+    in srgb,
+    var(--app-background, #1e1e2e) var(--app-transparency, 85%),
+    transparent
+  );
+  backdrop-filter: blur(var(--app-blur, 80px))
+    saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
+  -webkit-backdrop-filter: blur(var(--app-blur, 80px))
+    saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
+  color: var(--app-text-color, #ffffff);
+  font-family: var(--app-font-family, var(--font-family));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--overlay-shadow);
+}
+
+.overlay-panel::before {
+  content: "";
+  display: block;
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  flex: 0 0 2px;
+  z-index: 1;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
+    color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
+    color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: overlay-shimmer 3s linear infinite;
+}
+
+@keyframes overlay-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.overlay-item:hover,
+.overlay-item.selected {
+  background: color-mix(in srgb, var(--accent-color, #8b5cf6) 14%, transparent);
+}
+
+.overlay-name {
+  color: var(--app-text-color, #ffffff);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.overlay-path {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

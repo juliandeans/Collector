@@ -1,5 +1,6 @@
 <script>
     import { tick } from "svelte";
+    import "./overlay.css";
 
     /**
      * @typedef {Object} Props
@@ -76,10 +77,10 @@
     });
 </script>
 
-<div class="wikilink-picker" bind:this={pickerRef}>
+<div class="wikilink-picker overlay-panel" bind:this={pickerRef}>
     {#each notes.slice(0, 20) as note, index (note.path)}
         <button
-            class="wikilink-picker-item"
+            class="wikilink-picker-item overlay-item"
             class:selected={index === selectedIndex}
             type="button"
             onmousedown={(event) => {
@@ -88,9 +89,9 @@
             }}
             onpointermove={(event) => handlePointerMove(index, event)}
         >
-            <span class="wikilink-picker-name">{note.name}</span>
+            <span class="overlay-name">{note.name}</span>
             {#if showPaths}
-                <span class="wikilink-picker-path">{note.relative_path}</span>
+                <span class="overlay-path">{note.relative_path}</span>
             {/if}
         </button>
     {/each}
@@ -103,36 +104,6 @@
         flex-direction: column;
         max-height: min(70vh, 400px);
         overflow-y: auto;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: var(--app-border-radius, 12px);
-        background: color-mix(
-            in srgb,
-            rgba(12, 14, 18, 0.88) 82%,
-            var(--app-background, #1e1e2e)
-        );
-        color: var(--app-text-color, #ffffff);
-        font-family: var(--app-font-family, var(--font-family));
-        backdrop-filter: blur(40px)
-            saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
-        -webkit-backdrop-filter: blur(40px)
-            saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
-        box-shadow: var(--overlay-shadow);
-    }
-
-    .wikilink-picker::before {
-        content: "";
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        flex: 0 0 2px;
-        background: linear-gradient(
-            90deg,
-            color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
-            color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
-            color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
-        );
-        background-size: 200% 100%;
-        animation: shimmer 3s linear infinite;
     }
 
     .wikilink-picker-item {
@@ -148,38 +119,5 @@
         text-align: left;
         cursor: pointer;
         transition: background var(--transition-fast);
-    }
-
-    .wikilink-picker-item:hover,
-    .wikilink-picker-item.selected {
-        background: color-mix(
-            in srgb,
-            var(--accent-color, #8b5cf6) 14%,
-            transparent
-        );
-    }
-
-    .wikilink-picker-name {
-        color: var(--app-text-color, #ffffff);
-        font-size: 13px;
-        font-weight: 500;
-    }
-
-    .wikilink-picker-path {
-        overflow: hidden;
-        color: var(--text-secondary);
-        font-size: 10px;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-    }
-
-    @keyframes shimmer {
-        0% {
-            background-position: 200% 0;
-        }
-
-        100% {
-            background-position: -200% 0;
-        }
     }
 </style>

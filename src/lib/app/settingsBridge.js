@@ -17,6 +17,10 @@ export function computeBrightnessFilter(brightness = 0) {
 export function applyColorSettings(settings = {}) {
     const root = document.documentElement;
     root.style.setProperty(
+        "--text-secondary",
+        `color-mix(in srgb, ${settings.text_color ?? "#ffffff"} 50%, transparent)`,
+    );
+    root.style.setProperty(
         "--accent-color",
         settings.accent_color ?? "#8b5cf6",
     );

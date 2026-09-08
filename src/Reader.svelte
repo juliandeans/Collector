@@ -3,6 +3,8 @@
   const DEMO_FAKE_BG = import.meta.env.DEV && ENABLE_DEMO_FAKE_BG;
 
   import "./lib/reader/reader-shell.css";
+  import "./lib/overlay.css";
+  import { clampOverlayLeft } from "./lib/overlayPosition.js";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy, tick } from "svelte";
@@ -639,13 +641,14 @@
 
 {#if showAutocomplete && autocompleteResults.length > 0}
   {@const rect = autocompleteRange?.getBoundingClientRect()}
+  {@const left = clampOverlayLeft(rect?.left ?? 0)}
   <div
-    class="autocomplete-dropdown"
-    style={`left: ${rect?.left ?? 0}px; top: ${(rect?.bottom ?? 0) + 4}px;`}
+    class="autocomplete-dropdown overlay-panel"
+    style={`left: ${left}px; top: ${(rect?.bottom ?? 0) + 4}px; --app-text-color: ${appSettings.text_color}; --app-background: ${appSettings.overlay_color}; --app-transparency: ${appSettings.overlay_strength}%;`}
   >
     {#each autocompleteResults as note, index (note.path)}
       <button
-        class="autocomplete-item"
+        class="autocomplete-item overlay-item"
         class:selected={index === autocompleteIndex}
         type="button"
         onmousedown={(event) => {
@@ -654,9 +657,9 @@
         }}
         onmouseenter={() => (autocompleteIndex = index)}
       >
-        <span class="autocomplete-name">{note.name}</span>
+        <span class="overlay-name">{note.name}</span>
         {#if showNotePaths}
-          <span class="autocomplete-path">{note.relative_path}</span>
+          <span class="overlay-path">{note.relative_path}</span>
         {/if}
       </button>
     {/each}

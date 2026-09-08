@@ -131,18 +131,6 @@ body {
   min-width: 220px;
   max-width: 320px;
   overflow: hidden;
-  border-radius: 8px;
-  background: color-mix(
-    in srgb,
-    var(--app-background, #1e1e2e) var(--app-transparency, 55%),
-    transparent
-  );
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.22),
-    0 6px 16px rgba(0, 0, 0, 0.14);
-  backdrop-filter: blur(20px) saturate(130%);
-  -webkit-backdrop-filter: blur(20px) saturate(130%);
 }
 
 .autocomplete-item {
@@ -158,29 +146,6 @@ body {
   text-align: left;
   cursor: pointer;
   transition: background var(--transition-fast);
-}
-
-.autocomplete-item:hover,
-.autocomplete-item.selected {
-  background: color-mix(
-    in srgb,
-    var(--accent-color, #8b5cf6) 14%,
-    transparent
-  );
-}
-
-.autocomplete-name {
-  color: var(--app-text-color, #ffffff);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.autocomplete-path {
-  overflow: hidden;
-  color: var(--reader-text-secondary);
-  font-size: 10px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 ::highlight(search-result) {

@@ -1,5 +1,6 @@
 <script>
   import { tick } from "svelte";
+  import "../overlay.css";
 
   /**
    * @typedef {Object} Props
@@ -144,7 +145,7 @@
     onmousedown={() => onClose?.()}
   ></button>
 
-  <div class="palette" role="dialog" aria-modal="true">
+  <div class="palette overlay-panel" role="dialog" aria-modal="true">
     <input
       bind:this={inputRef}
       value={query}
@@ -161,15 +162,15 @@
       {:else}
         {#each notes as note, index (note.path)}
           <button
-            class="palette-item"
+            class="palette-item overlay-item"
             class:selected={index === selectedIndex}
             type="button"
             onpointermove={(event) => handlePointerMove(index, event)}
             onclick={() => onOpenNote?.(note)}
           >
-            <span class="palette-name">{note.name}</span>
+            <span class="overlay-name">{note.name}</span>
             {#if showPaths}
-              <span class="palette-path">{note.relative_path}</span>
+              <span class="overlay-path">{note.relative_path}</span>
             {/if}
           </button>
         {/each}
@@ -212,41 +213,9 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border-radius: var(--app-border-radius, 12px);
-    background: color-mix(
-      in srgb,
-      var(--app-background, #1e1e2e) var(--app-transparency, 85%),
-      transparent
-    );
-    backdrop-filter: blur(var(--app-blur, 80px))
-      saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
-    -webkit-backdrop-filter: blur(var(--app-blur, 80px))
-      saturate(var(--app-saturation, 200%)) var(--app-brightness-filter);
-    color: var(--app-text-color, #ffffff);
-    font-family: var(--app-font-family, var(--font-family));
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: var(--overlay-shadow);
     transform: translateX(-50%) translateZ(0);
     -webkit-transform: translateX(-50%) translateZ(0);
     z-index: 121;
-  }
-
-  .palette::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent),
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 35%, transparent),
-      color-mix(in srgb, var(--accent-color, #8b5cf6) 70%, transparent)
-    );
-    background-size: 200% 100%;
-    animation: shimmer 3s linear infinite;
-    z-index: 1;
   }
 
   .palette-input {
@@ -294,27 +263,6 @@
     border-bottom: 0;
   }
 
-  .palette-item:hover,
-  .palette-item.selected {
-    background: color-mix(
-      in srgb,
-      var(--accent-color, #8b5cf6) 14%,
-      transparent
-    );
-  }
-
-  .palette-name {
-    color: var(--app-text-color, #ffffff);
-    font-weight: 500;
-    font-size: 13px;
-  }
-
-  .palette-path {
-    margin-top: 2px;
-    color: var(--text-secondary);
-    font-size: 10px;
-  }
-
   .palette-empty {
     padding: 18px 16px;
     color: rgba(255, 255, 255, 0.58);
@@ -332,15 +280,5 @@
   .palette-results::-webkit-scrollbar-thumb {
     background: rgba(0, 0, 0, 0.12);
     border-radius: 3px;
-  }
-
-  @keyframes shimmer {
-    0% {
-      background-position: 200% 0;
-    }
-
-    100% {
-      background-position: -200% 0;
-    }
   }
 </style>

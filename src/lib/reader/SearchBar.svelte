@@ -94,7 +94,7 @@
 
   .search-count {
     min-width: 56px;
-    color: var(--reader-text-secondary);
+    color: var(--text-secondary);
     font-size: 11px;
     text-align: right;
     white-space: nowrap;
@@ -110,7 +110,7 @@
     border: 0;
     border-radius: 4px;
     background: transparent;
-    color: var(--reader-text-secondary);
+    color: var(--text-secondary);
     cursor: pointer;
     font-size: 12px;
     transition: background var(--transition-fast);

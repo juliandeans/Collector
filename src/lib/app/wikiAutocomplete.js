@@ -1,5 +1,6 @@
 import { findWikiTrigger, computeWikilinkInsertion } from "../capture/wiki-utils.js";
 import { getAutocompleteResults } from "../reader/autocomplete.js";
+import { clampOverlayLeft } from "../overlayPosition.js";
 
 function getTextareaPosition(textarea, position) {
     const rect = textarea.getBoundingClientRect();
@@ -67,14 +68,6 @@ function getTextareaPosition(textarea, position) {
     }
 }
 
-function clampWikiDropdownLeft(left) {
-    const margin = 12;
-    const pickerWidth = Math.min(320, window.innerWidth - margin * 2);
-    const maxLeft = window.innerWidth - pickerWidth - margin;
-
-    return Math.max(margin, Math.min(left, maxLeft));
-}
-
 function getWikiDropdownPosition(textarea, anchorPosition, cursorPosition) {
     if (!textarea) return { left: 0, top: 0 };
 
@@ -82,7 +75,7 @@ function getWikiDropdownPosition(textarea, anchorPosition, cursorPosition) {
     const caretRect = getTextareaPosition(textarea, cursorPosition);
 
     return {
-        left: clampWikiDropdownLeft(anchorRect.left),
+        left: clampOverlayLeft(anchorRect.left),
         top: caretRect.bottom + 6,
     };
 }

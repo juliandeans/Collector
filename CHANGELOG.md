@@ -3,6 +3,26 @@
 All notable changes to Collector are documented here.  
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.0] - 2026-09-08
+
+### Changed
+- The wikilink suggestion popups (Reader and Capture), the "append to note"
+  picker, and the command palette now share one consistent visual design
+  (background, accent highlight bar, text colors) instead of three
+  independently-styled looks that had quietly drifted apart.
+- The muted/secondary text color used throughout the Reader and its popups
+  (note paths, headings, quotes, list markers) now derives automatically
+  from your chosen Text Color setting instead of being a fixed color —
+  adapts correctly to both dark and light text setups.
+
+### Fixed
+- Wikilink suggestion path text in the Reader rendered in black instead of
+  a legible muted color.
+- The Reader's wikilink suggestion popup could render partly or fully
+  off-screen and become invisible when opened near the right edge of the
+  window. It now stays within the window, matching how the Capture
+  window's popup already behaved.
+
 ## [1.2.5] - 2026-06-09
 
 ### Added
