@@ -197,6 +197,18 @@ pub struct Settings {
     pub internal_link_color: String,
     #[serde(default = "default_external_link_color")]
     pub external_link_color: String,
+    #[serde(default)]
+    pub remember_window_geometry: bool,
+    #[serde(default)]
+    pub remembered_window_x: Option<i32>,
+    #[serde(default)]
+    pub remembered_window_y: Option<i32>,
+    #[serde(default)]
+    pub remembered_window_width: Option<u32>,
+    #[serde(default)]
+    pub remembered_window_height: Option<u32>,
+    #[serde(default)]
+    pub persist_capture_draft: bool,
 }
 
 impl Default for Settings {
@@ -273,8 +285,66 @@ impl Default for Settings {
             accent_color: default_accent_color(),
             internal_link_color: default_internal_link_color(),
             external_link_color: default_external_link_color(),
+            remember_window_geometry: false,
+            remembered_window_x: None,
+            remembered_window_y: None,
+            remembered_window_width: None,
+            remembered_window_height: None,
+            persist_capture_draft: false,
         }
     }
 }
 
+#[cfg(test)]
+mod new_field_tests {
+    use super::Settings;
 
+    #[test]
+    fn defaults_have_geometry_memory_and_draft_persistence_off() {
+        let settings = Settings::default();
+        assert!(!settings.remember_window_geometry);
+        assert_eq!(settings.remembered_window_x, None);
+        assert_eq!(settings.remembered_window_y, None);
+        assert_eq!(settings.remembered_window_width, None);
+        assert_eq!(settings.remembered_window_height, None);
+        assert!(!settings.persist_capture_draft);
+    }
+
+    #[test]
+    fn old_config_without_new_fields_still_deserializes() {
+        let mut value = serde_json::to_value(Settings::default()).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("remember_window_geometry");
+        object.remove("remembered_window_x");
+        object.remove("remembered_window_y");
+        object.remove("remembered_window_width");
+        object.remove("remembered_window_height");
+        object.remove("persist_capture_draft");
+
+        let content = serde_json::to_string(&value).unwrap();
+        let settings: Settings = serde_json::from_str(&content)
+            .expect("old config without new fields must still deserialize");
+
+        assert!(!settings.remember_window_geometry);
+        assert!(!settings.persist_capture_draft);
+    }
+
+    #[test]
+    fn remembered_geometry_roundtrips_through_json() {
+        let mut settings = Settings::default();
+        settings.remember_window_geometry = true;
+        settings.remembered_window_x = Some(120);
+        settings.remembered_window_y = Some(80);
+        settings.remembered_window_width = Some(400);
+        settings.remembered_window_height = Some(650);
+
+        let content = serde_json::to_string(&settings).unwrap();
+        let round_tripped: Settings = serde_json::from_str(&content).unwrap();
+
+        assert!(round_tripped.remember_window_geometry);
+        assert_eq!(round_tripped.remembered_window_x, Some(120));
+        assert_eq!(round_tripped.remembered_window_y, Some(80));
+        assert_eq!(round_tripped.remembered_window_width, Some(400));
+        assert_eq!(round_tripped.remembered_window_height, Some(650));
+    }
+}
