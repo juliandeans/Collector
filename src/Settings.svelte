@@ -285,7 +285,7 @@
                 {#if activePanel === "vault"}
                     <PanelVault bind:settings {showStatus} validation={fieldIssues} onChange={scheduleAutoSave} />
                 {:else if activePanel === "capture"}
-                    <PanelCapture bind:settings {showStatus} validation={fieldIssues} onChange={scheduleAutoSave} />
+                    <PanelCapture bind:settings {showStatus} validation={fieldIssues} />
                 {:else if activePanel === "reader"}
                     <PanelReader bind:settings validation={fieldIssues} {vaultNotes} onChange={scheduleAutoSave} />
                 {:else if activePanel === "look"}

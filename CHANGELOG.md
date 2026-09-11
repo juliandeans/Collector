@@ -5,7 +5,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [1.3.0] - 2026-09-08
 
+### Added
+- Configurable "Next Tab" / "Previous Tab" keyboard shortcuts in the Reader
+  (default: Option+Right / Option+Left).
+
 ### Changed
+- The "Save Actions" shortcuts (Save to Daily Note, Create New Note, Append
+  to Note) now sit right below "Capture Window" in Settings → Shortcuts
+  instead of at the bottom of the tab.
 - The wikilink suggestion popups (Reader and Capture), the "append to note"
   picker, and the command palette now share one consistent visual design
   (background, accent highlight bar, text colors) instead of three
@@ -20,6 +27,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   continuous amount.
 
 ### Fixed
+- The shortcut recorder in Settings now shows "Option" instead of "Alt"
+  when capturing a key combo that uses the Option key.
 - Wikilink suggestion path text in the Reader rendered in black instead of
   a legible muted color.
 - The Reader's wikilink suggestion popup could render partly or fully
