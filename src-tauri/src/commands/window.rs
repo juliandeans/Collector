@@ -18,6 +18,15 @@ pub(crate) async fn save_settings(
 ) -> Result<(), String> {
     new_settings.normalize_pinned_note_paths();
     new_settings.normalize_screenshot_path();
+
+    {
+        let current = state.settings.read().await;
+        new_settings.remembered_window_x = current.remembered_window_x;
+        new_settings.remembered_window_y = current.remembered_window_y;
+        new_settings.remembered_window_width = current.remembered_window_width;
+        new_settings.remembered_window_height = current.remembered_window_height;
+    }
+
     new_settings.validate().map_err(|e| {
         log::error!("Settings validation failed: {}", e);
         e

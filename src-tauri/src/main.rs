@@ -258,6 +258,42 @@ fn position_window_logical(
     let app = window.app_handle();
     let monitor = edge_detect::get_screen_bounds(&app);
 
+    if settings.remember_window_geometry {
+        if let (Some(x), Some(y), Some(width), Some(height)) = (
+            settings.remembered_window_x,
+            settings.remembered_window_y,
+            settings.remembered_window_width,
+            settings.remembered_window_height,
+        ) {
+            let overlaps_current_monitor = (x as f64) < (monitor.x as f64 + monitor.width as f64)
+                && (x as f64 + width as f64) > monitor.x as f64
+                && (y as f64) < (monitor.y as f64 + monitor.height as f64)
+                && (y as f64 + height as f64) > monitor.y as f64;
+
+            if overlaps_current_monitor {
+                window
+                    .set_size(LogicalSize {
+                        width: width as f64,
+                        height: height as f64,
+                    })
+                    .map_err(|e| e.to_string())?;
+
+                window
+                    .set_position(LogicalPosition {
+                        x: x as f64,
+                        y: y as f64,
+                    })
+                    .map_err(|e| e.to_string())?;
+
+                return Ok(());
+            }
+
+            log::warn!(
+                "Remembered window geometry is off-screen for the current monitor; falling back to edge position"
+            );
+        }
+    }
+
     let width = settings.window_width as f64;
     let height = settings.window_height as f64;
 
