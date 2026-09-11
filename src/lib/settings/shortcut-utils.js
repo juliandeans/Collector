@@ -11,7 +11,7 @@ export function handleShortcutKeyDown(event, field, settings, onChange = () => {
     if (event.metaKey) modifiers.push("Cmd");
     if (event.ctrlKey) modifiers.push("Ctrl");
     if (event.shiftKey) modifiers.push("Shift");
-    if (event.altKey) modifiers.push("Alt");
+    if (event.altKey) modifiers.push("Option");
 
     let key = event.code;
 
