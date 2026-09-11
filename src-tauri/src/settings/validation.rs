@@ -195,6 +195,14 @@ impl Settings {
             crate::shortcuts::validate_shortcut(&self.reader_command_palette_shortcut)?;
         }
 
+        if !self.reader_next_tab_shortcut.trim().is_empty() {
+            crate::shortcuts::validate_shortcut(&self.reader_next_tab_shortcut)?;
+        }
+
+        if !self.reader_previous_tab_shortcut.trim().is_empty() {
+            crate::shortcuts::validate_shortcut(&self.reader_previous_tab_shortcut)?;
+        }
+
         if !self.save_to_daily_shortcut.trim().is_empty() {
             crate::shortcuts::validate_shortcut(&self.save_to_daily_shortcut)?;
         }
@@ -408,6 +416,8 @@ mod tests {
             reader_open_in_obsidian_shortcut: String::new(),
             reader_navigate_back_shortcut: String::new(),
             reader_command_palette_shortcut: String::new(),
+            reader_next_tab_shortcut: String::new(),
+            reader_previous_tab_shortcut: String::new(),
             ..Default::default()
         };
 
@@ -427,6 +437,14 @@ mod tests {
             },
             Settings {
                 reader_command_palette_shortcut: "Cmd+Plus".to_string(),
+                ..Default::default()
+            },
+            Settings {
+                reader_next_tab_shortcut: "Cmd".to_string(),
+                ..Default::default()
+            },
+            Settings {
+                reader_previous_tab_shortcut: "Cmd+Plus".to_string(),
                 ..Default::default()
             },
         ];

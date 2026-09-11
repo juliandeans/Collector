@@ -84,6 +84,12 @@ export function applySettings(currentSettings = {}, settings = {}) {
     reader_command_palette_shortcut:
       settings.reader_command_palette_shortcut ??
       currentSettings.reader_command_palette_shortcut,
+    reader_next_tab_shortcut:
+      settings.reader_next_tab_shortcut ??
+      currentSettings.reader_next_tab_shortcut,
+    reader_previous_tab_shortcut:
+      settings.reader_previous_tab_shortcut ??
+      currentSettings.reader_previous_tab_shortcut,
     pinned_notes: normalizePinnedNotes(
       settings.pinned_notes ?? currentSettings.pinned_notes,
     ),

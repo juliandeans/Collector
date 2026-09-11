@@ -310,6 +310,30 @@
     await tabLifecycle.activateTab(index, forceReload, tabLifecycleBag());
   }
 
+  let tabSwitchInFlight = false;
+
+  async function nextTab() {
+    if (tabSwitchInFlight || tabs.length < 2) return;
+    tabSwitchInFlight = true;
+    try {
+      const nextIndex = (activeTabIndex + 1) % tabs.length;
+      await activateTab(nextIndex);
+    } finally {
+      tabSwitchInFlight = false;
+    }
+  }
+
+  async function previousTab() {
+    if (tabSwitchInFlight || tabs.length < 2) return;
+    tabSwitchInFlight = true;
+    try {
+      const previousIndex = (activeTabIndex - 1 + tabs.length) % tabs.length;
+      await activateTab(previousIndex);
+    } finally {
+      tabSwitchInFlight = false;
+    }
+  }
+
   async function flushPendingSave(showConfirmation = false) {
     await tabLifecycle.flushPendingSave(showConfirmation, tabLifecycleBag());
   }
@@ -520,6 +544,14 @@
           {
             getShortcut: () => appSettings.reader_command_palette_shortcut,
             onMatch: openPalette,
+          },
+          {
+            getShortcut: () => appSettings.reader_next_tab_shortcut,
+            onMatch: nextTab,
+          },
+          {
+            getShortcut: () => appSettings.reader_previous_tab_shortcut,
+            onMatch: previousTab,
           },
         ],
       );

@@ -475,6 +475,8 @@ export function validateSettings(settings = {}) {
             field: "reader_command_palette_shortcut",
             label: "Open Command Palette",
         },
+        { field: "reader_next_tab_shortcut", label: "Next Tab" },
+        { field: "reader_previous_tab_shortcut", label: "Previous Tab" },
         { field: "capture_text_shortcut", label: "Copy Text to Collector" },
         { field: "save_to_daily_shortcut", label: "Save to Daily Note" },
         { field: "save_as_note_shortcut", label: "Create New Note" },
@@ -512,6 +514,8 @@ export function validateSettings(settings = {}) {
             { field: "reader_open_in_obsidian_shortcut" },
             { field: "reader_navigate_back_shortcut" },
             { field: "reader_command_palette_shortcut" },
+            { field: "reader_next_tab_shortcut" },
+            { field: "reader_previous_tab_shortcut" },
         ],
         "Reader action shortcuts must be unique.",
     );
@@ -535,6 +539,8 @@ export function validateSettings(settings = {}) {
             field: "reader_command_palette_shortcut",
             label: "Open Command Palette",
         },
+        { field: "reader_next_tab_shortcut", label: "Next Tab" },
+        { field: "reader_previous_tab_shortcut", label: "Previous Tab" },
     ]);
 
     for (const [field, label] of [

@@ -79,6 +79,14 @@ pub(super) fn default_reader_command_palette_shortcut() -> String {
     "Cmd+P".to_string()
 }
 
+pub(super) fn default_reader_next_tab_shortcut() -> String {
+    "Option+Right".to_string()
+}
+
+pub(super) fn default_reader_previous_tab_shortcut() -> String {
+    "Option+Left".to_string()
+}
+
 pub(super) fn default_note_filename_template() -> String {
     "note-YYYY-MM-DD-HHmmss".to_string()
 }

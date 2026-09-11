@@ -179,6 +179,34 @@
             <FieldIssue issue={validation.reader_command_palette_shortcut} />
             <small>Shortcut pressed inside the Reader window</small>
         </div>
+        <div class="field">
+            <label for="reader_next_tab_shortcut">Next Tab</label>
+            <input
+                class="shortcut-input"
+                type="text"
+                id="reader_next_tab_shortcut"
+                bind:value={settings.reader_next_tab_shortcut}
+                placeholder="Option+Right"
+                onkeydown={(e) =>
+                    handleShortcutKeyDown(e, "reader_next_tab_shortcut")}
+            />
+            <FieldIssue issue={validation.reader_next_tab_shortcut} />
+            <small>Shortcut pressed inside the Reader window</small>
+        </div>
+        <div class="field">
+            <label for="reader_previous_tab_shortcut">Previous Tab</label>
+            <input
+                class="shortcut-input"
+                type="text"
+                id="reader_previous_tab_shortcut"
+                bind:value={settings.reader_previous_tab_shortcut}
+                placeholder="Option+Left"
+                onkeydown={(e) =>
+                    handleShortcutKeyDown(e, "reader_previous_tab_shortcut")}
+            />
+            <FieldIssue issue={validation.reader_previous_tab_shortcut} />
+            <small>Shortcut pressed inside the Reader window</small>
+        </div>
     </Section>
 
     <Section title="Copy Text to Collector">
