@@ -494,7 +494,6 @@ fn main() {
         capture_text_shortcut_manager: capture_text_shortcut_manager.clone(),
         save_as_note_shortcut_manager: save_as_note_shortcut_manager.clone(),
         vault_index: Arc::new(RwLock::new(None)),
-        window_geometry_debounce: window_geometry_debounce.clone(),
     };
 
     let window_geometry_debounce_for_setup = window_geometry_debounce.clone();

@@ -1,4 +1,3 @@
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
@@ -16,5 +15,4 @@ pub(crate) struct AppState {
     pub(crate) capture_text_shortcut_manager: Arc<ShortcutManager>,
     pub(crate) save_as_note_shortcut_manager: Arc<ShortcutManager>,
     pub(crate) vault_index: Arc<RwLock<Option<VaultIndex>>>,
-    pub(crate) window_geometry_debounce: Arc<AtomicU64>,
 }
