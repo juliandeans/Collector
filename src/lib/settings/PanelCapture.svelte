@@ -2,10 +2,19 @@
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
     import FieldIssue from "./FieldIssue.svelte";
+    import { handleShortcutKeyDown as captureShortcutKeyDown } from "./shortcut-utils.js";
 
-    let { settings = $bindable(), validation = {} } = $props();
+    let {
+        settings = $bindable(),
+        validation = {},
+        onChange = () => {}
+    } = $props();
 
     let showTemplateEditor = $state(false);
+
+    function handleShortcutKeyDown(event, field) {
+        captureShortcutKeyDown(event, field, settings, onChange);
+    }
 </script>
 
 <div class="settings-panel">
@@ -176,6 +185,48 @@
         </div>
     </Section>
 
+    <Section title="Save Actions">
+        <div class="field">
+            <label for="save_to_daily_shortcut">Save to Daily Note</label>
+            <input
+                class="shortcut-input"
+                type="text"
+                id="save_to_daily_shortcut"
+                bind:value={settings.save_to_daily_shortcut}
+                placeholder="Cmd+Enter"
+                onkeydown={(e) =>
+                    handleShortcutKeyDown(e, "save_to_daily_shortcut")}
+            />
+            <FieldIssue issue={validation.save_to_daily_shortcut} />
+        </div>
+        <div class="field">
+            <label for="save_as_note_shortcut">Create New Note</label>
+            <input
+                class="shortcut-input"
+                type="text"
+                id="save_as_note_shortcut"
+                bind:value={settings.save_as_note_shortcut}
+                placeholder="Cmd+Shift+Enter"
+                onkeydown={(e) =>
+                    handleShortcutKeyDown(e, "save_as_note_shortcut")}
+            />
+            <FieldIssue issue={validation.save_as_note_shortcut} />
+        </div>
+        <div class="field">
+            <label for="append_to_note_shortcut">Append to Note</label>
+            <input
+                class="shortcut-input"
+                type="text"
+                id="append_to_note_shortcut"
+                bind:value={settings.append_to_note_shortcut}
+                placeholder="Cmd+Option+Enter"
+                onkeydown={(e) =>
+                    handleShortcutKeyDown(e, "append_to_note_shortcut")}
+            />
+            <FieldIssue issue={validation.append_to_note_shortcut} />
+        </div>
+    </Section>
+
     <Section title="Pickers">
         <div class="field">
             <Checkbox bind:checked={settings.show_note_paths}>
@@ -275,5 +326,10 @@
             flex-direction: column;
             gap: 0;
         }
+    }
+
+    .shortcut-input {
+        width: 280px;
+        max-width: 100%;
     }
 </style>
