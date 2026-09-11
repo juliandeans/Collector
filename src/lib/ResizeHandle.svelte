@@ -3,13 +3,10 @@
 
     let { onResizeStart = () => {} } = $props();
 
-    // The window is borderless (decorations: false) and has
-    // setMovableByWindowBackground enabled, so the native OS edge-resize
-    // region isn't reliably reachable — dragging what looks like the edge
-    // just moves the window instead. Driving Tauri's own resize-drag API
-    // from this dedicated hit area resizes reliably regardless. preventDefault
-    // + stopPropagation keep the same mousedown from also being picked up
-    // as a window-background move.
+    // JavaScript fallback for platforms supporting Tauri resize dragging.
+    // On macOS, window_resize.rs consumes this hit area before Tao starts
+    // background dragging. DOM cancellation is too late for that native path,
+    // and Tao 0.35.3 does not implement drag_resize_window on macOS.
     function startResize(event) {
         event.preventDefault();
         event.stopPropagation();

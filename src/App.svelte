@@ -770,9 +770,8 @@
             0 2px 8px var(--shadow-sm);
     }
 
-    /* backdrop-filter/box-shadow are expensive to keep recomputing on a
-       borderless transparent window while it's actively being resized —
-       visible as flicker. Drop them for the duration of the resize. */
+    /* Effects for the JavaScript resize fallback. The native macOS handler
+       leaves these effects unchanged. */
     .capture-container.resizing {
         backdrop-filter: none;
         -webkit-backdrop-filter: none;

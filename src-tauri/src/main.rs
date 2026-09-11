@@ -22,6 +22,12 @@ mod vault_index;
 mod vault_paths;
 mod window_geometry;
 mod window_style;
+#[cfg(target_os = "macos")]
+mod resize_geometry;
+#[cfg(target_os = "macos")]
+mod window_resize;
+#[cfg(all(debug_assertions, target_os = "macos"))]
+mod resize_diagnostics;
 
 use std::sync::Arc;
 use tauri::{AppHandle, Listener, Manager, WindowEvent};
@@ -228,6 +234,8 @@ fn main() {
             });
 
             if let Some(window) = app.get_webview_window("capture") {
+                #[cfg(target_os = "macos")]
+                window_resize::install(&window)?;
                 warn_if_failed(
                     position_window_logical(&window, &settings),
                     "Failed to position capture window",
@@ -265,6 +273,8 @@ fn main() {
             }
 
             if let Some(window) = app.get_webview_window("reader") {
+                #[cfg(target_os = "macos")]
+                window_resize::install(&window)?;
                 warn_if_failed(
                     position_reader_window_logical(&window, &settings),
                     "Failed to position reader window",
@@ -306,6 +316,8 @@ fn main() {
         })
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
+            #[cfg(all(debug_assertions, target_os = "macos"))]
+            resize_diagnostics::resize_diagnostics,
             commands::settings::load_settings,
             commands::window::save_settings,
             commands::capture::save_as_note,
