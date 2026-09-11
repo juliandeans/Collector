@@ -16,6 +16,7 @@ mod markdown_sections;
 mod selected_text;
 mod settings;
 mod shortcuts;
+mod tray;
 mod updater;
 mod vault_index;
 mod vault_paths;
@@ -23,11 +24,7 @@ mod window_geometry;
 mod window_style;
 
 use std::sync::Arc;
-use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Listener, Manager, WindowEvent,
-};
+use tauri::{AppHandle, Listener, Manager, WindowEvent};
 use tokio::sync::RwLock;
 
 use crate::app_state::AppState;
@@ -79,66 +76,6 @@ pub(crate) async fn show_reader_internal(app: &AppHandle) -> Result<(), String> 
     }
     state.edge_detector.set_reader_open(true).await;
     Ok(())
-}
-
-fn create_tray_menu(app: &AppHandle) -> Menu<tauri::Wry> {
-    let quick_capture = MenuItem::with_id(
-        app,
-        "quick_capture",
-        "Quick Capture (⌘⇧N)",
-        true,
-        None::<String>,
-    )
-    .unwrap();
-    let settings = MenuItem::with_id(app, "settings", "Settings...", true, None::<String>).unwrap();
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<String>).unwrap();
-
-    Menu::with_items(
-        app,
-        &[
-            &quick_capture,
-            &settings,
-            &PredefinedMenuItem::separator(app).unwrap(),
-            &quit,
-        ],
-    )
-    .unwrap()
-}
-
-fn handle_tray_event(app: &AppHandle, event: TrayIconEvent) {
-    if let TrayIconEvent::Click {
-        button,
-        button_state,
-        ..
-    } = event
-    {
-        if button == MouseButton::Left && button_state == MouseButtonState::Up {
-            let app_handle = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let state = app_handle.state::<AppState>();
-                let settings = state.settings.read().await.clone();
-                show_capture_window(&app_handle, &settings);
-            });
-        }
-    }
-}
-
-fn show_capture_window(app: &AppHandle, settings: &Settings) {
-    if let Some(window) = app.get_webview_window("capture") {
-        warn_if_failed(
-            position_window_logical(&window, settings),
-            "Failed to position capture window",
-        );
-        configure_macos_window(
-            &window,
-            settings.border_radius as f64,
-            settings.window_blur as i64,
-        );
-        warn_if_failed(window.show(), "Failed to show capture window");
-        warn_if_failed(window.set_focus(), "Failed to focus capture window");
-        warn_if_failed(app.emit("reset_capture", ()), "Failed to emit reset_capture");
-        warn_if_failed(app.emit("show_capture", ()), "Failed to emit show_capture");
-    }
 }
 
 fn main() {
@@ -205,90 +142,8 @@ fn main() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            let menu = create_tray_menu(&app_handle);
-            let settings_for_tray = settings.clone();
-            let _tray = TrayIconBuilder::with_id("main")
-                .icon(
-                    tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
-                        .unwrap(),
-                )
-                .menu(&menu)
-                .on_menu_event(move |app, event| match event.id().as_ref() {
-                    "quick_capture" => {
-                        show_capture_window(app, &settings_for_tray);
-                    }
-                    "settings" => {
-                        let app_clone = app.clone();
-                        tauri::async_runtime::spawn(async move {
-                            if let Err(error) = commands::window::open_settings(app_clone).await {
-                                log::warn!("Failed to open settings window: {}", error);
-                            }
-                        });
-                    }
-                    "open_update" => {
-                        open::that("https://github.com/juliandeans/Collector/releases/latest").ok();
-                    }
-                    "quit" => std::process::exit(0),
-                    _ => {}
-                })
-                .on_tray_icon_event(|_tray, event| {
-                    handle_tray_event(_tray.app_handle(), event);
-                })
-                .build(app)?;
-
-            let app_handle_for_update = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                if let Some(latest) = updater::check_for_update().await {
-                    let quick_capture = MenuItem::with_id(
-                        &app_handle_for_update,
-                        "quick_capture",
-                        "Quick Capture (⌘⇧N)",
-                        true,
-                        None::<String>,
-                    )
-                    .unwrap();
-                    let settings = MenuItem::with_id(
-                        &app_handle_for_update,
-                        "settings",
-                        "Settings...",
-                        true,
-                        None::<String>,
-                    )
-                    .unwrap();
-                    let open_update = MenuItem::with_id(
-                        &app_handle_for_update,
-                        "open_update",
-                        format!("Update available: v{}", latest),
-                        true,
-                        None::<String>,
-                    )
-                    .unwrap();
-                    let quit = MenuItem::with_id(
-                        &app_handle_for_update,
-                        "quit",
-                        "Quit",
-                        true,
-                        None::<String>,
-                    )
-                    .unwrap();
-                    let new_menu = Menu::with_items(
-                        &app_handle_for_update,
-                        &[
-                            &quick_capture,
-                            &settings,
-                            &PredefinedMenuItem::separator(&app_handle_for_update).unwrap(),
-                            &open_update,
-                            &PredefinedMenuItem::separator(&app_handle_for_update).unwrap(),
-                            &quit,
-                        ],
-                    )
-                    .unwrap();
-
-                    if let Some(tray) = app_handle_for_update.tray_by_id("main") {
-                        let _ = tray.set_menu(Some(new_menu));
-                    }
-                }
-            });
+            tray::setup_tray(app, settings.clone())?;
+            tray::spawn_update_watcher(app_handle.clone());
 
             let detector = edge_detector.clone();
             let app_handle_edge = app_handle.clone();
