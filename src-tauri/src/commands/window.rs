@@ -27,6 +27,10 @@ pub(crate) async fn save_settings(
         new_settings.remembered_window_y = current.remembered_window_y;
         new_settings.remembered_window_width = current.remembered_window_width;
         new_settings.remembered_window_height = current.remembered_window_height;
+        new_settings.remembered_reader_x = current.remembered_reader_x;
+        new_settings.remembered_reader_y = current.remembered_reader_y;
+        new_settings.remembered_reader_width = current.remembered_reader_width;
+        new_settings.remembered_reader_height = current.remembered_reader_height;
 
         new_settings.validate().map_err(|e| {
             log::error!("Settings validation failed: {}", e);

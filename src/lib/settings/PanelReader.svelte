@@ -140,6 +140,7 @@
                     bind:value={settings.reader_width}
                     min="200"
                     max="800"
+                    disabled={settings.remember_reader_geometry}
                 />
                 <FieldIssue issue={validation.reader_width} />
             </div>
@@ -151,9 +152,19 @@
                     bind:value={settings.reader_height}
                     min="200"
                     max="1200"
+                    disabled={settings.remember_reader_geometry}
                 />
                 <FieldIssue issue={validation.reader_height} />
             </div>
+        </div>
+        <div class="field">
+            <Checkbox bind:checked={settings.remember_reader_geometry}>
+                Remember size and position
+            </Checkbox>
+            <small>
+                Uses wherever you last moved/resized the reader window
+                instead of the values above.
+            </small>
         </div>
     </Section>
 

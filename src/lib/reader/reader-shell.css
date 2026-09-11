@@ -37,6 +37,15 @@ body {
   -webkit-transform: translateZ(0);
 }
 
+/* backdrop-filter/box-shadow are expensive to keep recomputing on a
+   borderless transparent window while it's actively being resized —
+   visible as flicker. Drop them for the duration of the resize. */
+.reader-container.resizing {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
 .accent-line,
 .reader-topbar,
 .search-bar,

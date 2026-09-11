@@ -6,6 +6,7 @@
   import "./lib/overlay.css";
   import { clampOverlayLeft } from "./lib/overlayPosition.js";
   import { cornerRadiusCss } from "./lib/cornerRadius.js";
+  import { setupResizeFlicker } from "./lib/resizeFlicker.js";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy, tick } from "svelte";
@@ -15,6 +16,7 @@
   import SearchBar from "./lib/reader/SearchBar.svelte";
   import StatusToast from "./lib/reader/StatusToast.svelte";
   import TabContextMenu from "./lib/reader/TabContextMenu.svelte";
+  import ResizeHandle from "./lib/ResizeHandle.svelte";
   import { imagePathCache } from "./lib/reader/contentProcessing.js";
   import * as editorBridge from "./lib/reader/editorBridge.js";
   import * as tabLifecycle from "./lib/reader/tabLifecycle.js";
@@ -73,6 +75,9 @@
   let statusTimeout;
   let unlistenShowReader;
   let unlistenSettingsChanged;
+  let cleanupResizeFlicker;
+  let armResize = $state(() => {});
+  let isResizing = $state(false);
   let cleanupGlobalListeners = () => {};
   const saveScheduler = createDebouncedJob(600);
 
@@ -504,6 +509,12 @@
 
       unlistenShowReader = await listen("show_reader", handleShowReader);
 
+      const resizeFlicker = await setupResizeFlicker((value) => {
+        isResizing = value;
+      });
+      armResize = resizeFlicker.armResize;
+      cleanupResizeFlicker = resizeFlicker.cleanup;
+
       unlistenSettingsChanged = await listen(
         "settings_changed",
         (event) => handleSettingsChanged(event.payload),
@@ -568,6 +579,7 @@
     cleanupGlobalListeners?.();
     unlistenShowReader?.();
     unlistenSettingsChanged?.();
+    cleanupResizeFlicker?.();
   });
 </script>
 
@@ -575,6 +587,7 @@
   class="reader-container"
   class:demo-fake-bg={DEMO_FAKE_BG}
   class:palette-open={showPalette}
+  class:resizing={isResizing}
   style="
     --app-background: {appSettings.overlay_color};
     --app-font-family: {appSettings.font_family};
@@ -671,6 +684,7 @@
 
   <!-- Bottom bar disabled. Re-enable when back navigation is needed. -->
   <StatusToast message={statusMessage} type={statusType} />
+  <ResizeHandle onResizeStart={armResize} />
 </div>
 
 {#if showAutocomplete && autocompleteResults.length > 0}

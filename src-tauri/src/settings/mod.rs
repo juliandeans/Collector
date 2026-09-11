@@ -214,6 +214,16 @@ pub struct Settings {
     #[serde(default)]
     pub remembered_window_height: Option<u32>,
     #[serde(default)]
+    pub remember_reader_geometry: bool,
+    #[serde(default)]
+    pub remembered_reader_x: Option<i32>,
+    #[serde(default)]
+    pub remembered_reader_y: Option<i32>,
+    #[serde(default)]
+    pub remembered_reader_width: Option<u32>,
+    #[serde(default)]
+    pub remembered_reader_height: Option<u32>,
+    #[serde(default)]
     pub persist_capture_draft: bool,
 }
 
@@ -299,6 +309,11 @@ impl Default for Settings {
             remembered_window_y: None,
             remembered_window_width: None,
             remembered_window_height: None,
+            remember_reader_geometry: false,
+            remembered_reader_x: None,
+            remembered_reader_y: None,
+            remembered_reader_width: None,
+            remembered_reader_height: None,
             persist_capture_draft: false,
         }
     }
@@ -316,6 +331,11 @@ mod new_field_tests {
         assert_eq!(settings.remembered_window_y, None);
         assert_eq!(settings.remembered_window_width, None);
         assert_eq!(settings.remembered_window_height, None);
+        assert!(!settings.remember_reader_geometry);
+        assert_eq!(settings.remembered_reader_x, None);
+        assert_eq!(settings.remembered_reader_y, None);
+        assert_eq!(settings.remembered_reader_width, None);
+        assert_eq!(settings.remembered_reader_height, None);
         assert!(!settings.persist_capture_draft);
     }
 
@@ -328,6 +348,11 @@ mod new_field_tests {
         object.remove("remembered_window_y");
         object.remove("remembered_window_width");
         object.remove("remembered_window_height");
+        object.remove("remember_reader_geometry");
+        object.remove("remembered_reader_x");
+        object.remove("remembered_reader_y");
+        object.remove("remembered_reader_width");
+        object.remove("remembered_reader_height");
         object.remove("persist_capture_draft");
 
         let content = serde_json::to_string(&value).unwrap();
@@ -335,6 +360,7 @@ mod new_field_tests {
             .expect("old config without new fields must still deserialize");
 
         assert!(!settings.remember_window_geometry);
+        assert!(!settings.remember_reader_geometry);
         assert!(!settings.persist_capture_draft);
     }
 
@@ -346,6 +372,11 @@ mod new_field_tests {
         settings.remembered_window_y = Some(80);
         settings.remembered_window_width = Some(400);
         settings.remembered_window_height = Some(650);
+        settings.remember_reader_geometry = true;
+        settings.remembered_reader_x = Some(220);
+        settings.remembered_reader_y = Some(90);
+        settings.remembered_reader_width = Some(500);
+        settings.remembered_reader_height = Some(750);
 
         let content = serde_json::to_string(&settings).unwrap();
         let round_tripped: Settings = serde_json::from_str(&content).unwrap();
@@ -355,5 +386,10 @@ mod new_field_tests {
         assert_eq!(round_tripped.remembered_window_y, Some(80));
         assert_eq!(round_tripped.remembered_window_width, Some(400));
         assert_eq!(round_tripped.remembered_window_height, Some(650));
+        assert!(round_tripped.remember_reader_geometry);
+        assert_eq!(round_tripped.remembered_reader_x, Some(220));
+        assert_eq!(round_tripped.remembered_reader_y, Some(90));
+        assert_eq!(round_tripped.remembered_reader_width, Some(500));
+        assert_eq!(round_tripped.remembered_reader_height, Some(750));
     }
 }

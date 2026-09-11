@@ -32,7 +32,8 @@ use crate::edge_detect::EdgeDetector;
 use crate::settings::Settings;
 use crate::shortcuts::ShortcutManager;
 use crate::window_geometry::{
-    handle_capture_window_geometry_event, position_reader_window_logical, position_window_logical,
+    handle_capture_window_geometry_event, handle_reader_window_geometry_event,
+    position_reader_window_logical, position_window_logical,
 };
 use crate::window_style::configure_macos_window;
 
@@ -98,6 +99,7 @@ fn main() {
     let capture_text_shortcut_manager = Arc::new(ShortcutManager::new());
     let save_as_note_shortcut_manager = Arc::new(ShortcutManager::new());
     let window_geometry_debounce = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let reader_window_geometry_debounce = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
     let app_state = AppState {
         settings: Arc::new(RwLock::new(settings.clone())),
@@ -110,6 +112,7 @@ fn main() {
     };
 
     let window_geometry_debounce_for_setup = window_geometry_debounce.clone();
+    let reader_window_geometry_debounce_for_setup = reader_window_geometry_debounce.clone();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -282,6 +285,19 @@ fn main() {
                         &edge_side,
                         round_all_corners,
                     );
+                });
+
+                let reader_geometry_app_handle = app_handle.clone();
+                let reader_geometry_window = window.clone();
+                let reader_geometry_debounce = reader_window_geometry_debounce_for_setup.clone();
+                window.on_window_event(move |event| {
+                    if matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
+                        handle_reader_window_geometry_event(
+                            &reader_geometry_app_handle,
+                            &reader_geometry_window,
+                            reader_geometry_debounce.clone(),
+                        );
+                    }
                 });
             }
 

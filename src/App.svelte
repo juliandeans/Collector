@@ -7,6 +7,7 @@
     import { getCurrentWindow } from "@tauri-apps/api/window";
     import { defaultSettings } from "./lib/stores.js";
     import { cornerRadiusCss } from "./lib/cornerRadius.js";
+    import { setupResizeFlicker } from "./lib/resizeFlicker.js";
     import {
         applyColorSettings,
         loadInitialSettings,
@@ -31,7 +32,7 @@
     import CaptureActionBar from "./lib/capture/CaptureActionBar.svelte";
     import CaptureStatus from "./lib/capture/CaptureStatus.svelte";
     import CaptureLoadingIndicator from "./lib/capture/CaptureLoadingIndicator.svelte";
-    import CaptureResizeHandle from "./lib/capture/CaptureResizeHandle.svelte";
+    import ResizeHandle from "./lib/ResizeHandle.svelte";
     import CaptureImageGallery from "./lib/capture/CaptureImageGallery.svelte";
     import CaptureAccentLine from "./lib/capture/CaptureAccentLine.svelte";
     import CaptureDropOverlay from "./lib/capture/CaptureDropOverlay.svelte";
@@ -68,6 +69,9 @@
     let unlistenSaveAsNote;
     let unlistenSettingsChanged;
     let unlistenDragDrop;
+    let cleanupResizeFlicker;
+    let armResize = $state(() => {});
+    let isResizing = $state(false);
     let isTauri = false;
     let cleanupGlobalDragListeners;
     let wikiAutocompleteOpen = $state(false);
@@ -217,6 +221,11 @@
                     applySettingsUpdate,
                 });
                 unlistenDragDrop = await setupTauriDragDrop({ handleDragDropEvent });
+                const resizeFlicker = await setupResizeFlicker((value) => {
+                    isResizing = value;
+                });
+                armResize = resizeFlicker.armResize;
+                cleanupResizeFlicker = resizeFlicker.cleanup;
                 await loadInitialSettings({
                     invoke,
                     setAppSettings: (settings) => {
@@ -238,6 +247,7 @@
         unlistenSaveAsNote?.();
         unlistenSettingsChanged?.();
         unlistenDragDrop?.();
+        cleanupResizeFlicker?.();
         cleanupGlobalDragListeners?.();
 
         freeBlobUrls();
@@ -577,6 +587,7 @@
     class="capture-container"
     class:demo-fake-bg={DEMO_FAKE_BG}
     class:dragging={isDragging}
+    class:resizing={isResizing}
     class:append-picker-open={showAppendPicker}
     style="
     --app-background: {appSettings.overlay_color};
@@ -647,7 +658,7 @@
         onAppend={openAppendPicker}
     />
 
-    <CaptureResizeHandle />
+    <ResizeHandle onResizeStart={armResize} />
 
     <CaptureDropOverlay show={isDragging} />
 
@@ -757,6 +768,15 @@
         box-shadow:
             var(--shadow-md),
             0 2px 8px var(--shadow-sm);
+    }
+
+    /* backdrop-filter/box-shadow are expensive to keep recomputing on a
+       borderless transparent window while it's actively being resized —
+       visible as flicker. Drop them for the duration of the resize. */
+    .capture-container.resizing {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        box-shadow: none;
     }
 
     .content-wrapper {
