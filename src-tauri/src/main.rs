@@ -6,6 +6,7 @@
 
 mod app_state;
 mod capture;
+mod capture_draft;
 mod commands;
 mod edge_detect;
 mod fs_util;
@@ -748,6 +749,9 @@ fn main() {
             commands::capture::save_as_note,
             commands::capture::append_to_daily_note,
             commands::capture::append_to_note,
+            commands::capture::save_capture_draft,
+            commands::capture::load_capture_draft,
+            commands::capture::clear_capture_draft,
             commands::vault::read_note_file,
             commands::vault::write_note_file,
             commands::system::open_external_url,

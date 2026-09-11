@@ -99,3 +99,31 @@ pub(crate) async fn get_daily_note_path(
     let file_path = resolve_vault_write_path(&settings, &daily_path, create_parent)?;
     Ok(file_path.to_string_lossy().to_string())
 }
+
+#[tauri::command]
+pub(crate) async fn save_capture_draft(
+    content: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let persist_enabled = state.settings.read().await.persist_capture_draft;
+    if !persist_enabled {
+        return Ok(());
+    }
+
+    crate::capture_draft::save_draft(&content)
+}
+
+#[tauri::command]
+pub(crate) async fn load_capture_draft(state: tauri::State<'_, AppState>) -> Result<String, String> {
+    let persist_enabled = state.settings.read().await.persist_capture_draft;
+    if !persist_enabled {
+        return Ok(String::new());
+    }
+
+    crate::capture_draft::load_draft()
+}
+
+#[tauri::command]
+pub(crate) async fn clear_capture_draft() -> Result<(), String> {
+    crate::capture_draft::clear_draft()
+}
