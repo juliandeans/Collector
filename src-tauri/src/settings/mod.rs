@@ -152,6 +152,10 @@ pub struct Settings {
     pub reader_navigate_back_shortcut: String,
     #[serde(default = "default_reader_command_palette_shortcut")]
     pub reader_command_palette_shortcut: String,
+    #[serde(default = "default_reader_next_tab_shortcut")]
+    pub reader_next_tab_shortcut: String,
+    #[serde(default = "default_reader_previous_tab_shortcut")]
+    pub reader_previous_tab_shortcut: String,
     #[serde(default = "default_true")]
     pub reader_edge_enabled: bool,
     #[serde(default = "default_false")]
@@ -263,6 +267,8 @@ impl Default for Settings {
             reader_open_in_obsidian_shortcut: default_reader_open_in_obsidian_shortcut(),
             reader_navigate_back_shortcut: String::new(),
             reader_command_palette_shortcut: default_reader_command_palette_shortcut(),
+            reader_next_tab_shortcut: default_reader_next_tab_shortcut(),
+            reader_previous_tab_shortcut: default_reader_previous_tab_shortcut(),
             reader_edge_enabled: default_true(),
             reader_edge_open_delay_enabled: default_false(),
             reader_edge_open_delay_ms: default_edge_open_delay_ms(),

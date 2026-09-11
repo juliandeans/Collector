@@ -2,6 +2,7 @@
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
     import FieldIssue from "./FieldIssue.svelte";
+    import { handleShortcutKeyDown as captureShortcutKeyDown } from "./shortcut-utils.js";
 
     let {
         settings = $bindable(),
@@ -10,59 +11,7 @@
     } = $props();
 
     function handleShortcutKeyDown(event, field) {
-        event.preventDefault();
-
-        if (
-            ["Control", "Shift", "Alt", "Meta", "Command"].includes(event.key)
-        ) {
-            return;
-        }
-
-        const modifiers = [];
-        if (event.metaKey) modifiers.push("Cmd");
-        if (event.ctrlKey) modifiers.push("Ctrl");
-        if (event.shiftKey) modifiers.push("Shift");
-        if (event.altKey) modifiers.push("Alt");
-
-        let key = event.code;
-
-        const keyMap = {
-            Space: "Space",
-            Escape: "Escape",
-            Enter: "Enter",
-            Backspace: "Backspace",
-            Delete: "Delete",
-            ArrowUp: "Up",
-            ArrowDown: "Down",
-            ArrowLeft: "Left",
-            ArrowRight: "Right",
-            Tab: "Tab",
-            Home: "Home",
-            End: "End",
-            PageUp: "PageUp",
-            PageDown: "PageDown",
-        };
-
-        if (keyMap[key]) {
-            key = keyMap[key];
-        } else if (key.startsWith("Key")) {
-            key = key.substring(3).toUpperCase();
-        } else if (key.startsWith("Digit")) {
-            key = key.substring(5);
-        } else if (key.startsWith("F") && key.length <= 3) {
-            key = key;
-        } else {
-            return;
-        }
-
-        if (modifiers.length === 0) {
-            return;
-        }
-
-        const shortcut = [...modifiers, key].join("+");
-        settings[field] = shortcut;
-        settings = { ...settings };
-        onChange();
+        captureShortcutKeyDown(event, field, settings, onChange);
     }
 </script>
 
@@ -179,6 +128,34 @@
             <FieldIssue issue={validation.reader_command_palette_shortcut} />
             <small>Shortcut pressed inside the Reader window</small>
         </div>
+        <div class="field">
+            <label for="reader_next_tab_shortcut">Next Tab</label>
+            <input
+                class="shortcut-input"
+                type="text"
+                id="reader_next_tab_shortcut"
+                bind:value={settings.reader_next_tab_shortcut}
+                placeholder="Option+Right"
+                onkeydown={(e) =>
+                    handleShortcutKeyDown(e, "reader_next_tab_shortcut")}
+            />
+            <FieldIssue issue={validation.reader_next_tab_shortcut} />
+            <small>Shortcut pressed inside the Reader window</small>
+        </div>
+        <div class="field">
+            <label for="reader_previous_tab_shortcut">Previous Tab</label>
+            <input
+                class="shortcut-input"
+                type="text"
+                id="reader_previous_tab_shortcut"
+                bind:value={settings.reader_previous_tab_shortcut}
+                placeholder="Option+Left"
+                onkeydown={(e) =>
+                    handleShortcutKeyDown(e, "reader_previous_tab_shortcut")}
+            />
+            <FieldIssue issue={validation.reader_previous_tab_shortcut} />
+            <small>Shortcut pressed inside the Reader window</small>
+        </div>
     </Section>
 
     <Section title="Copy Text to Collector">
@@ -203,48 +180,6 @@
                     >System Settings → Privacy & Security → Accessibility</strong
                 >, then restart the app.
             </p>
-        </div>
-    </Section>
-
-    <Section title="Save Actions">
-        <div class="field">
-            <label for="save_to_daily_shortcut">Save to Daily Note</label>
-            <input
-                class="shortcut-input"
-                type="text"
-                id="save_to_daily_shortcut"
-                bind:value={settings.save_to_daily_shortcut}
-                placeholder="Cmd+Enter"
-                onkeydown={(e) =>
-                    handleShortcutKeyDown(e, "save_to_daily_shortcut")}
-            />
-            <FieldIssue issue={validation.save_to_daily_shortcut} />
-        </div>
-        <div class="field">
-            <label for="save_as_note_shortcut">Create New Note</label>
-            <input
-                class="shortcut-input"
-                type="text"
-                id="save_as_note_shortcut"
-                bind:value={settings.save_as_note_shortcut}
-                placeholder="Cmd+Shift+Enter"
-                onkeydown={(e) =>
-                    handleShortcutKeyDown(e, "save_as_note_shortcut")}
-            />
-            <FieldIssue issue={validation.save_as_note_shortcut} />
-        </div>
-        <div class="field">
-            <label for="append_to_note_shortcut">Append to Note</label>
-            <input
-                class="shortcut-input"
-                type="text"
-                id="append_to_note_shortcut"
-                bind:value={settings.append_to_note_shortcut}
-                placeholder="Cmd+Option+Enter"
-                onkeydown={(e) =>
-                    handleShortcutKeyDown(e, "append_to_note_shortcut")}
-            />
-            <FieldIssue issue={validation.append_to_note_shortcut} />
         </div>
     </Section>
 </div>
