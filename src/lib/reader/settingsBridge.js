@@ -52,6 +52,10 @@ export function applySettings(currentSettings = {}, settings = {}) {
     font_family: settings.font_family ?? currentSettings.font_family,
     font_size: settings.font_size ?? currentSettings.font_size,
     border_radius: settings.border_radius ?? currentSettings.border_radius,
+    reader_edge_side:
+      settings.reader_edge_side ?? currentSettings.reader_edge_side,
+    round_all_corners:
+      settings.round_all_corners ?? currentSettings.round_all_corners,
     overlay_strength:
       settings.overlay_strength ?? currentSettings.overlay_strength,
     window_blur: settings.window_blur ?? currentSettings.window_blur,

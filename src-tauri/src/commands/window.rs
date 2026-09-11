@@ -68,6 +68,8 @@ pub(crate) async fn save_settings(
             &window,
             new_settings.border_radius as f64,
             new_settings.window_blur as i64,
+            &new_settings.edge_side,
+            new_settings.round_all_corners,
         );
     }
 
@@ -80,6 +82,8 @@ pub(crate) async fn save_settings(
             &reader_window,
             new_settings.border_radius as f64,
             new_settings.window_blur as i64,
+            &new_settings.reader_edge_side,
+            new_settings.round_all_corners,
         );
     }
 

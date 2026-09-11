@@ -5,6 +5,7 @@
   import "./lib/reader/reader-shell.css";
   import "./lib/overlay.css";
   import { clampOverlayLeft } from "./lib/overlayPosition.js";
+  import { cornerRadiusCss } from "./lib/cornerRadius.js";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy, tick } from "svelte";
@@ -579,6 +580,7 @@
     --app-font-family: {appSettings.font_family};
     --app-font-size: {appSettings.font_size}px;
     --app-border-radius: {appSettings.border_radius}px;
+    --app-corner-radius: {cornerRadiusCss(appSettings.border_radius, appSettings.reader_edge_side, appSettings.round_all_corners)};
     --app-transparency: {appSettings.overlay_strength}%;
     --app-blur: {appSettings.window_blur}px;
     --app-saturation: {appSettings.window_saturation}%;

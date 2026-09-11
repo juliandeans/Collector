@@ -29,7 +29,7 @@ body {
     var(--app-brightness-filter);
   -webkit-backdrop-filter: saturate(var(--app-saturation, 200%))
     var(--app-brightness-filter);
-  border-radius: var(--app-border-radius, 12px);
+  border-radius: var(--app-corner-radius, var(--app-border-radius, 12px));
   border: 0.5px solid rgba(0, 0, 0, 0.08);
   box-shadow: var(--shadow-md), 0 2px 8px var(--shadow-sm);
   overflow: clip;

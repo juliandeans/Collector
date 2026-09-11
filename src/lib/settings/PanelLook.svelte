@@ -1,5 +1,6 @@
 <script>
     import Section from "./Section.svelte";
+    import Checkbox from "./Checkbox.svelte";
     import FieldIssue from "./FieldIssue.svelte";
     import { getSystemFonts } from "../utils.js";
 
@@ -16,17 +17,6 @@
 
 <div class="settings-panel">
     <Section title="Glass Effect">
-        <div class="field">
-            <label for="border_radius">Corner Radius: {settings.border_radius}px</label>
-            <input
-                type="range"
-                id="border_radius"
-                bind:value={settings.border_radius}
-                min="0"
-                max="20"
-            />
-            <FieldIssue issue={validation.border_radius} />
-        </div>
         <div class="field">
             <label for="window_blur"
                 >Background Blur: {blurLookName(settings.window_blur)}</label
@@ -72,6 +62,27 @@
             />
             <FieldIssue issue={validation.window_brightness} />
             <small>Darkens or brightens what is behind the window.</small>
+        </div>
+        <div class="field">
+            <label for="border_radius">Corner Radius: {settings.border_radius}px</label>
+            <input
+                type="range"
+                id="border_radius"
+                bind:value={settings.border_radius}
+                min="0"
+                max="20"
+            />
+            <FieldIssue issue={validation.border_radius} />
+        </div>
+        <div class="field">
+            <Checkbox bind:checked={settings.round_all_corners}>
+                Round all four corners
+            </Checkbox>
+            <small>
+                Off by default: the two corners facing the window's docked
+                screen edge stay square, only the corners facing the
+                screen's interior are rounded.
+            </small>
         </div>
     </Section>
 

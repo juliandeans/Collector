@@ -150,6 +150,8 @@ fn show_capture_window(app: &AppHandle, settings: &Settings) {
             &window,
             settings.border_radius as f64,
             settings.window_blur as i64,
+            &settings.edge_side,
+            settings.round_all_corners,
         );
         warn_if_failed(window.show(), "Failed to show capture window");
         warn_if_failed(window.set_focus(), "Failed to focus capture window");

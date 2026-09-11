@@ -53,6 +53,8 @@ async fn show_capture_internal(app: &AppHandle) -> Result<(), String> {
             &window,
             settings.border_radius as f64,
             settings.window_blur as i64,
+            &settings.edge_side,
+            settings.round_all_corners,
         );
         warn_if_failed(window.show(), "Failed to show capture window");
         warn_if_failed(window.set_focus(), "Failed to focus capture window");
@@ -70,6 +72,8 @@ pub(crate) async fn show_reader_internal(app: &AppHandle) -> Result<(), String> 
             &window,
             settings.border_radius as f64,
             settings.window_blur as i64,
+            &settings.reader_edge_side,
+            settings.round_all_corners,
         );
         warn_if_failed(window.show(), "Failed to show reader window");
         warn_if_failed(window.set_focus(), "Failed to focus reader window");
@@ -229,10 +233,18 @@ fn main() {
                 let window_clone = window.clone();
                 let border_radius = settings.border_radius;
                 let window_blur = settings.window_blur;
+                let edge_side = settings.edge_side.clone();
+                let round_all_corners = settings.round_all_corners;
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(tokio::time::Duration::from_millis(WINDOW_INIT_DELAY_MS))
                         .await;
-                    configure_macos_window(&window_clone, border_radius as f64, window_blur as i64);
+                    configure_macos_window(
+                        &window_clone,
+                        border_radius as f64,
+                        window_blur as i64,
+                        &edge_side,
+                        round_all_corners,
+                    );
                 });
 
                 let geometry_app_handle = app_handle.clone();
@@ -258,10 +270,18 @@ fn main() {
                 let window_clone = window.clone();
                 let border_radius = settings.border_radius;
                 let window_blur = settings.window_blur;
+                let edge_side = settings.reader_edge_side.clone();
+                let round_all_corners = settings.round_all_corners;
                 tauri::async_runtime::spawn(async move {
                     tokio::time::sleep(tokio::time::Duration::from_millis(WINDOW_INIT_DELAY_MS))
                         .await;
-                    configure_macos_window(&window_clone, border_radius as f64, window_blur as i64);
+                    configure_macos_window(
+                        &window_clone,
+                        border_radius as f64,
+                        window_blur as i64,
+                        &edge_side,
+                        round_all_corners,
+                    );
                 });
             }
 

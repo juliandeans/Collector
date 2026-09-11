@@ -54,6 +54,7 @@ export const defaultSettings = {
   window_blur: 55,
   window_saturation: 85,
   window_brightness: -85,
+  round_all_corners: false,
   text_color: '#ffffff',
   accent_color: '#8b5cf6',
   internal_link_color: '#a78bfa',

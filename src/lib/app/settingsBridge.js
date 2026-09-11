@@ -40,6 +40,9 @@ function buildInitialAppSettings(settings) {
         font_family: settings.font_family,
         font_size: settings.font_size,
         border_radius: settings.border_radius,
+        edge_side: settings.edge_side ?? defaultSettings.edge_side,
+        round_all_corners:
+            settings.round_all_corners ?? defaultSettings.round_all_corners,
         overlay_strength:
             settings.overlay_strength ?? defaultSettings.overlay_strength,
         window_blur: settings.window_blur ?? defaultSettings.window_blur,
@@ -86,6 +89,9 @@ export function applySettingsUpdate(current, incoming) {
         font_family: incoming.font_family ?? current.font_family,
         font_size: incoming.font_size ?? current.font_size,
         border_radius: incoming.border_radius ?? current.border_radius,
+        edge_side: incoming.edge_side ?? current.edge_side,
+        round_all_corners:
+            incoming.round_all_corners ?? current.round_all_corners,
         overlay_strength:
             incoming.overlay_strength ?? current.overlay_strength,
         window_blur: incoming.window_blur ?? current.window_blur,

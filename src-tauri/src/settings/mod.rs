@@ -191,6 +191,8 @@ pub struct Settings {
     pub window_saturation: u32,
     #[serde(default = "default_window_brightness")]
     pub window_brightness: i32,
+    #[serde(default = "default_false")]
+    pub round_all_corners: bool,
     #[serde(default = "default_autostart_enabled")]
     pub autostart_enabled: bool,
     #[serde(default = "default_text_color")]
@@ -286,6 +288,7 @@ impl Default for Settings {
             window_blur: default_window_blur(),
             window_saturation: default_window_saturation(),
             window_brightness: default_window_brightness(),
+            round_all_corners: false,
             autostart_enabled: default_autostart_enabled(),
             text_color: default_text_color(),
             accent_color: default_accent_color(),

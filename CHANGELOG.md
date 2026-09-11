@@ -13,6 +13,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The "Save Actions" shortcuts (Save to Daily Note, Create New Note, Append
   to Note) now sit right below "Capture Window" in Settings → Shortcuts
   instead of at the bottom of the tab.
+- The "Corner Radius" slider moved to the bottom of "Glass Effect", below
+  Background Brightness, next to its new "Round all four corners" checkbox.
+- By default, the two window corners against the screen edge Capture/Reader
+  dock to now stay square instead of rounded — only the corners facing the
+  screen's interior are rounded, so the flush edge reads as one clean line.
+  Enable "Round all four corners" in Settings → Look & Feel to get the old
+  all-rounded look back.
 - The wikilink suggestion popups (Reader and Capture), the "append to note"
   picker, and the command palette now share one consistent visual design
   (background, accent highlight bar, text colors) instead of three

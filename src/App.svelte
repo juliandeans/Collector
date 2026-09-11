@@ -6,6 +6,7 @@
     import { onMount, onDestroy, tick } from "svelte";
     import { getCurrentWindow } from "@tauri-apps/api/window";
     import { defaultSettings } from "./lib/stores.js";
+    import { cornerRadiusCss } from "./lib/cornerRadius.js";
     import {
         applyColorSettings,
         loadInitialSettings,
@@ -582,6 +583,7 @@
     --app-font-family: {appSettings.font_family};
     --app-font-size: {appSettings.font_size}px;
     --app-border-radius: {appSettings.border_radius}px;
+    --app-corner-radius: {cornerRadiusCss(appSettings.border_radius, appSettings.edge_side, appSettings.round_all_corners)};
     --app-transparency: {appSettings.overlay_strength}%;
     --app-blur: {appSettings.window_blur}px;
     --app-saturation: {appSettings.window_saturation}%;
@@ -729,7 +731,7 @@
             var(--app-brightness-filter);
         -webkit-backdrop-filter: saturate(var(--app-saturation, 200%))
             var(--app-brightness-filter);
-        border-radius: var(--app-border-radius, 12px);
+        border-radius: var(--app-corner-radius, var(--app-border-radius, 12px));
         border: 0.5px solid rgba(0, 0, 0, 0.08);
         box-shadow:
             var(--shadow-md),
