@@ -268,12 +268,15 @@ fn position_window_logical(
             settings.remembered_window_width,
             settings.remembered_window_height,
         ) {
-            let overlaps_current_monitor = (x as f64) < (monitor.x as f64 + monitor.width as f64)
-                && (x as f64 + width as f64) > monitor.x as f64
-                && (y as f64) < (monitor.y as f64 + monitor.height as f64)
-                && (y as f64 + height as f64) > monitor.y as f64;
+            let all_monitors = edge_detect::get_all_monitor_bounds_from_app(&app);
+            let overlaps_any_monitor = all_monitors.iter().any(|m| {
+                (x as f64) < (m.x as f64 + m.width as f64)
+                    && (x as f64 + width as f64) > m.x as f64
+                    && (y as f64) < (m.y as f64 + m.height as f64)
+                    && (y as f64 + height as f64) > m.y as f64
+            });
 
-            if overlaps_current_monitor {
+            if overlaps_any_monitor {
                 window
                     .set_size(LogicalSize {
                         width: width as f64,
@@ -292,7 +295,7 @@ fn position_window_logical(
             }
 
             log::warn!(
-                "Remembered window geometry is off-screen for the current monitor; falling back to edge position"
+                "Remembered window geometry is off-screen for all connected monitors; falling back to edge position"
             );
         }
     }

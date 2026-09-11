@@ -19,42 +19,40 @@ pub(crate) async fn save_settings(
     new_settings.normalize_pinned_note_paths();
     new_settings.normalize_screenshot_path();
 
+    let old_vault_path;
     {
-        let current = state.settings.read().await;
+        let mut current = state.settings.write().await;
+
         new_settings.remembered_window_x = current.remembered_window_x;
         new_settings.remembered_window_y = current.remembered_window_y;
         new_settings.remembered_window_width = current.remembered_window_width;
         new_settings.remembered_window_height = current.remembered_window_height;
-    }
 
-    new_settings.validate().map_err(|e| {
-        log::error!("Settings validation failed: {}", e);
-        e
-    })?;
+        new_settings.validate().map_err(|e| {
+            log::error!("Settings validation failed: {}", e);
+            e
+        })?;
 
-    new_settings.save().map_err(|e| {
-        log::error!("Failed to save settings to file: {}", e);
-        e
-    })?;
+        new_settings.save().map_err(|e| {
+            log::error!("Failed to save settings to file: {}", e);
+            e
+        })?;
 
-    match Settings::load() {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("Failed to verify saved settings: {}", e);
+        match Settings::load() {
+            Ok(_) => {}
+            Err(e) => {
+                log::error!("Failed to verify saved settings: {}", e);
+            }
         }
-    }
 
-    let old_vault_path = {
-        let old = state.settings.read().await;
-        old.vault_path.clone()
-    };
+        old_vault_path = current.vault_path.clone();
+        *current = new_settings.clone();
+    }
 
     if old_vault_path != new_settings.vault_path {
         *state.vault_index.write().await = None;
         log::info!("Vault index invalidated: vault path changed");
     }
-
-    *state.settings.write().await = new_settings.clone();
 
     state
         .edge_detector
