@@ -87,6 +87,8 @@
     // ── auto-save ──────────────────────────────────────────
 
     let saveTimer;
+    let isSaving = $state(false);
+    let saveAgainRequested = false;
 
     function scheduleAutoSave() {
         if (!isLoaded) return;
@@ -105,6 +107,24 @@
     }
 
     async function performSave() {
+        if (isSaving) {
+            saveAgainRequested = true;
+            return false;
+        }
+
+        isSaving = true;
+        try {
+            return await performSaveNow();
+        } finally {
+            isSaving = false;
+            if (saveAgainRequested) {
+                saveAgainRequested = false;
+                void performSave();
+            }
+        }
+    }
+
+    async function performSaveNow() {
         const currentValidation = validateSettings(settings);
         if (currentValidation.hasErrors) {
             const plural = currentValidation.errorCount === 1 ? "" : "s";
