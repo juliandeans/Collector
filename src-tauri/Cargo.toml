@@ -11,7 +11,7 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2.1", features = [ "macos-private-api",
+tauri = { version = "2.11", features = [ "macos-private-api",
     "tray-icon",
     "image-ico",
     "image-png"
@@ -31,7 +31,7 @@ cocoa = "0.25"
 objc = "0.2"
 base64 = "0.22"
 tauri-plugin-autostart = "2.1"
-tauri-plugin-dialog = "2.6.0"
+tauri-plugin-dialog = "2.7"
 open = "5"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 semver = "1"
