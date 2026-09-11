@@ -23,7 +23,7 @@ use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Listener, LogicalPosition, LogicalSize, Manager,
+    AppHandle, Emitter, Listener, LogicalPosition, LogicalSize, Manager, WindowEvent,
 };
 use tokio::sync::RwLock;
 
@@ -155,6 +155,8 @@ fn configure_macos_window(
                 log::warn!("NSWindow pointer is null - cannot configure window");
                 return;
             }
+
+            let _: () = msg_send![ns_window, setMovableByWindowBackground: YES];
 
             let content_view: id = msg_send![ns_window, contentView];
             if content_view.is_null() {
@@ -315,6 +317,72 @@ fn position_window_logical(
     Ok(())
 }
 
+const WINDOW_GEOMETRY_DEBOUNCE_MS: u64 = 400;
+
+fn handle_capture_window_geometry_event(
+    app: &AppHandle,
+    window: &tauri::WebviewWindow,
+    debounce: Arc<std::sync::atomic::AtomicU64>,
+) {
+    use std::sync::atomic::Ordering;
+
+    let my_generation = debounce.fetch_add(1, Ordering::SeqCst) + 1;
+
+    let app = app.clone();
+    let window = window.clone();
+
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_millis(
+            WINDOW_GEOMETRY_DEBOUNCE_MS,
+        ))
+        .await;
+
+        if debounce.load(Ordering::SeqCst) != my_generation {
+            return;
+        }
+
+        let state = app.state::<AppState>();
+        let remember = state.settings.read().await.remember_window_geometry;
+        if !remember {
+            return;
+        }
+
+        let Ok(physical_position) = window.outer_position() else {
+            return;
+        };
+        let Ok(physical_size) = window.outer_size() else {
+            return;
+        };
+        let scale = window.scale_factor().unwrap_or(1.0);
+
+        let logical_position = physical_position.to_logical::<f64>(scale);
+        let logical_size = physical_size.to_logical::<f64>(scale);
+
+        let logical_x = logical_position.x.round() as i32;
+        let logical_y = logical_position.y.round() as i32;
+        let logical_width = logical_size.width.round() as u32;
+        let logical_height = logical_size.height.round() as u32;
+
+        let mut settings = state.settings.write().await;
+        let unchanged = settings.remembered_window_x == Some(logical_x)
+            && settings.remembered_window_y == Some(logical_y)
+            && settings.remembered_window_width == Some(logical_width)
+            && settings.remembered_window_height == Some(logical_height);
+        if unchanged {
+            return;
+        }
+
+        settings.remembered_window_x = Some(logical_x);
+        settings.remembered_window_y = Some(logical_y);
+        settings.remembered_window_width = Some(logical_width);
+        settings.remembered_window_height = Some(logical_height);
+
+        if let Err(error) = settings.save() {
+            log::warn!("Failed to persist remembered window geometry: {}", error);
+        }
+    });
+}
+
 fn position_reader_window_logical(
     window: &tauri::WebviewWindow,
     settings: &Settings,
@@ -416,6 +484,7 @@ fn main() {
     let reader_shortcut_manager = Arc::new(ShortcutManager::new());
     let capture_text_shortcut_manager = Arc::new(ShortcutManager::new());
     let save_as_note_shortcut_manager = Arc::new(ShortcutManager::new());
+    let window_geometry_debounce = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
     let app_state = AppState {
         settings: Arc::new(RwLock::new(settings.clone())),
@@ -425,7 +494,10 @@ fn main() {
         capture_text_shortcut_manager: capture_text_shortcut_manager.clone(),
         save_as_note_shortcut_manager: save_as_note_shortcut_manager.clone(),
         vault_index: Arc::new(RwLock::new(None)),
+        window_geometry_debounce: window_geometry_debounce.clone(),
     };
+
+    let window_geometry_debounce_for_setup = window_geometry_debounce.clone();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -635,6 +707,19 @@ fn main() {
                     tokio::time::sleep(tokio::time::Duration::from_millis(WINDOW_INIT_DELAY_MS))
                         .await;
                     configure_macos_window(&window_clone, border_radius as f64, window_blur as i64);
+                });
+
+                let geometry_app_handle = app_handle.clone();
+                let geometry_window = window.clone();
+                let geometry_debounce = window_geometry_debounce_for_setup.clone();
+                window.on_window_event(move |event| {
+                    if matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
+                        handle_capture_window_geometry_event(
+                            &geometry_app_handle,
+                            &geometry_window,
+                            geometry_debounce.clone(),
+                        );
+                    }
                 });
             }
 
