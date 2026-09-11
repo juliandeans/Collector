@@ -52,6 +52,12 @@ export async function saveAsNoteAction({
             body = rest.join("\n").trim();
         }
 
+        if (title !== null && !body.trim()) {
+            showStatus("Add some content below the title", "error");
+            setLoading(false);
+            return;
+        }
+
         await invoke("save_as_note", {
             content: body,
             title: title,
