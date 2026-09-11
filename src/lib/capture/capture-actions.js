@@ -12,6 +12,11 @@ export async function appendToDailyNoteAction({
 }) {
     try {
         await invoke("append_to_daily_note", { text: content });
+        try {
+            await invoke("clear_capture_draft");
+        } catch (e) {
+            console.error("Failed to clear capture draft:", e);
+        }
         freeBlobUrls();
         resetCaptureState();
         deferHideCapture();
@@ -62,6 +67,11 @@ export async function saveAsNoteAction({
             content: body,
             title: title,
         });
+        try {
+            await invoke("clear_capture_draft");
+        } catch (e) {
+            console.error("Failed to clear capture draft:", e);
+        }
         freeBlobUrls();
         resetCaptureState();
         deferHideCapture();
@@ -73,9 +83,28 @@ export async function saveAsNoteAction({
 }
 
 /**
- * Action: close the capture window after cleanup.
+ * Action: close the capture window after cleanup, flushing a draft of the
+ * current content first if there is any (draft persistence is a no-op
+ * server-side when the user hasn't enabled it in Settings). This is a
+ * same-tick top-up of the debounced autosave in App.svelte — it catches
+ * the last <400ms of typing that the debounce timer hasn't flushed yet.
  */
-export async function closeCaptureAction({ invoke, freeBlobUrls, resetCaptureState }) {
+export async function closeCaptureAction({
+    content,
+    invoke,
+    freeBlobUrls,
+    resetCaptureState,
+}) {
+    try {
+        if (content && content.trim()) {
+            await invoke("save_capture_draft", { content });
+        } else {
+            await invoke("clear_capture_draft");
+        }
+    } catch (e) {
+        console.error("Failed to persist capture draft:", e);
+    }
+
     freeBlobUrls();
     resetCaptureState();
 

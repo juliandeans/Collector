@@ -52,6 +52,7 @@ export function setupGlobalDragListeners({
 }
 
 export async function setupCaptureWindowListeners({
+    invoke,
     getContent,
     setContent,
     setStatusMessage,
@@ -67,16 +68,27 @@ export async function setupCaptureWindowListeners({
     setUnlistenCaptureTextFailed,
     setUnlistenSaveAsNote,
 }) {
-    // reset_capture: clear all capture state for a fresh start.
+    // reset_capture: clear all capture state for a fresh start, then restore
+    // a persisted draft if one exists (only written when the user has
+    // "Keep unsaved text after closing" enabled in Settings).
     // Emitted before show_capture when the user wants a clean slate
     // (global shortcut, edge detection, tray).
     // NOT emitted by capture-text (Cmd+Shift+C) — that must append.
     setUnlistenReset(
-        await listen("reset_capture", () => {
+        await listen("reset_capture", async () => {
             freeBlobUrls();
             resetCaptureState();
             setStatusMessage("");
             closeAppendPicker();
+
+            try {
+                const draft = await invoke("load_capture_draft");
+                if (draft) {
+                    setContent(draft);
+                }
+            } catch (e) {
+                console.error("Failed to load capture draft:", e);
+            }
         }),
     );
 

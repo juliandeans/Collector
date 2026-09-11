@@ -45,6 +45,7 @@
 
     let textareaRef = $state();
     let content = $state("");
+    let draftSaveTimer;
     let isDragging = $state(false);
     let isLoading = $state(false);
     let statusMessage = $state("");
@@ -81,6 +82,19 @@
     let autocompleteResults = $derived(appSettings?.autocomplete_results ?? 20);
 
     let brightnessFilter = $derived(computeBrightnessFilter(appSettings.window_brightness));
+
+    $effect(() => {
+        const currentContent = content;
+        clearTimeout(draftSaveTimer);
+
+        if (!isTauri || !currentContent.trim()) return;
+
+        draftSaveTimer = setTimeout(() => {
+            invoke("save_capture_draft", { content: currentContent }).catch((e) => {
+                console.error("Failed to persist capture draft:", e);
+            });
+        }, 400);
+    });
 
     function applyAppendPickerState(patch) {
         if (patch.showAppendPicker !== undefined) {
@@ -161,6 +175,7 @@
         if (isTauri) {
             try {
                 await setupCaptureWindowListeners({
+                    invoke,
                     getContent: () => content,
                     setContent: (v) => {
                         content = v;
@@ -301,6 +316,7 @@
 
     async function handleClose() {
         await closeCaptureAction({
+            content,
             invoke,
             freeBlobUrls,
             resetCaptureState,

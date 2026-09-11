@@ -173,6 +173,12 @@ export async function appendToNote(
             });
         }
 
+        try {
+            await invoke("clear_capture_draft");
+        } catch (e) {
+            console.error("Failed to clear capture draft:", e);
+        }
+
         freeBlobUrls();
         resetCaptureState();
         deferHideCapture();

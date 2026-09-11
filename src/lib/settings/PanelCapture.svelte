@@ -47,6 +47,18 @@
         </div>
     </Section>
 
+    <Section title="Draft">
+        <div class="field">
+            <Checkbox bind:checked={settings.persist_capture_draft}>
+                Keep unsaved text after closing
+            </Checkbox>
+            <small>
+                If you close the capture window with unsent text, it's
+                restored the next time you open it.
+            </small>
+        </div>
+    </Section>
+
     <Section title="Entry">
         <div class="field">
             <label for="entry_header">Entry Header</label>
