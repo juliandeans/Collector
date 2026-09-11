@@ -53,6 +53,10 @@
   }
 }
 
+.overlay-item {
+  background: transparent;
+}
+
 .overlay-item:hover,
 .overlay-item.selected {
   background: color-mix(in srgb, var(--accent-color, #8b5cf6) 14%, transparent);

@@ -311,7 +311,6 @@
 
     .heading-picker-item {
         border: 0;
-        background: transparent;
         color: inherit;
         font: inherit;
         display: flex;

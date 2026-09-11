@@ -113,7 +113,6 @@
         width: 100%;
         padding: 8px 12px;
         border: 0;
-        background: transparent;
         color: inherit;
         font: inherit;
         text-align: left;
