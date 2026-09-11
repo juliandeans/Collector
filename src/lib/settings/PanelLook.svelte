@@ -7,7 +7,7 @@
 
     const systemFonts = getSystemFonts();
 
-    const BLUR_LOOK_NAMES = ["Max", "Light", "Medium", "Strong"];
+    const BLUR_LOOK_NAMES = ["Off", "Light", "Medium", "Strong"];
     function blurLookName(value) {
         const step = Math.round((value ?? 50) / 50);
         return BLUR_LOOK_NAMES[Math.min(Math.max(step, 0), 3)];
