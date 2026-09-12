@@ -19,6 +19,31 @@ fn warn_if_failed<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) 
     }
 }
 
+fn show_and_focus_capture(app: &AppHandle) {
+    warn_if_failed(app.emit("show_capture", ()), "Failed to emit show_capture");
+    if let Some(window) = app.get_webview_window("capture") {
+        warn_if_failed(window.show(), "Failed to show capture window");
+        warn_if_failed(window.set_focus(), "Failed to focus capture window");
+    }
+}
+
+async fn hide_window_and_update_edge(app: &AppHandle, window_label: &str) {
+    if let Some(window) = app.get_webview_window(window_label) {
+        if window.is_visible().unwrap_or(false) {
+            warn_if_failed(
+                window.hide(),
+                &format!("Failed to hide {} window", window_label),
+            );
+            let state = app.state::<crate::app_state::AppState>();
+            if window_label == "capture" {
+                state.edge_detector.set_capture_open(false).await;
+            } else if window_label == "reader" {
+                state.edge_detector.set_reader_open(false).await;
+            }
+        }
+    }
+}
+
 impl ShortcutManager {
     pub fn new() -> Self {
         Self {
@@ -41,118 +66,176 @@ impl ShortcutManager {
         current_shortcuts
     }
 
-    pub async fn register(&self, app: &AppHandle, settings: &Settings) -> Result<(), String> {
-        let open_shortcut_str = normalize_shortcut(&settings.global_shortcut);
-        let close_shortcut_str = normalize_shortcut(&settings.global_close_shortcut);
-        self.unregister_current_shortcuts(app, "global").await;
+    async fn register_single_action<F, Fut>(
+        &self,
+        app: &AppHandle,
+        context: &str,
+        raw_shortcut: &str,
+        action: F,
+    ) -> Result<(), String>
+    where
+        F: Fn(AppHandle) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static,
+    {
+        let shortcut_str = normalize_shortcut(raw_shortcut);
+        self.unregister_current_shortcuts(app, context).await;
+
+        if shortcut_str.trim().is_empty() {
+            return Ok(());
+        }
+
+        let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
+            let err_msg = format!("Invalid {} shortcut '{}': {:?}", context, shortcut_str, e);
+            log::error!("{}", err_msg);
+            err_msg
+        })?;
+
+        let app_handle = app.clone();
+        let action = Arc::new(action);
+
+        app.global_shortcut()
+            .on_shortcut(shortcut, move |_app, _shortcut, event| {
+                if event.state == ShortcutState::Pressed {
+                    let app_handle = app_handle.clone();
+                    let action = action.clone();
+                    tauri::async_runtime::spawn(async move {
+                        action(app_handle).await;
+                    });
+                }
+            })
+            .map_err(|e| {
+                let err_msg = format!(
+                    "Failed to register {} shortcut '{}': {:?}",
+                    context, shortcut_str, e
+                );
+                log::error!("{}", err_msg);
+                err_msg
+            })?;
+
+        *self.current_shortcuts.lock().await = vec![shortcut_str];
+        Ok(())
+    }
+
+    async fn register_window_shortcuts<F>(
+        &self,
+        app: &AppHandle,
+        context: &str,
+        window_label: &'static str,
+        open_shortcut: &str,
+        close_shortcut: &str,
+        closes_window: bool,
+        on_show: F,
+    ) -> Result<(), String>
+    where
+        F: Fn(&AppHandle) + Send + Sync + 'static,
+    {
+        let open_shortcut_str = normalize_shortcut(open_shortcut);
+        let close_shortcut_str = normalize_shortcut(close_shortcut);
+        self.unregister_current_shortcuts(app, context).await;
 
         let mut registered_shortcuts = Vec::new();
         let app_handle = app.clone();
-        let closes_window = settings.global_shortcut_closes_window;
+        let on_show = Arc::new(on_show);
 
         if !open_shortcut_str.trim().is_empty() {
             let shortcut: Shortcut = open_shortcut_str.parse().map_err(|e| {
-                let err_msg = format!("Invalid shortcut '{}': {:?}", open_shortcut_str, e);
+                let err_msg = format!("Invalid {} shortcut '{}': {:?}", context, open_shortcut_str, e);
                 log::error!("{}", err_msg);
                 err_msg
             })?;
 
             let app_handle_open = app_handle.clone();
+            let on_show = on_show.clone();
             app.global_shortcut()
-                .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
+                .on_shortcut(shortcut, move |_app, _shortcut, event| {
                     if event.state == ShortcutState::Pressed {
-                        let app_handle2 = app_handle_open.clone();
+                        let app_h = app_handle_open.clone();
+                        let on_show = on_show.clone();
                         tauri::async_runtime::spawn(async move {
-                            if let Some(window) = app_handle2.get_webview_window("capture") {
+                            if let Some(window) = app_h.get_webview_window(window_label) {
                                 if window.is_visible().unwrap_or(false) {
                                     if closes_window {
-                                        warn_if_failed(
-                                            window.hide(),
-                                            "Failed to hide capture window",
-                                        );
-                                        let state = app_handle2.state::<crate::app_state::AppState>();
-                                        state.edge_detector.set_capture_open(false).await;
+                                        hide_window_and_update_edge(&app_h, window_label).await;
                                     } else {
                                         warn_if_failed(
                                             window.show(),
-                                            "Failed to show capture window",
+                                            &format!("Failed to show {} window", window_label),
                                         );
                                         warn_if_failed(
                                             window.set_focus(),
-                                            "Failed to focus capture window",
+                                            &format!("Failed to focus {} window", window_label),
                                         );
                                     }
                                     return;
                                 }
                             }
 
-                            warn_if_failed(
-                                app_handle2.emit("reset_capture", ()),
-                                "Failed to emit reset_capture",
-                            );
-                            warn_if_failed(
-                                app_handle2.emit("show_capture", ()),
-                                "Failed to emit show_capture",
-                            );
-                            if let Some(window) = app_handle2.get_webview_window("capture") {
-                                warn_if_failed(window.show(), "Failed to show capture window");
-                                warn_if_failed(
-                                    window.set_focus(),
-                                    "Failed to focus capture window",
-                                );
-                            }
+                            on_show(&app_h);
                         });
                     }
                 })
                 .map_err(|e| {
                     let err_msg = format!(
-                        "Failed to register shortcut '{}': {:?}",
-                        open_shortcut_str, e
+                        "Failed to register {} shortcut '{}': {:?}",
+                        context, open_shortcut_str, e
                     );
                     log::error!("{}", err_msg);
                     err_msg
                 })?;
 
-            registered_shortcuts.push(open_shortcut_str.clone());
+            registered_shortcuts.push(open_shortcut_str);
         }
 
         if !closes_window && !close_shortcut_str.trim().is_empty() {
             let shortcut: Shortcut = close_shortcut_str.parse().map_err(|e| {
-                let err_msg = format!("Invalid shortcut '{}': {:?}", close_shortcut_str, e);
+                let err_msg = format!(
+                    "Invalid {} close shortcut '{}': {:?}",
+                    context, close_shortcut_str, e
+                );
                 log::error!("{}", err_msg);
                 err_msg
             })?;
 
             let app_handle_close = app_handle.clone();
             app.global_shortcut()
-                .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
+                .on_shortcut(shortcut, move |_app, _shortcut, event| {
                     if event.state == ShortcutState::Pressed {
-                        let app_handle2 = app_handle_close.clone();
+                        let app_h = app_handle_close.clone();
                         tauri::async_runtime::spawn(async move {
-                            if let Some(window) = app_handle2.get_webview_window("capture") {
-                                if window.is_visible().unwrap_or(false) {
-                                    warn_if_failed(window.hide(), "Failed to hide capture window");
-                                    let state = app_handle2.state::<crate::app_state::AppState>();
-                                    state.edge_detector.set_capture_open(false).await;
-                                }
-                            }
+                            hide_window_and_update_edge(&app_h, window_label).await;
                         });
                     }
                 })
                 .map_err(|e| {
                     let err_msg = format!(
-                        "Failed to register shortcut '{}': {:?}",
-                        close_shortcut_str, e
+                        "Failed to register {} close shortcut '{}': {:?}",
+                        context, close_shortcut_str, e
                     );
                     log::error!("{}", err_msg);
                     err_msg
                 })?;
 
-            registered_shortcuts.push(close_shortcut_str.clone());
+            registered_shortcuts.push(close_shortcut_str);
         }
 
         *self.current_shortcuts.lock().await = registered_shortcuts;
         Ok(())
+    }
+
+    pub async fn register(&self, app: &AppHandle, settings: &Settings) -> Result<(), String> {
+        self.register_window_shortcuts(
+            app,
+            "global",
+            "capture",
+            &settings.global_shortcut,
+            &settings.global_close_shortcut,
+            settings.global_shortcut_closes_window,
+            |app| {
+                warn_if_failed(app.emit("reset_capture", ()), "Failed to emit reset_capture");
+                show_and_focus_capture(app);
+            },
+        )
+        .await
     }
 
     pub async fn update(&self, app: &AppHandle, settings: &Settings) -> Result<(), String> {
@@ -164,84 +247,44 @@ impl ShortcutManager {
         app: &AppHandle,
         settings: &Settings,
     ) -> Result<(), String> {
-        let shortcut_str = normalize_shortcut(&settings.capture_text_shortcut);
-        if shortcut_str.trim().is_empty() {
-            self.unregister_current_shortcuts(app, "capture_text").await;
-            return Ok(());
-        }
+        self.register_single_action(app, "capture_text", &settings.capture_text_shortcut, |app| async move {
+            let controller = app
+                .state::<crate::app_state::AppState>()
+                .capture_mode_controller
+                .clone();
+            controller.suppress_watcher(true);
+            let selected_result = tauri::async_runtime::spawn_blocking(
+                crate::selected_text::capture_selected_text,
+            )
+            .await;
+            controller.suppress_watcher(false);
+            let selected = selected_result.ok().flatten().unwrap_or_default();
 
-        self.unregister_current_shortcuts(app, "capture_text").await;
+            log::info!("Captured text length={}", summarize_text_len(&selected));
+            show_and_focus_capture(&app);
 
-        let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
-            let err_msg = format!("Invalid capture_text shortcut '{}': {:?}", shortcut_str, e);
-            log::error!("{}", err_msg);
-            err_msg
-        })?;
-
-        let app_handle = app.clone();
-        app.global_shortcut()
-            .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    let app_handle2 = app_handle.clone();
-
-                    tauri::async_runtime::spawn(async move {
-                        let controller = app_handle2
-                            .state::<crate::app_state::AppState>()
-                            .capture_mode_controller
-                            .clone();
-                        controller.suppress_watcher(true);
-                        let selected_result = tauri::async_runtime::spawn_blocking(
-                            crate::selected_text::capture_selected_text,
-                        )
-                        .await;
-                        controller.suppress_watcher(false);
-                        let selected = selected_result.ok().flatten().unwrap_or_default();
-
-                        log::info!("Captured text length={}", summarize_text_len(&selected));
-                        warn_if_failed(
-                            app_handle2.emit("show_capture", ()),
-                            "Failed to emit show_capture",
-                        );
-                        if let Some(window) = app_handle2.get_webview_window("capture") {
-                            warn_if_failed(window.show(), "Failed to show capture window");
-                            warn_if_failed(window.set_focus(), "Failed to focus capture window");
-                        }
-
-                        if selected.trim().is_empty() {
-                            log::warn!("No text was captured");
-                            warn_if_failed(
-                                app_handle2.emit(
-                                    "capture_text_failed",
-                                    "No text was captured. Select text in another app and try again.",
-                                ),
-                                "Failed to emit capture_text_failed",
-                            );
-                            return;
-                        }
-
-                        tokio::time::sleep(tokio::time::Duration::from_millis(
-                            CAPTURE_TEXT_INSERT_DELAY_MS,
-                        ))
-                        .await;
-
-                        warn_if_failed(
-                            app_handle2.emit("insert_capture_text", selected),
-                            "Failed to emit insert_capture_text",
-                        );
-                    });
-                }
-            })
-            .map_err(|e| {
-                let err_msg = format!(
-                    "Failed to register capture_text shortcut '{}': {:?}",
-                    shortcut_str, e
+            if selected.trim().is_empty() {
+                log::warn!("No text was captured");
+                warn_if_failed(
+                    app.emit(
+                        "capture_text_failed",
+                        "No text was captured. Select text in another app and try again.",
+                    ),
+                    "Failed to emit capture_text_failed",
                 );
-                log::error!("{}", err_msg);
-                err_msg
-            })?;
+                return;
+            }
 
-        *self.current_shortcuts.lock().await = vec![shortcut_str.clone()];
-        Ok(())
+            tokio::time::sleep(tokio::time::Duration::from_millis(
+                CAPTURE_TEXT_INSERT_DELAY_MS,
+            ))
+            .await;
+
+            warn_if_failed(
+                app.emit("insert_capture_text", selected),
+                "Failed to emit insert_capture_text",
+            );
+        }).await
     }
 
     pub async fn register_save_as_note(
@@ -249,41 +292,12 @@ impl ShortcutManager {
         app: &AppHandle,
         settings: &Settings,
     ) -> Result<(), String> {
-        let shortcut_str = normalize_shortcut(&settings.save_as_note_shortcut);
-        if shortcut_str.trim().is_empty() {
-            self.unregister_current_shortcuts(app, "save_as_note").await;
-            return Ok(());
-        }
-
-        self.unregister_current_shortcuts(app, "save_as_note").await;
-
-        let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
-            let err_msg = format!("Invalid save_as_note shortcut '{}': {:?}", shortcut_str, e);
-            log::error!("{}", err_msg);
-            err_msg
-        })?;
-
-        let app_handle = app.clone();
-        app.global_shortcut()
-            .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    warn_if_failed(
-                        app_handle.emit("save_as_note", ()),
-                        "Failed to emit save_as_note",
-                    );
-                }
-            })
-            .map_err(|e| {
-                let err_msg = format!(
-                    "Failed to register save_as_note shortcut '{}': {:?}",
-                    shortcut_str, e
-                );
-                log::error!("{}", err_msg);
-                err_msg
-            })?;
-
-        *self.current_shortcuts.lock().await = vec![shortcut_str.clone()];
-        Ok(())
+        self.register_single_action(app, "save_as_note", &settings.save_as_note_shortcut, |app| async move {
+            warn_if_failed(
+                app.emit("save_as_note", ()),
+                "Failed to emit save_as_note",
+            );
+        }).await
     }
 
     pub async fn register_capture_mode(
@@ -292,47 +306,14 @@ impl ShortcutManager {
         settings: &Settings,
         controller: Arc<CaptureModeController>,
     ) -> Result<(), String> {
-        let shortcut_str = normalize_shortcut(&settings.capture_mode_shortcut);
-        if shortcut_str.trim().is_empty() {
-            self.unregister_current_shortcuts(app, "capture_mode").await;
-            return Ok(());
-        }
-
-        self.unregister_current_shortcuts(app, "capture_mode").await;
-
-        let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
-            let err_msg = format!(
-                "Invalid capture_mode shortcut '{}': {:?}",
-                shortcut_str, e
-            );
-            log::error!("{}", err_msg);
-            err_msg
-        })?;
-
-        let app_handle = app.clone();
-        app.global_shortcut()
-            .on_shortcut(shortcut, move |_app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    let app_handle = app_handle.clone();
-                    let controller = controller.clone();
-                    tauri::async_runtime::spawn(async move {
-                        if let Err(error) = controller.toggle(&app_handle).await {
-                            log::warn!("Failed to toggle capture mode: {}", error);
-                        }
-                    });
+        self.register_single_action(app, "capture_mode", &settings.capture_mode_shortcut, move |app| {
+            let controller = controller.clone();
+            async move {
+                if let Err(error) = controller.toggle(&app).await {
+                    log::warn!("Failed to toggle capture mode: {}", error);
                 }
-            })
-            .map_err(|e| {
-                let err_msg = format!(
-                    "Failed to register capture_mode shortcut '{}': {:?}",
-                    shortcut_str, e
-                );
-                log::error!("{}", err_msg);
-                err_msg
-            })?;
-
-        *self.current_shortcuts.lock().await = vec![shortcut_str];
-        Ok(())
+            }
+        }).await
     }
 
     pub async fn register_ocr(
@@ -340,85 +321,48 @@ impl ShortcutManager {
         app: &AppHandle,
         settings: &Settings,
     ) -> Result<(), String> {
-        let shortcut_str = normalize_shortcut(&settings.ocr_shortcut);
-        if shortcut_str.trim().is_empty() {
-            self.unregister_current_shortcuts(app, "ocr").await;
-            return Ok(());
-        }
+        self.register_single_action(app, "ocr", &settings.ocr_shortcut, |app| async move {
+            let ocr_result = tauri::async_runtime::spawn_blocking(
+                crate::ocr::ocr_clipboard,
+            )
+            .await;
 
-        self.unregister_current_shortcuts(app, "ocr").await;
+            show_and_focus_capture(&app);
 
-        let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
-            let err_msg = format!("Invalid ocr shortcut '{}': {:?}", shortcut_str, e);
-            log::error!("{}", err_msg);
-            err_msg
-        })?;
-
-        let app_handle = app.clone();
-        app.global_shortcut()
-            .on_shortcut(shortcut, move |_app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed {
-                    let app_handle2 = app_handle.clone();
-
-                    tauri::async_runtime::spawn(async move {
-                        let ocr_result = tauri::async_runtime::spawn_blocking(
-                            crate::ocr::ocr_clipboard,
-                        )
-                        .await;
-
-                        warn_if_failed(
-                            app_handle2.emit("show_capture", ()),
-                            "Failed to emit show_capture",
-                        );
-                        if let Some(window) = app_handle2.get_webview_window("capture") {
-                            warn_if_failed(window.show(), "Failed to show capture window");
-                            warn_if_failed(window.set_focus(), "Failed to focus capture window");
-                        }
-
-                        match ocr_result {
-                            Ok(Ok(ocr)) => {
-                                log::info!(
-                                    "OCR text extracted length={}",
-                                    summarize_text_len(&ocr.text)
-                                );
-                                tokio::time::sleep(tokio::time::Duration::from_millis(
-                                    CAPTURE_TEXT_INSERT_DELAY_MS,
-                                ))
-                                .await;
-                                warn_if_failed(
-                                    app_handle2.emit("insert_capture_text", ocr.text),
-                                    "Failed to emit insert_capture_text",
-                                );
-                            }
-                            Ok(Err(err_msg)) => {
-                                log::warn!("OCR failed: {}", err_msg);
-                                warn_if_failed(
-                                    app_handle2.emit("capture_text_failed", err_msg),
-                                    "Failed to emit capture_text_failed",
-                                );
-                            }
-                            Err(e) => {
-                                log::error!("OCR task join error: {}", e);
-                                warn_if_failed(
-                                    app_handle2.emit(
-                                        "capture_text_failed",
-                                        "OCR failed to process image",
-                                    ),
-                                    "Failed to emit capture_text_failed",
-                                );
-                            }
-                        }
-                    });
+            match ocr_result {
+                Ok(Ok(ocr)) => {
+                    log::info!(
+                        "OCR text extracted length={}",
+                        summarize_text_len(&ocr.text)
+                    );
+                    tokio::time::sleep(tokio::time::Duration::from_millis(
+                        CAPTURE_TEXT_INSERT_DELAY_MS,
+                    ))
+                    .await;
+                    warn_if_failed(
+                        app.emit("insert_capture_text", ocr.text),
+                        "Failed to emit insert_capture_text",
+                    );
                 }
-            })
-            .map_err(|e| {
-                let err_msg = format!("Failed to register ocr shortcut '{}': {:?}", shortcut_str, e);
-                log::error!("{}", err_msg);
-                err_msg
-            })?;
-
-        *self.current_shortcuts.lock().await = vec![shortcut_str];
-        Ok(())
+                Ok(Err(err_msg)) => {
+                    log::warn!("OCR failed: {}", err_msg);
+                    warn_if_failed(
+                        app.emit("capture_text_failed", err_msg),
+                        "Failed to emit capture_text_failed",
+                    );
+                }
+                Err(e) => {
+                    log::error!("OCR task join error: {}", e);
+                    warn_if_failed(
+                        app.emit(
+                            "capture_text_failed",
+                            "OCR failed to process image",
+                        ),
+                        "Failed to emit capture_text_failed",
+                    );
+                }
+            }
+        }).await
     }
 
     pub async fn register_reader(
@@ -426,108 +370,18 @@ impl ShortcutManager {
         app: &AppHandle,
         settings: &Settings,
     ) -> Result<(), String> {
-        let open_shortcut_str = normalize_shortcut(&settings.reader_shortcut);
-        let close_shortcut_str = normalize_shortcut(&settings.reader_close_shortcut);
-        self.unregister_current_shortcuts(app, "reader").await;
-
-        let mut registered_shortcuts = Vec::new();
-        let app_handle = app.clone();
-        let closes_window = settings.reader_shortcut_closes_window;
-
-        if !open_shortcut_str.trim().is_empty() {
-            let shortcut: Shortcut = open_shortcut_str.parse().map_err(|e| {
-                let err_msg = format!("Invalid reader shortcut '{}': {:?}", open_shortcut_str, e);
-                log::error!("{}", err_msg);
-                err_msg
-            })?;
-
-            let app_handle_open = app_handle.clone();
-            app.global_shortcut()
-                .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
-                    if event.state == ShortcutState::Pressed {
-                        let app_handle2 = app_handle_open.clone();
-                        tauri::async_runtime::spawn(async move {
-                            if let Some(window) = app_handle2.get_webview_window("reader") {
-                                if window.is_visible().unwrap_or(false) {
-                                    if closes_window {
-                                        warn_if_failed(
-                                            window.hide(),
-                                            "Failed to hide reader window",
-                                        );
-                                        let state = app_handle2.state::<crate::app_state::AppState>();
-                                        state.edge_detector.set_reader_open(false).await;
-                                    } else {
-                                        warn_if_failed(
-                                            window.show(),
-                                            "Failed to show reader window",
-                                        );
-                                        warn_if_failed(
-                                            window.set_focus(),
-                                            "Failed to focus reader window",
-                                        );
-                                    }
-                                    return;
-                                }
-                            }
-                            warn_if_failed(
-                                app_handle2.emit("show_reader", ()),
-                                "Failed to emit show_reader",
-                            );
-                        });
-                    }
-                })
-                .map_err(|e| {
-                    let err_msg = format!(
-                        "Failed to register reader shortcut '{}': {:?}",
-                        open_shortcut_str, e
-                    );
-                    log::error!("{}", err_msg);
-                    err_msg
-                })?;
-
-            registered_shortcuts.push(open_shortcut_str.clone());
-        }
-
-        if !closes_window && !close_shortcut_str.trim().is_empty() {
-            let shortcut: Shortcut = close_shortcut_str.parse().map_err(|e| {
-                let err_msg = format!(
-                    "Invalid reader close shortcut '{}': {:?}",
-                    close_shortcut_str, e
-                );
-                log::error!("{}", err_msg);
-                err_msg
-            })?;
-
-            let app_handle_close = app_handle.clone();
-            app.global_shortcut()
-                .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
-                    if event.state == ShortcutState::Pressed {
-                        let app_handle2 = app_handle_close.clone();
-                        tauri::async_runtime::spawn(async move {
-                            if let Some(window) = app_handle2.get_webview_window("reader") {
-                                if window.is_visible().unwrap_or(false) {
-                                    warn_if_failed(window.hide(), "Failed to hide reader window");
-                                    let state = app_handle2.state::<crate::app_state::AppState>();
-                                    state.edge_detector.set_reader_open(false).await;
-                                }
-                            }
-                        });
-                    }
-                })
-                .map_err(|e| {
-                    let err_msg = format!(
-                        "Failed to register reader close shortcut '{}': {:?}",
-                        close_shortcut_str, e
-                    );
-                    log::error!("{}", err_msg);
-                    err_msg
-                })?;
-
-            registered_shortcuts.push(close_shortcut_str.clone());
-        }
-
-        *self.current_shortcuts.lock().await = registered_shortcuts;
-        Ok(())
+        self.register_window_shortcuts(
+            app,
+            "reader",
+            "reader",
+            &settings.reader_shortcut,
+            &settings.reader_close_shortcut,
+            settings.reader_shortcut_closes_window,
+            |app| {
+                warn_if_failed(app.emit("show_reader", ()), "Failed to emit show_reader");
+            },
+        )
+        .await
     }
 }
 
