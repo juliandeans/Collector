@@ -366,7 +366,7 @@ export function validateSettings(settings = {}) {
     );
     validateNumberRange(fields, settings, "border_radius", "Corner radius", 0, 30);
     validateNumberRange(fields, settings, "font_size", "Font size", 10, 24);
-    validateNumberRange(fields, settings, "overlay_strength", "Overlay strength", 0, 100);
+    validateNumberRange(fields, settings, "overlay_strength", "Tint strength", 0, 100);
     validateNumberRange(fields, settings, "window_blur", "Background blur", 0, 200);
     validateNumberRange(
         fields,
@@ -452,7 +452,7 @@ export function validateSettings(settings = {}) {
     }
 
     for (const [field, label] of [
-        ["overlay_color", "Overlay color"],
+        ["overlay_color", "Tint color"],
         ["accent_color", "Accent color"],
         ["internal_link_color", "Internal link color"],
         ["external_link_color", "External link color"],

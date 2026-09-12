@@ -2,32 +2,43 @@
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
     import FieldIssue from "./FieldIssue.svelte";
+    import SegmentedControl from "./SegmentedControl.svelte";
+    import SliderField from "./SliderField.svelte";
     import { getSystemFonts } from "../utils.js";
 
-    let { settings = $bindable(), validation = {} } = $props();
+    let {
+        settings = $bindable(),
+        validation = {},
+        onChange = () => {},
+    } = $props();
 
     const systemFonts = getSystemFonts();
 
-    const BLUR_LOOK_NAMES = ["Off", "Light", "Medium", "Strong"];
-    function blurLookName(value) {
-        const step = Math.round((value ?? 50) / 50);
-        return BLUR_LOOK_NAMES[Math.min(Math.max(step, 0), 3)];
-    }
+    const BLUR_OPTIONS = [
+        { label: "Off", value: 0 },
+        { label: "Light", value: 50 },
+        { label: "Medium", value: 100 },
+        { label: "Strong", value: 150 },
+    ];
+    const blurSelected = $derived(
+        BLUR_OPTIONS[
+            Math.min(Math.max(Math.round((settings.window_blur ?? 50) / 50), 0), 3)
+        ].value,
+    );
 </script>
 
 <div class="settings-panel">
     <Section title="Glass Effect">
         <div class="field">
-            <label for="window_blur"
-                >Background Blur: {blurLookName(settings.window_blur)}</label
-            >
-            <input
-                type="range"
+            <div class="field-label">Background Blur</div>
+            <SegmentedControl
                 id="window_blur"
-                bind:value={settings.window_blur}
-                min="0"
-                max="150"
-                step="50"
+                options={BLUR_OPTIONS}
+                value={blurSelected}
+                onSelect={(v) => {
+                    settings.window_blur = v;
+                    onChange();
+                }}
             />
             <FieldIssue issue={validation.window_blur} />
             <small
@@ -36,59 +47,32 @@
             >
         </div>
         <div class="field">
-            <label for="window_saturation"
-                >Background Saturation: {settings.window_saturation ?? 200}%</label
-            >
-            <input
-                type="range"
+            <SliderField
                 id="window_saturation"
+                label="Background Saturation"
                 bind:value={settings.window_saturation}
-                min="0"
-                max="300"
+                min={0}
+                max={300}
+                formatValue={(v) => `${v ?? 200}%`}
             />
             <FieldIssue issue={validation.window_saturation} />
             <small>Adjusts the color intensity behind the window.</small>
         </div>
         <div class="field">
-            <label for="window_brightness"
-                >Background Brightness: {settings.window_brightness ?? 0}</label
-            >
-            <input
-                type="range"
+            <SliderField
                 id="window_brightness"
+                label="Background Brightness"
                 bind:value={settings.window_brightness}
-                min="-100"
-                max="100"
+                min={-100}
+                max={100}
+                formatValue={(v) => `${v ?? 0}`}
+                showZeroTick
             />
             <FieldIssue issue={validation.window_brightness} />
             <small>Darkens or brightens what is behind the window.</small>
         </div>
         <div class="field">
-            <label for="border_radius">Corner Radius: {settings.border_radius}px</label>
-            <input
-                type="range"
-                id="border_radius"
-                bind:value={settings.border_radius}
-                min="0"
-                max="20"
-            />
-            <FieldIssue issue={validation.border_radius} />
-        </div>
-        <div class="field">
-            <Checkbox bind:checked={settings.round_all_corners}>
-                Round all four corners
-            </Checkbox>
-            <small>
-                Off by default: the two corners facing the window's docked
-                screen edge stay square, only the corners facing the
-                screen's interior are rounded.
-            </small>
-        </div>
-    </Section>
-
-    <Section title="Color Overlay">
-        <div class="field">
-            <label for="overlay_color">Overlay Color</label>
+            <label for="overlay_color">Tint Color</label>
             <div class="color-input">
                 <input
                     type="color"
@@ -104,18 +88,40 @@
             <FieldIssue issue={validation.overlay_color} />
         </div>
         <div class="field">
-            <label for="overlay_strength"
-                >Overlay Strength: {settings.overlay_strength ?? 10}%</label
-            >
-            <input
-                type="range"
+            <SliderField
                 id="overlay_strength"
+                label="Tint Strength"
                 bind:value={settings.overlay_strength}
-                min="0"
-                max="100"
+                min={0}
+                max={100}
+                formatValue={(v) => `${v ?? 10}%`}
             />
             <FieldIssue issue={validation.overlay_strength} />
-            <small>0% = no color overlay, 100% = solid overlay color.</small>
+            <small>0% = no tint, 100% = solid tint color.</small>
+        </div>
+    </Section>
+
+    <Section title="Window Shape">
+        <div class="field">
+            <SliderField
+                id="border_radius"
+                label="Corner Radius"
+                bind:value={settings.border_radius}
+                min={0}
+                max={20}
+                formatValue={(v) => `${v}px`}
+            />
+            <FieldIssue issue={validation.border_radius} />
+        </div>
+        <div class="field">
+            <Checkbox bind:checked={settings.round_all_corners}>
+                Round all four corners
+            </Checkbox>
+            <small>
+                Off by default: the two corners facing the window's docked
+                screen edge stay square, only the corners facing the
+                screen's interior are rounded.
+            </small>
         </div>
     </Section>
 
@@ -181,13 +187,13 @@
             </select>
         </div>
         <div class="field">
-            <label for="font_size">Font Size: {settings.font_size}px</label>
-            <input
-                type="range"
+            <SliderField
                 id="font_size"
+                label="Font Size"
                 bind:value={settings.font_size}
-                min="10"
-                max="24"
+                min={10}
+                max={24}
+                formatValue={(v) => `${v}px`}
             />
             <FieldIssue issue={validation.font_size} />
         </div>
@@ -212,41 +218,6 @@
 </div>
 
 <style>
-    input[type="range"] {
-        width: 100%;
-        margin: 4px 0;
-        -webkit-appearance: none;
-        appearance: none;
-        background: transparent;
-    }
-
-    input[type="range"]::-webkit-slider-runnable-track {
-        height: 4px;
-        border-radius: 2px;
-        background: var(--settings-input-border, rgba(0, 0, 0, 0.15));
-    }
-
-    input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        background: var(--settings-text, #1a1a1a);
-        margin-top: -5px;
-        border: none;
-        cursor: pointer;
-    }
-
-    input[type="range"]:focus {
-        outline: none;
-    }
-
-    input[type="range"]:focus::-webkit-slider-thumb {
-        box-shadow: 0 0 0 2px var(--settings-input-bg, white),
-            0 0 0 4px rgba(139, 92, 246, 0.3);
-    }
-
     .color-input {
         display: flex;
         gap: 8px;

@@ -37,6 +37,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   Medium/Strong) instead of a freely adjustable 0–200 value — macOS's
   native window blur only offers a handful of built-in looks, not a
   continuous amount.
+- Settings → "Look & Feel" is now "Appearance". Background Blur is a 4-step
+  segmented control instead of a slider, slider values now show beside the
+  track instead of inside the label, Background Brightness has a visible
+  zero mark, the color tint is now part of "Glass Effect" as "Tint" fields,
+  and Corner Radius / "Round all four corners" moved into a new "Window
+  Shape" section below Glass Effect.
 
 ### Fixed
 - The shortcut recorder in Settings now shows "Option" instead of "Alt"

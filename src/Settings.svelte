@@ -26,7 +26,7 @@
         { id: "vault", label: "Vault" },
         { id: "capture", label: "Capture" },
         { id: "reader", label: "Reader" },
-        { id: "look", label: "Look & Feel" },
+        { id: "look", label: "Appearance" },
         { id: "shortcuts", label: "Shortcuts" },
         { id: "activation", label: "Activation" },
         { id: "images", label: "Images" },
@@ -289,7 +289,7 @@
                 {:else if activePanel === "reader"}
                     <PanelReader bind:settings validation={fieldIssues} {vaultNotes} onChange={scheduleAutoSave} />
                 {:else if activePanel === "look"}
-                    <PanelLook bind:settings {showStatus} validation={fieldIssues} />
+                    <PanelLook bind:settings {showStatus} validation={fieldIssues} onChange={scheduleAutoSave} />
                 {:else if activePanel === "shortcuts"}
                     <PanelShortcuts bind:settings {showStatus} validation={fieldIssues} onChange={scheduleAutoSave} />
                 {:else if activePanel === "activation"}
