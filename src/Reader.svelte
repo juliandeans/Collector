@@ -9,6 +9,7 @@
   import { setupResizeFlicker } from "./lib/resizeFlicker.js";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount, onDestroy, tick } from "svelte";
   import CommandPalette from "./lib/reader/CommandPalette.svelte";
   import ReaderEditor from "./lib/reader/ReaderEditor.svelte";
@@ -17,6 +18,14 @@
   import StatusToast from "./lib/reader/StatusToast.svelte";
   import TabContextMenu from "./lib/reader/TabContextMenu.svelte";
   import ResizeHandle from "./lib/ResizeHandle.svelte";
+  import OcrDropOverlay from "./lib/ocr/OcrDropOverlay.svelte";
+  import {
+    ocrClipboardImage,
+    ocrFilePath,
+    getModifierFlags,
+    isOcrModifierActive,
+    normalizeOcrError,
+  } from "./lib/ocr/ocrClient.js";
   import { imagePathCache } from "./lib/reader/contentProcessing.js";
   import * as editorBridge from "./lib/reader/editorBridge.js";
   import * as tabLifecycle from "./lib/reader/tabLifecycle.js";
@@ -80,6 +89,159 @@
   let isResizing = $state(false);
   let cleanupGlobalListeners = () => {};
   const saveScheduler = createDebouncedJob(600);
+
+  let isOcrLoading = $state(false);
+  let isDragging = $state(false);
+  let isOcrModifierHeld = $state(false);
+  let unlistenDragDrop;
+
+  let modifierSymbol = $derived.by(() => {
+    const mod = appSettings?.ocr_drag_modifier || "Option";
+    switch (mod) {
+      case "Shift": return "⇧";
+      case "Control": return "⌃";
+      case "Command": return "⌘";
+      default: return "⌥";
+    }
+  });
+
+  let ocrPollInterval = null;
+  function startModifierPolling() {
+    if (ocrPollInterval) return;
+    const check = async () => {
+      if (!isDragging) {
+        stopModifierPolling();
+        return;
+      }
+      try {
+        const flags = await getModifierFlags({ invoke });
+        isOcrModifierHeld = isOcrModifierActive(flags, appSettings?.ocr_drag_modifier);
+      } catch {
+        isOcrModifierHeld = false;
+      }
+    };
+    check();
+    ocrPollInterval = setInterval(check, 80);
+  }
+
+  function stopModifierPolling() {
+    if (ocrPollInterval) {
+      clearInterval(ocrPollInterval);
+      ocrPollInterval = null;
+    }
+    isOcrModifierHeld = false;
+  }
+
+  $effect(() => {
+    if (isDragging) {
+      startModifierPolling();
+    } else {
+      stopModifierPolling();
+    }
+  });
+
+  async function handleOcrClipboard() {
+    if (isOcrLoading) return;
+    isOcrLoading = true;
+    showStatus("Extracting text…", "info", 1500);
+    try {
+      const result = await ocrClipboardImage({ invoke });
+      if (!result?.text) {
+        showStatus("No text recognized", "error", 2400);
+        return;
+      }
+      const success = editorComponent?.insertPlainText(result.text);
+      if (success) {
+        showStatus("Text extracted", "success", 1500);
+      } else {
+        showStatus("Failed to insert text", "error", 2400);
+      }
+    } catch (err) {
+      showStatus(normalizeOcrError(err), "error", 2400);
+    } finally {
+      isOcrLoading = false;
+    }
+  }
+
+  async function handleDragDropEvent(event) {
+    const payload = event?.payload;
+    if (!payload) return;
+
+    if (payload.type === "enter" || payload.type === "over") {
+      isDragging = true;
+      return;
+    }
+
+    if (payload.type === "leave") {
+      isDragging = false;
+      return;
+    }
+
+    if (payload.type === "drop") {
+      isDragging = false;
+      const paths = payload.paths;
+      if (!Array.isArray(paths) || paths.length === 0) return;
+
+      const modifierFlags = await getModifierFlags({ invoke });
+      const isOcr = isOcrModifierActive(modifierFlags, appSettings?.ocr_drag_modifier);
+
+      // Section 7: Reader ignores image drop without OCR modifier
+      if (!isOcr) {
+        return;
+      }
+
+      if (isOcrLoading) return;
+
+      const supportedExts = ["png", "jpg", "jpeg", "webp", "gif", "tiff", "tif", "bmp", "heic", "heif"];
+      const imagePaths = paths.filter((path) => {
+        const ext = path.split(".").pop()?.toLowerCase();
+        return supportedExts.includes(ext);
+      });
+
+      if (imagePaths.length === 0) {
+        showStatus("No supported image files found", "error", 2400);
+        return;
+      }
+
+      isOcrLoading = true;
+      try {
+        showStatus("Extracting text…", "info", 1500);
+        const ocrTexts = [];
+        let failedCount = 0;
+        for (const filePath of imagePaths) {
+          try {
+            const res = await ocrFilePath(filePath, { invoke });
+            if (res?.text) {
+              ocrTexts.push(res.text);
+            } else {
+              failedCount++;
+            }
+          } catch {
+            failedCount++;
+          }
+        }
+        if (ocrTexts.length === 0) {
+          showStatus("No text recognized", "error", 2400);
+          return;
+        }
+        const combinedText = ocrTexts.join("\n\n");
+        const success = editorComponent?.insertPlainText(combinedText);
+        if (success) {
+          showStatus(
+            failedCount > 0
+              ? `Text extracted (${failedCount} image${failedCount > 1 ? "s" : ""} failed)`
+              : "Text extracted",
+            "success",
+            1500,
+          );
+        } else {
+          showStatus("Failed to insert text", "error", 2400);
+        }
+      } finally {
+        isOcrLoading = false;
+      }
+    }
+  }
 
   let activeTab = $derived(tabs[activeTabIndex] ?? null);
   let fileMissing = $derived(missingFileMessage.trim() !== "");
@@ -565,8 +727,19 @@
             getShortcut: () => appSettings.reader_previous_tab_shortcut,
             onMatch: previousTab,
           },
+          {
+            getShortcut: () => appSettings.ocr_shortcut,
+            onMatch: handleOcrClipboard,
+          },
         ],
       );
+
+      try {
+        const win = getCurrentWindow();
+        unlistenDragDrop = await win.onDragDropEvent(handleDragDropEvent);
+      } catch (e) {
+        console.warn("Could not register onDragDropEvent in Reader:", e);
+      }
     } catch (error) {
       showStatus(normalizeError(error), "error", 2400);
     }
@@ -580,6 +753,8 @@
     unlistenShowReader?.();
     unlistenSettingsChanged?.();
     cleanupResizeFlicker?.();
+    unlistenDragDrop?.();
+    stopModifierPolling();
   });
 </script>
 
@@ -588,6 +763,8 @@
   class:demo-fake-bg={DEMO_FAKE_BG}
   class:palette-open={showPalette}
   class:resizing={isResizing}
+  ondragover={(e) => e.preventDefault()}
+  ondrop={(e) => e.preventDefault()}
   style="
     --app-background: {appSettings.overlay_color};
     --app-font-family: {appSettings.font_family};
@@ -685,6 +862,7 @@
   <!-- Bottom bar disabled. Re-enable when back navigation is needed. -->
   <StatusToast message={statusMessage} type={statusType} />
   <ResizeHandle onResizeStart={armResize} />
+  <OcrDropOverlay show={isDragging} isOcrActive={isOcrModifierHeld} hint={`Hold ${modifierSymbol} to extract text`} />
 </div>
 
 {#if showAutocomplete && autocompleteResults.length > 0}

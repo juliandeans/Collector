@@ -5,3 +5,5 @@ pub mod settings;
 pub mod system;
 pub mod vault;
 pub mod window;
+pub mod ocr;
+

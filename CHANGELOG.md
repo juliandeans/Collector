@@ -8,6 +8,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - Configurable "Next Tab" / "Previous Tab" keyboard shortcuts in the Reader
   (default: Option+Right / Option+Left).
+- OCR (image to text): a configurable shortcut (default Cmd+Shift+T) extracts
+  text from a clipboard image at the cursor, in both Capture and the Reader.
+  Dragging an image while holding a configurable modifier key (default
+  Option) does the same instead of the normal image import. Runs fully
+  locally via Apple's Vision framework — no image ever leaves the device.
 
 ### Changed
 - The "Save Actions" shortcuts (Save to Daily Note, Create New Note, Append

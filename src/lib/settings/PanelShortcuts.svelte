@@ -224,6 +224,38 @@
             </p>
         </div>
     </Section>
+
+    <Section title="OCR / Image to Text">
+        <div class="field">
+            <label for="ocr_shortcut">Shortcut</label>
+            <input
+                class="shortcut-input"
+                type="text"
+                id="ocr_shortcut"
+                bind:value={settings.ocr_shortcut}
+                placeholder="Cmd+Shift+T"
+                onkeydown={(e) =>
+                    handleShortcutKeyDown(e, "ocr_shortcut")}
+            />
+            <FieldIssue issue={validation.ocr_shortcut} />
+            <small>Extracts text from clipboard image at cursor</small>
+        </div>
+        <div class="field">
+            <label for="ocr_drag_modifier">Drag Modifier</label>
+            <select
+                id="ocr_drag_modifier"
+                bind:value={settings.ocr_drag_modifier}
+                onchange={onChange}
+            >
+                <option value="Option">Option</option>
+                <option value="Shift">Shift</option>
+                <option value="Control">Control</option>
+                <option value="Command">Command</option>
+            </select>
+            <FieldIssue issue={validation.ocr_drag_modifier} />
+            <small>Hold this modifier key while dropping an image to extract text</small>
+        </div>
+    </Section>
 </div>
 
 <style>

@@ -86,7 +86,7 @@
         "center": false,
         "hiddenTitle": true,
         "titleBarStyle": "Overlay",
-        "dragDropEnabled": false
+        "dragDropEnabled": true
       }
     ]
   },

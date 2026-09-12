@@ -90,6 +90,8 @@ export const defaultSettings = {
   reader_hide_callouts: true,
   note_filename_template: 'note-YYYY-MM-DD-HHmmss',
   note_template: '---\ncreated: <% tp.date.now("YYYY-MM-DD hh:mm") %>\nmodified: \ndaily: "[[<% tp.date.now("YYYY-MM-DD") %>]]"\ntags: inbox\ntype: inbox\n---',
+  ocr_shortcut: 'Cmd+Shift+T',
+  ocr_drag_modifier: 'Option',
 };
 
 export const settings = writable({

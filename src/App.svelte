@@ -36,6 +36,14 @@
     import CaptureImageGallery from "./lib/capture/CaptureImageGallery.svelte";
     import CaptureAccentLine from "./lib/capture/CaptureAccentLine.svelte";
     import CaptureDropOverlay from "./lib/capture/CaptureDropOverlay.svelte";
+    import OcrDropOverlay from "./lib/ocr/OcrDropOverlay.svelte";
+    import {
+        ocrClipboardImage,
+        getModifierFlags,
+        isOcrModifierActive,
+        normalizeOcrError,
+    } from "./lib/ocr/ocrClient.js";
+    import { insertTextIntoTextarea } from "./lib/ocr/insertUtils.js";
     import CaptureEditor from "./lib/capture/CaptureEditor.svelte";
     import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
     import { matchesShortcut } from "./lib/capture/capture-utils.js";
@@ -50,6 +58,8 @@
     let draftSaveTimer;
     let isDragging = $state(false);
     let isLoading = $state(false);
+    let isOcrLoading = $state(false);
+    let isOcrModifierHeld = $state(false);
     let statusMessage = $state("");
     let statusType = $state("");
     let showAppendPicker = $state(false);
@@ -251,7 +261,72 @@
         cleanupGlobalDragListeners?.();
 
         freeBlobUrls();
+        stopModifierPolling();
     });
+
+    let ocrPollInterval = null;
+    function startModifierPolling() {
+        if (ocrPollInterval) return;
+        const check = async () => {
+            if (!isDragging) {
+                stopModifierPolling();
+                return;
+            }
+            try {
+                const flags = await getModifierFlags({ invoke });
+                isOcrModifierHeld = isOcrModifierActive(flags, appSettings?.ocr_drag_modifier);
+            } catch {
+                isOcrModifierHeld = false;
+            }
+        };
+        check();
+        ocrPollInterval = setInterval(check, 80);
+    }
+
+    function stopModifierPolling() {
+        if (ocrPollInterval) {
+            clearInterval(ocrPollInterval);
+            ocrPollInterval = null;
+        }
+        isOcrModifierHeld = false;
+    }
+
+    $effect(() => {
+        if (isDragging) {
+            startModifierPolling();
+        } else {
+            stopModifierPolling();
+        }
+    });
+
+    async function handleOcrClipboard() {
+        if (isOcrLoading) return;
+        isOcrLoading = true;
+        showStatus("Extracting text…", "info");
+        try {
+            const result = await ocrClipboardImage({ invoke });
+            if (!result?.text) {
+                showStatus("No text recognized", "error");
+                return;
+            }
+            const { nextContent, nextCursorPosition } = insertTextIntoTextarea(
+                textareaRef,
+                content,
+                result.text,
+            );
+            content = nextContent;
+            showStatus("Text extracted", "success");
+            await tick();
+            if (textareaRef) {
+                textareaRef.selectionStart = textareaRef.selectionEnd = nextCursorPosition;
+                textareaRef.focus();
+            }
+        } catch (err) {
+            showStatus(normalizeOcrError(err), "error");
+        } finally {
+            isOcrLoading = false;
+        }
+    }
 
     function showStatus(message, type = "success") {
         statusMessage = message;
@@ -426,6 +501,12 @@
             return;
         }
 
+        if (matchesShortcut(e, appSettings.ocr_shortcut)) {
+            e.preventDefault();
+            handleOcrClipboard();
+            return;
+        }
+
         if (matchesShortcut(e, appSettings.append_to_note_shortcut)) {
             e.preventDefault();
             openAppendPicker();
@@ -549,6 +630,11 @@
             },
             showStatus,
             tick,
+            getAppSettings: () => appSettings,
+            getIsOcrLoading: () => isOcrLoading,
+            setIsOcrLoading: (v) => {
+                isOcrLoading = v;
+            },
         });
     }
 
@@ -570,6 +656,12 @@
                 dragCounter = v;
             },
             showStatus,
+            getAppSettings: () => appSettings,
+            tick,
+            getIsOcrLoading: () => isOcrLoading,
+            setIsOcrLoading: (v) => {
+                isOcrLoading = v;
+            },
         });
     }
 
@@ -660,7 +752,8 @@
 
     <ResizeHandle onResizeStart={armResize} />
 
-    <CaptureDropOverlay show={isDragging} />
+    <CaptureDropOverlay show={isDragging && !isOcrModifierHeld} />
+    <OcrDropOverlay show={isDragging && isOcrModifierHeld} isOcrActive={true} />
 
     <CaptureStatus message={statusMessage} type={statusType} />
 

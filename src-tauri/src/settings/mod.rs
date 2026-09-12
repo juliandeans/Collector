@@ -225,6 +225,10 @@ pub struct Settings {
     pub remembered_reader_height: Option<u32>,
     #[serde(default)]
     pub persist_capture_draft: bool,
+    #[serde(default = "default_ocr_shortcut")]
+    pub ocr_shortcut: String,
+    #[serde(default = "default_ocr_drag_modifier")]
+    pub ocr_drag_modifier: String,
 }
 
 impl Default for Settings {
@@ -315,6 +319,8 @@ impl Default for Settings {
             remembered_reader_width: None,
             remembered_reader_height: None,
             persist_capture_draft: false,
+            ocr_shortcut: default_ocr_shortcut(),
+            ocr_drag_modifier: default_ocr_drag_modifier(),
         }
     }
 }

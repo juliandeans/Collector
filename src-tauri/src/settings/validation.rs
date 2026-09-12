@@ -23,6 +23,10 @@ impl Settings {
             return Err("edge_side must be 'left' or 'right'".to_string());
         }
 
+        if !matches!(self.ocr_drag_modifier.as_str(), "Option" | "Shift" | "Control" | "Command") {
+            return Err("ocr_drag_modifier must be 'Option', 'Shift', 'Control', or 'Command'".to_string());
+        }
+
         if self.window_width < 200 || self.window_width > 800 {
             return Err("window_width must be between 200 and 800".to_string());
         }
@@ -211,6 +215,10 @@ impl Settings {
             crate::shortcuts::validate_shortcut(&self.append_to_note_shortcut)?;
         }
 
+        if !self.ocr_shortcut.trim().is_empty() {
+            crate::shortcuts::validate_shortcut(&self.ocr_shortcut)?;
+        }
+
         if !self.global_shortcut_closes_window
             && !self.global_shortcut.trim().is_empty()
             && !self.global_close_shortcut.trim().is_empty()
@@ -234,13 +242,14 @@ impl Settings {
         }
 
         // Cross-slot shortcut conflict check
-        let shortcut_fields: [(&str, &str); 6] = [
+        let shortcut_fields: [(&str, &str); 7] = [
             ("Note window shortcut", &self.global_shortcut),
             ("Note close shortcut", &self.global_close_shortcut),
             ("Reader shortcut", &self.reader_shortcut),
             ("Reader close shortcut", &self.reader_close_shortcut),
             ("Capture text shortcut", &self.capture_text_shortcut),
             ("Save as note shortcut", &self.save_as_note_shortcut),
+            ("OCR shortcut", &self.ocr_shortcut),
         ];
 
         for i in 0..shortcut_fields.len() {
@@ -515,4 +524,34 @@ mod tests {
         // validation must pass with defaults
         assert!(settings.validate().is_ok());
     }
+
+    #[test]
+    fn rejects_invalid_ocr_drag_modifier() {
+        let mut settings = Settings::default();
+        settings.ocr_drag_modifier = "None".to_string();
+        assert!(settings.validate().is_err());
+
+        settings.ocr_drag_modifier = "Alt".to_string();
+        assert!(settings.validate().is_err());
+
+        settings.ocr_drag_modifier = "Option".to_string();
+        assert!(settings.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_ocr_shortcut_conflicts_with_global_shortcuts() {
+        let mut settings = Settings::default();
+        // global_shortcut is Cmd+Shift+N
+        settings.ocr_shortcut = "Cmd+Shift+N".to_string();
+        assert!(settings.validate().is_err());
+
+        // capture_text_shortcut is Cmd+Shift+C
+        settings.ocr_shortcut = "Cmd+Shift+C".to_string();
+        assert!(settings.validate().is_err());
+
+        // Unique shortcut passes
+        settings.ocr_shortcut = "Cmd+Shift+T".to_string();
+        assert!(settings.validate().is_ok());
+    }
 }
+

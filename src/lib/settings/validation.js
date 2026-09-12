@@ -481,6 +481,7 @@ export function validateSettings(settings = {}) {
         { field: "save_to_daily_shortcut", label: "Save to Daily Note" },
         { field: "save_as_note_shortcut", label: "Create New Note" },
         { field: "append_to_note_shortcut", label: "Append to Note" },
+        { field: "ocr_shortcut", label: "OCR Shortcut" },
     ];
 
     for (const shortcut of shortcutFields) {
@@ -507,6 +508,41 @@ export function validateSettings(settings = {}) {
         ]);
     }
 
+    const globalHotkeys = [
+        { field: "global_shortcut", label: "Open Capture Window" },
+        { field: "global_close_shortcut", label: "Close Capture Window" },
+        { field: "reader_shortcut", label: "Open Reader Window" },
+        { field: "reader_close_shortcut", label: "Close Reader Window" },
+        { field: "capture_text_shortcut", label: "Copy Text to Collector" },
+        { field: "save_as_note_shortcut", label: "Create New Note" },
+    ];
+
+    const ocrValue = getString(settings.ocr_shortcut);
+    if (ocrValue && fields.ocr_shortcut?.type !== "error") {
+        const canonicalOcr = canonicalShortcut(ocrValue, { commandOrControl: true });
+        if (canonicalOcr) {
+            for (const { field, label } of globalHotkeys) {
+                const hotkeyValue = getString(settings[field]);
+                if (!hotkeyValue || fields[field]?.type === "error") continue;
+                const canonicalHotkey = canonicalShortcut(hotkeyValue, { commandOrControl: true });
+                if (canonicalOcr === canonicalHotkey) {
+                    addIssue(
+                        fields,
+                        "ocr_shortcut",
+                        "error",
+                        `OCR shortcut conflicts with ${label}.`,
+                    );
+                    addIssue(
+                        fields,
+                        field,
+                        "error",
+                        `Shortcut conflicts with OCR shortcut.`,
+                    );
+                }
+            }
+        }
+    }
+
     addShortcutGroupCollisions(
         fields,
         settings,
@@ -516,6 +552,7 @@ export function validateSettings(settings = {}) {
             { field: "reader_command_palette_shortcut" },
             { field: "reader_next_tab_shortcut" },
             { field: "reader_previous_tab_shortcut" },
+            { field: "ocr_shortcut" },
         ],
         "Reader action shortcuts must be unique.",
     );
@@ -526,6 +563,7 @@ export function validateSettings(settings = {}) {
             { field: "save_to_daily_shortcut" },
             { field: "save_as_note_shortcut" },
             { field: "append_to_note_shortcut" },
+            { field: "ocr_shortcut" },
         ],
         "Save action shortcuts must be unique.",
     );
@@ -541,6 +579,7 @@ export function validateSettings(settings = {}) {
         },
         { field: "reader_next_tab_shortcut", label: "Next Tab" },
         { field: "reader_previous_tab_shortcut", label: "Previous Tab" },
+        { field: "ocr_shortcut", label: "OCR Shortcut" },
     ]);
 
     for (const [field, label] of [
@@ -551,6 +590,16 @@ export function validateSettings(settings = {}) {
         if (value !== "left" && value !== "right") {
             addIssue(fields, field, "error", `${label} must be left or right.`);
         }
+    }
+
+    const ocrModifier = getString(settings.ocr_drag_modifier);
+    if (!["Option", "Shift", "Control", "Command"].includes(ocrModifier)) {
+        addIssue(
+            fields,
+            "ocr_drag_modifier",
+            "error",
+            "OCR drag modifier must be Option, Shift, Control, or Command.",
+        );
     }
 
     const fieldValues = Object.values(fields);

@@ -154,3 +154,12 @@ pub(super) fn default_daily_note_folder() -> String {
 pub(super) fn default_daily_note_format() -> String {
     "YYYY-MM-DD".to_string()
 }
+
+pub(super) fn default_ocr_shortcut() -> String {
+    "Cmd+Shift+T".to_string()
+}
+
+pub(super) fn default_ocr_drag_modifier() -> String {
+    "Option".to_string()
+}
+

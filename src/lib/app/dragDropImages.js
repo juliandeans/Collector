@@ -1,4 +1,11 @@
 import { isFileDrag, normalizeFilePath, normalizeImageResult } from "../capture/capture-utils.js";
+import {
+    ocrFilePath,
+    ocrFile,
+    getModifierFlags,
+    isOcrModifierActive,
+} from "../ocr/ocrClient.js";
+import { insertTextIntoTextarea } from "../ocr/insertUtils.js";
 
 export function handleDragDropEvent(
     event,
@@ -92,6 +99,9 @@ export async function handleDrop(
         setDragCounter,
         showStatus,
         tick,
+        getAppSettings,
+        getIsOcrLoading,
+        setIsOcrLoading,
     },
 ) {
     e.preventDefault();
@@ -113,6 +123,71 @@ export async function handleDrop(
     if (files.length === 0) {
         showStatus("Failed to import images: no files found", "error");
         return;
+    }
+
+    // Check if OCR modifier is active
+    const settings = getAppSettings ? getAppSettings() : null;
+    let isOcr = isOcrModifierActive(e, settings?.ocr_drag_modifier);
+    if (!isOcr && invoke) {
+        const flags = await getModifierFlags({ invoke });
+        isOcr = isOcrModifierActive(flags, settings?.ocr_drag_modifier);
+    }
+
+    if (isOcr) {
+        if (getIsOcrLoading?.()) return;
+        setIsOcrLoading?.(true);
+        try {
+            showStatus("Extracting text…", "info");
+            const ocrTexts = [];
+            let failedCount = 0;
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                let filePath = file.path || file.webkitRelativePath || null;
+                if (!filePath && items[i]?.kind === "file") {
+                    const fileFromItem = items[i].getAsFile();
+                    filePath = fileFromItem?.path || fileFromItem?.webkitRelativePath || null;
+                }
+                try {
+                    const res = filePath
+                        ? await ocrFilePath(filePath, { invoke })
+                        : await ocrFile(file, { invoke });
+                    if (res?.text) {
+                        ocrTexts.push(res.text);
+                    } else {
+                        failedCount++;
+                    }
+                } catch {
+                    failedCount++;
+                }
+            }
+            if (ocrTexts.length === 0) {
+                showStatus("No text recognized", "error");
+                return;
+            }
+            const combinedText = ocrTexts.join("\n\n");
+            const textarea = getTextarea();
+            const currentContent = getContent();
+            const { nextContent, nextCursorPosition } = insertTextIntoTextarea(
+                textarea,
+                currentContent,
+                combinedText,
+            );
+            setContent(nextContent);
+            showStatus(
+                failedCount > 0
+                    ? `Text extracted (${failedCount} image${failedCount > 1 ? "s" : ""} failed)`
+                    : "Text extracted",
+                "success",
+            );
+            if (tick) await tick();
+            if (textarea) {
+                textarea.selectionStart = textarea.selectionEnd = nextCursorPosition;
+                textarea.focus();
+            }
+            return;
+        } finally {
+            setIsOcrLoading?.(false);
+        }
     }
 
     const promises = files.map(async (file, index) => {
@@ -323,6 +398,10 @@ export async function handleTauriFileDrop(
         setIsDragging,
         setDragCounter,
         showStatus,
+        getAppSettings,
+        tick,
+        getIsOcrLoading,
+        setIsOcrLoading,
     },
 ) {
     setIsDragging(false);
@@ -333,9 +412,24 @@ export async function handleTauriFileDrop(
         return;
     }
 
+    // Check if OCR modifier is active before deciding which format list
+    // applies: OCR accepts a wider set of raster formats, but the existing
+    // normal image import must keep accepting only its original five
+    // formats, unchanged.
+    const settings = getAppSettings ? getAppSettings() : null;
+    let isOcr = false;
+    if (invoke) {
+        const modifierFlags = await getModifierFlags({ invoke });
+        isOcr = isOcrModifierActive(modifierFlags, settings?.ocr_drag_modifier);
+    }
+
+    const normalImportExts = ["png", "jpg", "jpeg", "webp", "gif"];
+    const ocrExts = [...normalImportExts, "tiff", "tif", "bmp", "heic", "heif"];
+    const eligibleExts = isOcr ? ocrExts : normalImportExts;
+
     const imagePaths = paths.filter((path) => {
         const ext = path.split(".").pop()?.toLowerCase();
-        return ["png", "jpg", "jpeg", "webp", "gif"].includes(ext);
+        return eligibleExts.includes(ext);
     });
 
     if (imagePaths.length === 0) {
@@ -344,6 +438,59 @@ export async function handleTauriFileDrop(
             "error",
         );
         return;
+    }
+
+    if (isOcr) {
+        if (getIsOcrLoading?.()) return;
+        setIsOcrLoading?.(true);
+        try {
+            showStatus("Extracting text…", "info");
+            const ocrTexts = [];
+            let failedCount = 0;
+            for (const filePath of imagePaths) {
+                try {
+                    const res = await ocrFilePath(filePath, { invoke });
+                    if (res?.text) {
+                        ocrTexts.push(res.text);
+                    } else {
+                        failedCount++;
+                    }
+                } catch {
+                    failedCount++;
+                }
+            }
+            if (ocrTexts.length === 0) {
+                showStatus("No text recognized", "error");
+                setTimeout(() => getTextarea()?.focus(), 50);
+                return;
+            }
+            const combinedText = ocrTexts.join("\n\n");
+            const textarea = getTextarea();
+            const currentContent = getContent();
+            const { nextContent, nextCursorPosition } = insertTextIntoTextarea(
+                textarea,
+                currentContent,
+                combinedText,
+            );
+            setContent(nextContent);
+            showStatus(
+                failedCount > 0
+                    ? `Text extracted (${failedCount} image${failedCount > 1 ? "s" : ""} failed)`
+                    : "Text extracted",
+                "success",
+            );
+            if (tick) await tick();
+            setTimeout(() => {
+                const el = getTextarea();
+                if (el) {
+                    el.selectionStart = el.selectionEnd = nextCursorPosition;
+                    el.focus();
+                }
+            }, 50);
+            return;
+        } finally {
+            setIsOcrLoading?.(false);
+        }
     }
 
     const promises = imagePaths.map(async (filePath, index) => {

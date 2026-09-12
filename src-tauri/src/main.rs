@@ -13,6 +13,7 @@ mod fs_util;
 mod image_handler;
 mod log_safety;
 mod markdown_sections;
+mod ocr;
 mod selected_text;
 mod settings;
 mod shortcuts;
@@ -338,6 +339,10 @@ fn main() {
             commands::vault::reindex_vault,
             commands::images::save_image,
             commands::images::save_image_from_bytes,
+            commands::ocr::ocr_clipboard_image,
+            commands::ocr::ocr_image_file,
+            commands::ocr::ocr_image_bytes,
+            commands::ocr::get_modifier_flags,
             commands::settings::toggle_edge_detection,
             commands::autostart::set_autostart,
             commands::autostart::is_autostart_enabled,

@@ -561,6 +561,13 @@
         return true;
     }
 
+    export function insertPlainText(text) {
+        if (!insertPlainTextAtSelection(text)) return false;
+        onChange?.();
+        checkAutocomplete();
+        return true;
+    }
+
     function handleEditorPaste(event) {
         const plainText = event.clipboardData?.getData("text/plain") ?? "";
         if (!plainText) return;

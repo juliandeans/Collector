@@ -111,6 +111,9 @@ export function applySettings(currentSettings = {}, settings = {}) {
     reader_hide_html: settings.reader_hide_html ?? currentSettings.reader_hide_html,
     reader_hide_callouts:
       settings.reader_hide_callouts ?? currentSettings.reader_hide_callouts,
+    ocr_shortcut: settings.ocr_shortcut ?? currentSettings.ocr_shortcut,
+    ocr_drag_modifier:
+      settings.ocr_drag_modifier ?? currentSettings.ocr_drag_modifier,
   };
 }
 
