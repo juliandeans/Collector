@@ -146,3 +146,107 @@ test("out-of-range cursor is rejected", () => {
         null,
     );
 });
+import { computeListIndentation } from "../src/lib/capture/list-continuation.js";
+
+test("Tab indents a bullet item by its marker width", () => {
+    const result = computeListIndentation({
+        content: "- item",
+        selectionStart: 6,
+        selectionEnd: 6,
+        key: "Tab",
+    });
+    assert.deepEqual(result, {
+        nextContent: "  - item",
+        nextCursorPosition: 8,
+    });
+});
+
+test("Tab on a nested item adds another level", () => {
+    const result = computeListIndentation({
+        content: "  - sub",
+        selectionStart: 7,
+        selectionEnd: 7,
+        key: "Tab",
+    });
+    assert.deepEqual(result, {
+        nextContent: "    - sub",
+        nextCursorPosition: 9,
+    });
+});
+
+test("Tab on a numbered item aligns under the content column", () => {
+    const result = computeListIndentation({
+        content: "1. a",
+        selectionStart: 4,
+        selectionEnd: 4,
+        key: "Tab",
+    });
+    assert.deepEqual(result, {
+        nextContent: "   1. a",
+        nextCursorPosition: 7,
+    });
+});
+
+test("Shift+Tab outdents one level", () => {
+    const result = computeListIndentation({
+        content: "  - item",
+        selectionStart: 8,
+        selectionEnd: 8,
+        key: "Tab",
+        shiftKey: true,
+    });
+    assert.deepEqual(result, {
+        nextContent: "- item",
+        nextCursorPosition: 6,
+    });
+});
+
+test("Shift+Tab on a top-level item does nothing", () => {
+    assert.equal(
+        computeListIndentation({
+            content: "- item",
+            selectionStart: 6,
+            selectionEnd: 6,
+            key: "Tab",
+            shiftKey: true,
+        }),
+        null,
+    );
+});
+
+test("Tab on a non-list line is not handled", () => {
+    assert.equal(
+        computeListIndentation({
+            content: "plain text",
+            selectionStart: 10,
+            selectionEnd: 10,
+            key: "Tab",
+        }),
+        null,
+    );
+});
+
+test("Tab with a multi-line selection is not handled", () => {
+    assert.equal(
+        computeListIndentation({
+            content: "- a\n- b",
+            selectionStart: 2,
+            selectionEnd: 5,
+            key: "Tab",
+        }),
+        null,
+    );
+});
+
+test("Tab with modifier keys is not handled (app shortcuts win)", () => {
+    assert.equal(
+        computeListIndentation({
+            content: "- item",
+            selectionStart: 6,
+            selectionEnd: 6,
+            key: "Tab",
+            metaKey: true,
+        }),
+        null,
+    );
+});

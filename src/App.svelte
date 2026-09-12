@@ -27,7 +27,8 @@
         computeInsertion,
         handleWikiKeydown,
     } from "./lib/app/wikiAutocomplete.js";
-    import { computeListContinuation } from "./lib/capture/list-continuation.js";
+    import { computeListContinuation, computeListIndentation } from "./lib/capture/list-continuation.js";
+    import { computeMarkdownWrap } from "./lib/capture/markdownWrap.js";
     import {
         createCaptureActions,
         handleAppShortcut,
@@ -476,34 +477,52 @@
             return;
         }
 
-        if (await handleListContinuation(e)) {
+        if (await handleListKeydown(e)) {
             return;
         }
 
-        handleAppShortcut({
+        const handledByAppShortcut = handleAppShortcut({
             event: e,
             appSettings,
             actions,
             openAppendPicker,
         });
+        if (handledByAppShortcut) return;
+
+        if (await handleMarkdownShortcut(e)) {
+            return;
+        }
     }
 
-    async function handleListContinuation(e) {
+    async function handleListKeydown(e) {
         if (wikiAutocompleteOpen) return false;
 
         const textarea = textareaRef;
         if (!textarea || e.target !== textarea) return false;
 
-        const result = computeListContinuation({
+        const base = {
             content,
             selectionStart: textarea.selectionStart,
             selectionEnd: textarea.selectionEnd,
-            key: e.key,
             metaKey: e.metaKey,
             ctrlKey: e.ctrlKey,
-            shiftKey: e.shiftKey,
             altKey: e.altKey,
-        });
+        };
+
+        let result = null;
+        if (e.key === "Enter") {
+            result = computeListContinuation({
+                ...base,
+                key: e.key,
+                shiftKey: e.shiftKey,
+            });
+        } else if (e.key === "Tab") {
+            result = computeListIndentation({
+                ...base,
+                key: e.key,
+                shiftKey: e.shiftKey,
+            });
+        }
         if (!result) return false;
 
         e.preventDefault();
@@ -512,6 +531,38 @@
         if (textareaRef) {
             textareaRef.selectionStart = textareaRef.selectionEnd =
                 result.nextCursorPosition;
+        }
+        return true;
+    }
+
+    async function handleMarkdownShortcut(e) {
+        if (showAppendPicker) return false;
+
+        const textarea = textareaRef;
+        if (!textarea || e.target !== textarea) return false;
+
+        const lowerKey = String(e.key).toLowerCase();
+        const style = lowerKey === "b" ? "bold" : lowerKey === "i" ? "italic" : null;
+        if (!style) return false;
+        if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return false;
+
+        const result = computeMarkdownWrap({
+            content,
+            selectionStart: textarea.selectionStart,
+            selectionEnd: textarea.selectionEnd,
+            key: e.key,
+            style,
+            metaKey: e.metaKey,
+            ctrlKey: e.ctrlKey,
+        });
+        if (!result) return false;
+
+        e.preventDefault();
+        content = result.nextContent;
+        await tick();
+        if (textareaRef) {
+            textareaRef.selectionStart = result.nextSelectionStart;
+            textareaRef.selectionEnd = result.nextSelectionEnd;
         }
         return true;
     }
