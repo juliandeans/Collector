@@ -332,6 +332,10 @@ impl Settings {
             return Err("daily_note_create_timeout_ms must be between 1000 and 60000".to_string());
         }
 
+        // Capture rules are intentionally rule-agnostic here. Unsupported or
+        // partially edited rules must not invalidate unrelated capture routes;
+        // the frontend and command/evaluation layers handle their fallbacks.
+
         Ok(())
     }
 }

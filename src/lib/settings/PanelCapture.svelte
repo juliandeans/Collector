@@ -2,8 +2,9 @@
     import Section from "./Section.svelte";
     import Checkbox from "./Checkbox.svelte";
     import FieldIssue from "./FieldIssue.svelte";
+    import PanelCaptureRules from "./PanelCaptureRules.svelte";
 
-    let { settings = $bindable(), validation = {} } = $props();
+    let { settings = $bindable(), validation = {}, vaultNotes = [], onChange = () => {} } = $props();
 
     let showTemplateEditor = $state(false);
 </script>
@@ -258,6 +259,10 @@
                 >
             {/if}
         </div>
+    </Section>
+
+    <Section title="Rules">
+        <PanelCaptureRules bind:settings {validation} {vaultNotes} {onChange} />
     </Section>
 </div>
 

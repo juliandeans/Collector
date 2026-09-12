@@ -34,7 +34,7 @@ export function applyColorSettings(settings = {}) {
     );
 }
 
-function buildInitialAppSettings(settings) {
+export function buildInitialAppSettings(settings) {
     return {
         overlay_color: settings.overlay_color,
         font_family: settings.font_family,
@@ -57,21 +57,24 @@ function buildInitialAppSettings(settings) {
         external_link_color:
             settings.external_link_color ?? defaultSettings.external_link_color,
         entry_header: settings.entry_header ?? defaultSettings.entry_header,
+        capture_rules: Array.isArray(settings.capture_rules)
+            ? settings.capture_rules
+            : [],
         show_note_paths:
             settings.show_note_paths ?? defaultSettings.show_note_paths,
         autocomplete_results:
-            settings.autocomplete_results ?? defaultSettings.autocomplete_results,
-        save_to_daily_shortcut:
-            settings.save_to_daily_shortcut ?? "Cmd+Enter",
+            settings.autocomplete_results ??
+            defaultSettings.autocomplete_results,
+        save_to_daily_shortcut: settings.save_to_daily_shortcut ?? "Cmd+Enter",
         save_as_note_shortcut:
             settings.save_as_note_shortcut ?? "Cmd+Shift+Enter",
         append_to_note_shortcut:
             settings.append_to_note_shortcut ?? "Cmd+Option+Enter",
         show_capture_action_bar: settings.show_capture_action_bar ?? true,
-        show_capture_mode_button:
-            settings.show_capture_mode_button ?? true,
+        show_capture_mode_button: settings.show_capture_mode_button ?? true,
         capture_mode_shortcut:
-            settings.capture_mode_shortcut ?? defaultSettings.capture_mode_shortcut,
+            settings.capture_mode_shortcut ??
+            defaultSettings.capture_mode_shortcut,
         persist_capture_draft_shortcut:
             settings.persist_capture_draft_shortcut ??
             defaultSettings.persist_capture_draft_shortcut,
@@ -102,8 +105,7 @@ export function applySettingsUpdate(current, incoming) {
         edge_side: incoming.edge_side ?? current.edge_side,
         round_all_corners:
             incoming.round_all_corners ?? current.round_all_corners,
-        overlay_strength:
-            incoming.overlay_strength ?? current.overlay_strength,
+        overlay_strength: incoming.overlay_strength ?? current.overlay_strength,
         window_blur: incoming.window_blur ?? current.window_blur,
         window_saturation:
             incoming.window_saturation ?? current.window_saturation,
@@ -116,6 +118,9 @@ export function applySettingsUpdate(current, incoming) {
         external_link_color:
             incoming.external_link_color ?? current.external_link_color,
         entry_header: incoming.entry_header ?? current.entry_header,
+        capture_rules: Array.isArray(incoming.capture_rules)
+            ? incoming.capture_rules
+            : (current.capture_rules ?? []),
         show_note_paths: incoming.show_note_paths ?? current.show_note_paths,
         autocomplete_results:
             incoming.autocomplete_results ?? current.autocomplete_results,
@@ -128,7 +133,8 @@ export function applySettingsUpdate(current, incoming) {
         show_capture_action_bar:
             incoming.show_capture_action_bar ?? current.show_capture_action_bar,
         show_capture_mode_button:
-            incoming.show_capture_mode_button ?? current.show_capture_mode_button,
+            incoming.show_capture_mode_button ??
+            current.show_capture_mode_button,
         capture_mode_shortcut:
             incoming.capture_mode_shortcut ?? current.capture_mode_shortcut,
         persist_capture_draft_shortcut:

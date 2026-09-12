@@ -38,6 +38,7 @@
     import CaptureWikilinkOverlay from "./lib/capture/CaptureWikilinkOverlay.svelte";
     import CaptureActionBar from "./lib/capture/CaptureActionBar.svelte";
     import CaptureModeButton from "./lib/capture/CaptureModeButton.svelte";
+    import CaptureRuleHint from "./lib/capture/CaptureRuleHint.svelte";
     import CaptureStatus from "./lib/capture/CaptureStatus.svelte";
     import CaptureLoadingIndicator from "./lib/capture/CaptureLoadingIndicator.svelte";
     import ResizeHandle from "./lib/ResizeHandle.svelte";
@@ -48,6 +49,10 @@
     import CaptureEditor from "./lib/capture/CaptureEditor.svelte";
     import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
     import { appendCapturedText } from "./lib/capture/captureTextAppend.js";
+    import {
+        describeRuleTarget,
+        evaluateCaptureRules,
+    } from "./lib/capture/rules.js";
 
     import "./lib/capture/capture.css";
 
@@ -103,6 +108,12 @@
 
     let showNotePaths = $derived(appSettings?.show_note_paths ?? true);
     let autocompleteResults = $derived(appSettings?.autocomplete_results ?? 20);
+    let ruleMatch = $derived(
+        evaluateCaptureRules(content, appSettings?.capture_rules),
+    );
+    let ruleTarget = $derived(
+        ruleMatch.matched ? describeRuleTarget(ruleMatch.rule) : "",
+    );
 
     let brightnessFilter = $derived(computeBrightnessFilter(appSettings.window_brightness));
 
@@ -672,6 +683,10 @@
             onDragenter={handleDragEnter}
         />
     </div>
+
+    {#if ruleMatch.matched && !statusMessage}
+        <CaptureRuleHint target={ruleTarget} />
+    {/if}
 
     <div class="capture-actions-row">
         <CaptureActionBar

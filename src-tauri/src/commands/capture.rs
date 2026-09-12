@@ -82,6 +82,33 @@ pub(crate) async fn append_to_note(
 }
 
 #[tauri::command]
+pub(crate) async fn append_to_note_section(
+    path: String,
+    heading: String,
+    position: String,
+    create_heading_if_missing: bool,
+    show_timestamp: bool,
+    text: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let settings = state.settings.read().await.clone();
+    settings.validate()?;
+    let resolved = resolve_vault_write_path(&settings, &path, false)?;
+
+    capture::append_to_note_section(
+        &text,
+        &resolved,
+        &heading,
+        &position,
+        create_heading_if_missing,
+        show_timestamp,
+        &settings,
+    )?;
+
+    Ok(())
+}
+
+#[tauri::command]
 pub(crate) async fn get_daily_note_path(
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {

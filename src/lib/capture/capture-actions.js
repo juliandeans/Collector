@@ -1,3 +1,10 @@
+import {
+    actionHandlers,
+    describeRuleTarget,
+    evaluateCaptureRules,
+    stripTriggers,
+} from "./rules.js";
+
 /**
  * Action: append current content to the daily note.
  */
@@ -9,8 +16,44 @@ export async function appendToDailyNoteAction({
     resetCaptureState,
     deferHideCapture,
     setLoading,
+    rules = [],
 }) {
     try {
+        const ruleMatch = evaluateCaptureRules(content, rules);
+        const action = ruleMatch.matched
+            ? ruleMatch.actions.find(
+                  (candidate) =>
+                      typeof candidate?.type === "string" &&
+                      Object.hasOwn(actionHandlers, candidate.type),
+              )
+            : null;
+
+        if (ruleMatch.matched && action?.type === "append") {
+            const text =
+                action.stripTrigger === false
+                    ? content
+                    : stripTriggers(content, ruleMatch.rule.conditions);
+
+            await invoke("append_to_note_section", {
+                path: action.note ?? "",
+                heading: action.heading ?? "",
+                position: action.position ?? "bottom",
+                createHeadingIfMissing: action.createHeadingIfMissing ?? false,
+                showTimestamp: action.showTimestamp ?? true,
+                text,
+            });
+            try {
+                await invoke("clear_capture_draft");
+            } catch (e) {
+                console.error("Failed to clear capture draft:", e);
+            }
+            freeBlobUrls();
+            resetCaptureState();
+            showStatus(`→ ${describeRuleTarget(ruleMatch.rule)} ✓`, "success");
+            deferHideCapture();
+            return;
+        }
+
         await invoke("append_to_daily_note", { text: content });
         try {
             await invoke("clear_capture_draft");
@@ -119,10 +162,7 @@ export async function closeCaptureAction({
  * Hide the capture window without clearing its in-memory buffer while the
  * backend-owned capture mode continues collecting clipboard text.
  */
-export async function hideCaptureWhileCollectingAction({
-    content,
-    invoke,
-}) {
+export async function hideCaptureWhileCollectingAction({ content, invoke }) {
     try {
         if (content && content.trim()) {
             await invoke("save_capture_draft", { content });

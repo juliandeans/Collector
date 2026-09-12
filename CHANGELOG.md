@@ -6,6 +6,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.3.0] - 2026-09-12
 
 ### Added
+
+- Capture Rules: capture text containing a user-defined trigger (word or
+  hashtag, e.g. `#heute`) can be routed automatically into a chosen note —
+  optionally appended under a specific heading, with or without the timestamp
+  header. Rules are configured in Settings → Capture → Rules (ordered list,
+  first match wins, no rules = standard behavior); while typing, the Capture
+  window shows live at the bottom edge which note the text would land in.
 - Capture Mode / Auto-Collect: automatically appends copied plain text from
   the clipboard into the Capture window while active. Can be toggled via
   the "Collect" button in the action bar or a global keyboard shortcut.
@@ -30,13 +37,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Tag autocomplete: typing `#` in the Capture textarea or the Reader editor
   opens a suggestion dropdown with every tag found in the vault (inline
   `#hashtags` plus frontmatter `tags:`), filterable while typing and
-  selectable with arrow keys (Enter inserts `#tag `, Escape closes).
+  selectable with arrow keys (Enter inserts `#tag`, Escape closes).
   A bare `#` right before the caret shows the full tag list, like Obsidian.
   Tags are indexed once per session in the background (best-effort: files
   that cannot be read, e.g. not-yet-downloaded iCloud items, are skipped);
   the list refreshes on window show and manual reindex.
 
 ### Changed
+
 - Background blur switched to macOS native `NSVisualEffectView` (WindowServer)
   instead of CSS `backdrop-filter`. Eliminates hard unblurred strips along
   screen edges when windows dock flush, and offers four clean native strengths
@@ -76,6 +84,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   2,300 lines without changing behavior or public APIs.
 
 ### Fixed
+
 - Fixed draft persistence shortcut toggle order so switching on immediately writes unsubmitted text to disk before background gates check setting state.
 - Tag suggestion dropdowns no longer let the scrollbar poke into the panel's
   rounded corners: the scroll area is inset inside the glass panel
@@ -104,6 +113,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.2.5] - 2026-06-09
 
 ### Added
+
 - Configurable keyboard shortcut for "Open Command Palette" in the Reader
   (default: Cmd+P). Can be set in Settings → Shortcuts.
 - Configurable keyboard shortcut for "Open in Obsidian" in the Reader
@@ -115,6 +125,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   Daily Note" shortcut when automatic Daily Note creation is enabled.
 
 ### Changed
+
 - Image drop confirmation toast ("X images added") removed from capture window.
 - Reader palette shortcuts are now fully configurable instead of hardcoded
   to Cmd+K/Cmd+P.
@@ -125,6 +136,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Settings validation messages now use softer error and warning colors.
 
 ### Fixed
+
 - Memory footprint growing unboundedly during Reader use. Base64-encoded
   image data was cached indefinitely in the frontend — every image ever
   opened in the Reader accumulated for the lifetime of the app, reaching
@@ -161,9 +173,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.2.4] - 2026-06-04
 
 ### Fixed
-- Daily note folder paths with date tokens (e.g. YYYY/MM/) now 
+
+- Daily note folder paths with date tokens (e.g. YYYY/MM/) now
   automatically create subdirectories when a new month or year begins
-- Notes folder path now supports date tokens (YYYY, MM, DD, HH, mm, ss) — 
+- Notes folder path now supports date tokens (YYYY, MM, DD, HH, mm, ss) —
   e.g. "YYYY/MM/" correctly resolves to "2026/06/" when saving a new note
 
 ---
@@ -171,6 +184,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.2.3] - 2026-06-03
 
 ### Added
+
 - Captures can now be inserted under a specific heading in the daily
   note (configurable target heading, top or bottom of the section).
   The heading can be auto-created if missing; falls back to appending
@@ -204,6 +218,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   file picker.
 
 ### Changed
+
 - Daily note captures now use section-insert logic instead of raw
   file append. Existing behaviour is preserved when no target heading
   is configured.
@@ -215,6 +230,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   feedback. Error messages remain and keep the window open.
 
 ### Fixed
+
 - Hardcoded "Journal" default for daily note folder removed — user-configured path is now respected; an error is shown if the folder is empty or missing.
 - Daily Notes folder is no longer silently created if it doesn't exist — an error is shown immediately instead.
 - Daily Note tab now uses a safer mechanism to always reflect the current day
@@ -248,6 +264,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.2.2] - 2026-05-31
 
 ### Fixed
+
 - Append to Note: selecting a note no longer freezes the capture
   window on macOS (WKWebView timing issue during step 1 → step 2
   transition)
@@ -259,11 +276,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.2.1] - 2026-05-27
 
 ### Fixed
+
 - Reader: active line no longer highlights the entire line — only the cursor is shown
 - Overlay styling unified across Command Palette, Append Picker, and Wikilink autocomplete (consistent typography, colors, and shadows)
 - Global CSS variables now load correctly in the Note Window, fixing path colors and other visual inconsistencies in overlays
 
 ### Added
+
 - `[[` Wikilink autocomplete in the Note Window — type `[[` to search and insert vault links while capturing
 - Setting: toggle vault-relative paths in all note pickers (Command Palette, Append Picker, Wikilink autocomplete)
 - Setting: configure how many results are shown in note pickers (default: 20)
@@ -273,6 +292,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.2.0] - 2026-05-27
 
 ### Fixed
+
 - Pinned Reader notes are now stored as vault-relative paths, so they keep working after moving the vault
 - Image folder is now stored as a vault-relative path; existing absolute paths are migrated automatically where possible
 - Copy Text to Collector no longer inserts stale clipboard content when nothing is selected
@@ -282,6 +302,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Open delay inputs in Settings keep the ms label aligned correctly
 
 ### Added
+
 - *Command Palette* — open any note in your vault with Cmd+P or Cmd+K directly from the capture window
 - *Append to Note* — two-step flow: choose any note in your vault, then append at the end or insert after a specific heading
 - Separate open delay controls for the Note Window and Reader Window
@@ -298,6 +319,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.1.1] - 2025
 
 ### Fixed
+
 - Daily note folder paths now support date placeholders (e.g. `Journal/YYYY/MM`)
 - Screenshot previews now display correctly in the capture window
 - Blank preview box no longer appears when image preview fails
@@ -305,6 +327,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Drag overlay in the Reader no longer gets stuck
 
 ### Added
+
 - Note filename template is now configurable in Settings
 - Option to hide callouts in the Reader
 - Dual monitor support: edge detection and window positioning now work correctly across all monitors
@@ -314,6 +337,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.1.0] - 2025
 
 ### Added
+
 - Reader Panel: tab-based reading view with Daily Note tab and configurable pinned notes
 - Hybrid Markdown editing: rendered reading view with raw Markdown editing on the active line
 - Image rendering: inline support for `![[image.png]]` and standard Markdown image links

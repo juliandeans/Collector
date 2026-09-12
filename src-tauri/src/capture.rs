@@ -357,5 +357,62 @@ pub fn append_to_note(
     Ok(())
 }
 
+/// Append `captured_text` to an arbitrary note under a markdown heading.
+pub fn append_to_note_section(
+    captured_text: &str,
+    file_path: &Path,
+    heading: &str,
+    position: &str,
+    create_heading_if_missing: bool,
+    show_timestamp: bool,
+    settings: &Settings,
+) -> Result<(), String> {
+    if captured_text.trim().is_empty() {
+        return Err("Nothing to append".to_string());
+    }
+
+    log::info!(
+        "Appending to note section (file={}, heading={}, position={}, chars={})",
+        redact_path(file_path),
+        heading,
+        position,
+        summarize_text_len(captured_text)
+    );
+
+    if !file_path.exists() {
+        return Err(format!(
+            "Note not found: {}. Please create the file first.",
+            file_path.display()
+        ));
+    }
+
+    let content = fs::read_to_string(file_path).map_err(|e| format!("Cannot read note: {}", e))?;
+    let entry = if show_timestamp {
+        let header = generate_header(&settings.entry_header);
+        format!("{}\n{}", header, captured_text)
+    } else {
+        captured_text.to_string()
+    };
+    let position = match position.trim().to_ascii_lowercase().as_str() {
+        "top" => InsertPosition::Top,
+        _ => InsertPosition::Bottom,
+    };
+    let new_content = markdown_sections::insert_into_markdown_section(
+        &content,
+        &entry,
+        heading,
+        position,
+        create_heading_if_missing,
+    );
+
+    atomic_write_text(file_path, &new_content).map_err(|e| format!("Cannot write note: {}", e))?;
+
+    log::info!(
+        "Successfully appended to note section (file={})",
+        redact_path(file_path)
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests;

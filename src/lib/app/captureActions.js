@@ -5,10 +5,7 @@ import {
     hideCaptureWhileCollectingAction,
 } from "../capture/capture-actions.js";
 import { matchesShortcut } from "../capture/capture-utils.js";
-import {
-    ocrClipboardImage,
-    normalizeOcrError,
-} from "../ocr/ocrClient.js";
+import { ocrClipboardImage, normalizeOcrError } from "../ocr/ocrClient.js";
 import { insertTextIntoTextarea } from "../ocr/insertUtils.js";
 
 export function createCaptureActions({
@@ -50,8 +47,10 @@ export function createCaptureActions({
 
         setIsLoading(true);
 
+        const appSettings = getAppSettings?.() ?? {};
         await appendToDailyNoteAction({
             content: content.trim(),
+            rules: appSettings.capture_rules,
             invoke,
             showStatus,
             freeBlobUrls,
@@ -126,7 +125,8 @@ export function createCaptureActions({
             await tick();
             const currentTextarea = getTextarea();
             if (currentTextarea) {
-                currentTextarea.selectionStart = currentTextarea.selectionEnd = nextCursorPosition;
+                currentTextarea.selectionStart = currentTextarea.selectionEnd =
+                    nextCursorPosition;
                 currentTextarea.focus();
             }
         } catch (err) {
@@ -153,14 +153,20 @@ export function createCaptureActions({
         try {
             const currentSettings = getAppSettings();
             const nextState = !currentSettings.persist_capture_draft;
-            const nextSettings = { ...currentSettings, persist_capture_draft: nextState };
+            const nextSettings = {
+                ...currentSettings,
+                persist_capture_draft: nextState,
+            };
 
             // 1. Save settings to backend first so the backend gate in save_capture_draft is open
             try {
                 await invoke("save_settings", { newSettings: nextSettings });
             } catch (e) {
                 console.error("Failed to save draft persistence setting:", e);
-                showStatus("Failed to update setting: " + e.toString(), "error");
+                showStatus(
+                    "Failed to update setting: " + e.toString(),
+                    "error",
+                );
                 return;
             }
 
@@ -171,9 +177,14 @@ export function createCaptureActions({
             if (nextState) {
                 const content = getContent();
                 if (content.trim()) {
-                    await invoke("save_capture_draft", { content }).catch((e) => {
-                        console.error("Failed to persist capture draft:", e);
-                    });
+                    await invoke("save_capture_draft", { content }).catch(
+                        (e) => {
+                            console.error(
+                                "Failed to persist capture draft:",
+                                e,
+                            );
+                        },
+                    );
                 }
                 showStatus("Keep unsaved text: ON", "info", 1800);
             } else {

@@ -13,6 +13,14 @@ pub(super) fn default_daily_note_insert_position() -> String {
     "bottom".to_string()
 }
 
+pub(super) fn default_rule_position() -> String {
+    "bottom".to_string()
+}
+
+pub(super) fn default_rule_match() -> String {
+    "any".to_string()
+}
+
 pub(super) fn default_daily_note_create_timeout_ms() -> u64 {
     15000
 }

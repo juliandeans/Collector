@@ -365,3 +365,218 @@ textarea:focus {
         background: transparent;
     }
 }
+
+/* ── Capture Rules ──────────────────────────────────────────────────── */
+
+.settings-container .capture-rules-empty p {
+    margin: 0 0 10px;
+    color: var(--settings-text-secondary, #6b7280);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.settings-container .capture-rules-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.settings-container .capture-rule-item {
+    border: 1px solid var(--settings-border, #e5e7eb);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: var(--settings-surface, #ffffff);
+}
+
+.settings-container .capture-rule-summary {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.settings-container .capture-rule-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--settings-text, #111827);
+}
+
+.settings-container .capture-rule-disabled {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--settings-text-secondary, #6b7280);
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.settings-container .capture-rule-detail {
+    font-size: 12px;
+    color: var(--settings-text-secondary, #6b7280);
+    margin-top: 2px;
+}
+
+.settings-container .capture-rule-target {
+    color: var(--settings-accent, #8b5cf6);
+}
+
+.settings-container .capture-rule-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.settings-container .capture-rule-reorder {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.settings-container .capture-rule-icon-button {
+    width: 22px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid var(--settings-border, #e5e7eb);
+    border-radius: 5px;
+    background: var(--settings-input-bg, #ffffff);
+    color: var(--settings-text-secondary, #6b7280);
+    font-size: 10px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.settings-container .capture-rule-icon-button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.settings-container .capture-rule-action-button {
+    padding: 4px 10px;
+    border: 1px solid var(--settings-border, #e5e7eb);
+    border-radius: 6px;
+    background: var(--settings-input-bg, #ffffff);
+    color: var(--settings-text, #111827);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.settings-container .capture-rule-delete {
+    color: #dc2626;
+}
+
+.settings-container .capture-rule-editor {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--settings-border, #e5e7eb);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.settings-container .capture-rule-editor-grid {
+    display: flex;
+    gap: 12px;
+}
+
+.settings-container .capture-rule-editor-grid .field {
+    flex: 1;
+}
+
+.settings-container .capture-rule-condition-fields {
+    display: flex;
+    gap: 8px;
+}
+
+.settings-container .capture-rule-condition-fields select {
+    flex-shrink: 0;
+    width: auto;
+}
+
+.settings-container .capture-rule-note-field {
+    position: relative;
+}
+
+.settings-container .capture-rule-note-picker {
+    position: absolute;
+    z-index: 30;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 180px;
+    overflow-y: auto;
+    background: var(--settings-surface, #ffffff);
+    border: 1px solid var(--settings-border, #e5e7eb);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.settings-container .capture-rule-note-option {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 10px;
+    border: none;
+    background: transparent;
+    color: var(--settings-text, #111827);
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.settings-container .capture-rule-note-option:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.settings-container .capture-rule-note-option small {
+    color: var(--settings-text-secondary, #6b7280);
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.settings-container .capture-rule-editor-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.settings-container .capture-rule-example {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(139, 92, 246, 0.08);
+    color: var(--settings-text-secondary, #6b7280);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.settings-container .capture-rule-example code {
+    font-size: 11px;
+    color: var(--settings-text, #111827);
+}
+
+.settings-container .capture-rule-example strong {
+    color: var(--settings-accent, #8b5cf6);
+}
+
+.settings-container .capture-rule-done {
+    align-self: flex-end;
+    color: var(--settings-text, #111827);
+}
+
+.settings-container .capture-rule-done:hover {
+    border-color: var(--settings-accent, #8b5cf6);
+}
+
+@media (max-width: 860px) {
+    .settings-container .capture-rule-editor-grid {
+        flex-direction: column;
+        gap: 0;
+    }
+}

@@ -396,3 +396,318 @@ async fn test_append_daily_note_integration() {
     // Aufraeumen
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+// ── append_to_note_section ──────────────────────────────────────────────
+
+fn setup_section_test_file(unique: &str, initial: &str) -> std::path::PathBuf {
+    // Eindeutiges Unterverzeichnis pro Test: die Tests laufen parallel und
+    // duerfen sich nicht gegenseitig ihre Dateien wegloeschen.
+    let tmp = std::env::temp_dir().join(format!("collector-test-section-{unique}"));
+    let _ = std::fs::create_dir_all(&tmp);
+    let file_path = tmp.join("note.md");
+    std::fs::write(&file_path, initial).unwrap();
+    file_path
+}
+
+fn cleanup_section_test_dir(unique: &str) {
+    let _ = std::fs::remove_dir_all(
+        std::env::temp_dir().join(format!("collector-test-section-{unique}")),
+    );
+}
+
+#[test]
+fn test_append_to_note_section_missing_file_is_hard_error() {
+    let settings = Settings::default();
+    let result = append_to_note_section(
+        "hello",
+        Path::new("/tmp/collector-test-section-does-not-exist.md"),
+        "## Heute",
+        "bottom",
+        false,
+        true,
+        &settings,
+    );
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.contains("Note not found"));
+}
+
+#[test]
+fn test_append_to_note_section_empty_text_is_rejected() {
+    let settings = Settings::default();
+    let result = append_to_note_section(
+        "   ",
+        Path::new("/tmp/collector-test-section-anywhere.md"),
+        "## Heute",
+        "bottom",
+        false,
+        true,
+        &settings,
+    );
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Nothing to append"));
+}
+
+#[test]
+fn test_append_to_note_section_bottom_of_existing_heading() {
+    let file_path = setup_section_test_file(
+        "bottom",
+        concat!(
+            "# Liste\n",
+            "\n",
+            "## Heute\n",
+            "\n",
+            "- old entry\n",
+            "\n",
+            "## Morgen\n",
+            "\n",
+            "- tomorrow\n",
+        ),
+    );
+    let settings = Settings::default();
+
+    let result = append_to_note_section(
+        "- new entry",
+        &file_path,
+        "## Heute",
+        "bottom",
+        false,
+        true,
+        &settings,
+    );
+    assert!(result.is_ok(), "expected ok: {:?}", result);
+
+    let content = std::fs::read_to_string(&file_path).unwrap();
+    let heute = content.find("## Heute").unwrap();
+    let old_pos = content.find("- old entry").unwrap();
+    let new_pos = content.find("- new entry").unwrap();
+    let morgen = content.find("## Morgen").unwrap();
+
+    assert!(heute < old_pos && old_pos < new_pos && new_pos < morgen);
+
+    // Sektion "Morgen" unveraendert
+    assert!(content.contains("- tomorrow"));
+
+    cleanup_section_test_dir("bottom");
+}
+
+#[test]
+fn test_append_to_note_section_top_of_existing_heading() {
+    let file_path = setup_section_test_file(
+        "top",
+        concat!("# Liste\n", "\n", "## Heute\n", "\n", "- old entry\n",),
+    );
+    let settings = Settings::default();
+
+    let result = append_to_note_section(
+        "- new entry",
+        &file_path,
+        "## Heute",
+        "top",
+        false,
+        true,
+        &settings,
+    );
+    assert!(result.is_ok(), "expected ok: {:?}", result);
+
+    let content = std::fs::read_to_string(&file_path).unwrap();
+    let new_pos = content.find("- new entry").unwrap();
+    let old_pos = content.find("- old entry").unwrap();
+    assert!(
+        new_pos < old_pos,
+        "top insert must land above existing entry"
+    );
+
+    cleanup_section_test_dir("top");
+}
+
+#[test]
+fn test_append_to_note_section_missing_heading_append_to_file_end() {
+    let file_path = setup_section_test_file("no-heading", "# Liste\n\n- existing\n");
+    let settings = Settings::default();
+
+    // create_heading_if_missing = false => Fallback: ans Dateiende
+    let result = append_to_note_section(
+        "- new entry",
+        &file_path,
+        "## Heute",
+        "bottom",
+        false,
+        true,
+        &settings,
+    );
+    assert!(result.is_ok(), "expected ok: {:?}", result);
+
+    let content = std::fs::read_to_string(&file_path).unwrap();
+    assert!(content.contains("- existing"));
+    assert!(content.contains("- new entry"));
+    // Keine Headline erzeugt
+    assert!(!content.contains("## Heute"));
+    // Neuer Eintrag am Ende
+    assert!(content.find("- new entry").unwrap() > content.find("- existing").unwrap());
+
+    cleanup_section_test_dir("no-heading");
+}
+
+#[test]
+fn test_append_to_note_section_missing_heading_created_when_enabled() {
+    let file_path = setup_section_test_file("create-heading", "# Liste\n\n- existing\n");
+    let settings = Settings::default();
+
+    let result = append_to_note_section(
+        "- new entry",
+        &file_path,
+        "## Heute",
+        "bottom",
+        true,
+        true,
+        &settings,
+    );
+    assert!(result.is_ok(), "expected ok: {:?}", result);
+
+    let content = std::fs::read_to_string(&file_path).unwrap();
+    assert!(content.contains("## Heute"));
+    assert!(content.contains("- existing"));
+    assert!(content.contains("- new entry"));
+
+    cleanup_section_test_dir("create-heading");
+}
+
+#[test]
+fn test_append_to_note_section_empty_heading_appends_to_file_end() {
+    let file_path = setup_section_test_file("empty-heading", "# Liste\n\n- existing\n");
+    let settings = Settings::default();
+
+    let result = append_to_note_section(
+        "- new entry",
+        &file_path,
+        "",
+        "bottom",
+        false,
+        true,
+        &settings,
+    );
+    assert!(result.is_ok(), "expected ok: {:?}", result);
+
+    let content = std::fs::read_to_string(&file_path).unwrap();
+    assert!(content.contains("- existing"));
+    let new_pos = content.find("- new entry").unwrap();
+    let existing_pos = content.find("- existing").unwrap();
+    assert!(new_pos > existing_pos);
+
+    cleanup_section_test_dir("empty-heading");
+}
+
+#[test]
+fn test_append_to_note_section_entry_has_generated_header() {
+    let file_path = setup_section_test_file("with-header", "# Liste\n\n## Heute\n\n- old\n");
+    let settings = Settings {
+        entry_header: "#### HH:mm".to_string(),
+        ..Default::default()
+    };
+
+    let result = append_to_note_section(
+        "- new entry",
+        &file_path,
+        "## Heute",
+        "bottom",
+        false,
+        true,
+        &settings,
+    );
+    assert!(result.is_ok(), "expected ok: {:?}", result);
+
+    let content = std::fs::read_to_string(&file_path).unwrap();
+    // Entry-Header (#### HH:MM-Format) wurde dem Eintrag vorangestellt
+    assert!(content.contains("#### "));
+    let header_pos = content.find("#### ").unwrap();
+    let new_pos = content.find("- new entry").unwrap();
+    assert!(header_pos < new_pos);
+
+    cleanup_section_test_dir("with-header");
+}
+
+#[test]
+fn test_append_to_note_section_position_is_case_insensitive() {
+    let file_path = setup_section_test_file("case-position", "# Liste\n\n## Heute\n\n- old\n");
+    let settings = Settings::default();
+
+    let result = append_to_note_section(
+        "- new entry",
+        &file_path,
+        "## Heute",
+        "TOP",
+        false,
+        true,
+        &settings,
+    );
+    assert!(result.is_ok(), "expected ok: {:?}", result);
+
+    let content = std::fs::read_to_string(&file_path).unwrap();
+    let new_pos = content.find("- new entry").unwrap();
+    let old_pos = content.find("- old").unwrap();
+    assert!(
+        new_pos < old_pos,
+        "\"TOP\" must be normalized to top insert"
+    );
+
+    cleanup_section_test_dir("case-position");
+}
+
+#[test]
+fn test_append_to_note_section_normalizes_crlf_to_lf() {
+    let file_path =
+        setup_section_test_file("crlf", "# Liste\r\n\r\n## Heute\r\n\r\n- old entry\r\n");
+    let settings = Settings::default();
+
+    let result = append_to_note_section(
+        "- new entry",
+        &file_path,
+        "## Heute",
+        "bottom",
+        false,
+        true,
+        &settings,
+    );
+    assert!(result.is_ok(), "expected ok: {:?}", result);
+
+    let content = std::fs::read_to_string(&file_path).unwrap();
+    // insert_into_markdown_section baut die Datei aus lines() neu auf und
+    // normalisiert dabei die GESAMTE Datei auf LF (erwartetes Verhalten)
+    assert!(!content.contains('\r'), "CRLF must be normalized to LF");
+    assert!(content.contains("## Heute"));
+    assert!(content.contains("- old entry"));
+    assert!(content.contains("- new entry"));
+
+    cleanup_section_test_dir("crlf");
+}
+
+#[test]
+fn test_append_to_note_section_without_timestamp_has_no_header() {
+    let file_path = setup_section_test_file("no-timestamp", "# Liste\n\n## Heute\n\n- old\n");
+    let settings = Settings {
+        entry_header: "#### HH:mm".to_string(),
+        ..Default::default()
+    };
+
+    let result = append_to_note_section(
+        "- new entry",
+        &file_path,
+        "## Heute",
+        "bottom",
+        false,
+        false,
+        &settings,
+    );
+    assert!(result.is_ok(), "expected ok: {:?}", result);
+
+    let content = std::fs::read_to_string(&file_path).unwrap();
+    assert!(content.contains("- new entry"));
+    // Kein Entry-Header ueber dem Inhalt
+    assert!(
+        !content.contains("#### "),
+        "show_timestamp=false must not generate an entry header"
+    );
+
+    cleanup_section_test_dir("no-timestamp");
+}

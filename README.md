@@ -12,6 +12,7 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 - Global shortcut: configurable system-wide hotkey, default `Cmd+Shift+N`
 - Quick capture: append to the Daily Note, any other note or save a new note directly into your vault
 - Section targeting — captures land under a specific heading in your Daily Note, top or bottom of the section
+- Capture Rules — route captures containing a trigger (word/hashtag like `#heute`) automatically into a chosen note, optionally under a specific heading, with a live destination hint while typing (Settings → Capture → Rules)
 - Image capture — drop or paste screenshots into the capture window with automatic compression
 - Reader Panel — tab-based reading view with your Daily Note, pinned notes, and on-demand tabs
 - Wikilink navigation — follow `[[links]]` inside the Reader, open in new tab with Cmd+Click

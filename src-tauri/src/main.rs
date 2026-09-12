@@ -380,6 +380,7 @@ fn main() {
             commands::capture::save_as_note,
             commands::capture::append_to_daily_note,
             commands::capture::append_to_note,
+            commands::capture::append_to_note_section,
             commands::capture::save_capture_draft,
             commands::capture::load_capture_draft,
             commands::capture::clear_capture_draft,

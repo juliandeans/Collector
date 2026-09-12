@@ -78,11 +78,22 @@ function validateRelativeFolder(fields, settings, field, label, options = {}) {
     }
 
     if (isAbsolutePath(value) || hasParentSegment(value)) {
-        addIssue(fields, field, "error", `${label} must stay inside the vault.`);
+        addIssue(
+            fields,
+            field,
+            "error",
+            `${label} must stay inside the vault.`,
+        );
     }
 }
 
-function validateFilenameTemplate(fields, settings, field, label, options = {}) {
+function validateFilenameTemplate(
+    fields,
+    settings,
+    field,
+    label,
+    options = {},
+) {
     const value = getString(settings[field]);
     if (!value) {
         addIssue(fields, field, "error", `${label} cannot be empty.`);
@@ -143,14 +154,24 @@ function validateNumberRange(fields, settings, field, label, min, max) {
     }
 
     if (value < min || value > max) {
-        addIssue(fields, field, "error", `${label} must be between ${min} and ${max}.`);
+        addIssue(
+            fields,
+            field,
+            "error",
+            `${label} must be between ${min} and ${max}.`,
+        );
     }
 }
 
 function validateColor(fields, settings, field, label) {
     const value = getString(settings[field]);
     if (!HEX_COLOR_PATTERN.test(value)) {
-        addIssue(fields, field, "error", `${label} must be a hex color like #8b5cf6.`);
+        addIssue(
+            fields,
+            field,
+            "error",
+            `${label} must be a hex color like #8b5cf6.`,
+        );
     }
 }
 
@@ -169,7 +190,10 @@ function parseShortcut(shortcut) {
         .filter(Boolean);
 
     if (parts.length < 2) {
-        return { ok: false, reason: "Shortcut must contain a modifier and a key." };
+        return {
+            ok: false,
+            reason: "Shortcut must contain a modifier and a key.",
+        };
     }
 
     const modifiers = [];
@@ -190,7 +214,10 @@ function parseShortcut(shortcut) {
     }
 
     if (modifiers.length === 0) {
-        return { ok: false, reason: "Shortcut must include at least one modifier." };
+        return {
+            ok: false,
+            reason: "Shortcut must include at least one modifier.",
+        };
     }
 
     if (!key) {
@@ -198,7 +225,10 @@ function parseShortcut(shortcut) {
     }
 
     if (!VALID_KEYS.has(key)) {
-        return { ok: false, reason: `"${key}" is not a supported shortcut key.` };
+        return {
+            ok: false,
+            reason: `"${key}" is not a supported shortcut key.`,
+        };
     }
 
     return {
@@ -224,7 +254,11 @@ function canonicalShortcut(value, { commandOrControl = false } = {}) {
         return modifier;
     });
 
-    return [...new Set(modifiers)].sort().join("+") + "+" + parsed.key.toLowerCase();
+    return (
+        [...new Set(modifiers)].sort().join("+") +
+        "+" +
+        parsed.key.toLowerCase()
+    );
 }
 
 function validateShortcut(fields, settings, field, label) {
@@ -295,10 +329,7 @@ function addReaderPrecedenceWarnings(fields, settings, entries) {
             !parsed.modifiers.includes("commandorcontrol");
         const key = parsed.key.toLowerCase();
 
-        if (
-            hasOnlyPrimary &&
-            (reservedKeys.has(key) || /^[1-9]$/.test(key))
-        ) {
+        if (hasOnlyPrimary && (reservedKeys.has(key) || /^[1-9]$/.test(key))) {
             addIssue(
                 fields,
                 field,
@@ -309,13 +340,91 @@ function addReaderPrecedenceWarnings(fields, settings, entries) {
     }
 }
 
+function validateCaptureRules(fields, settings = {}) {
+    const rules = Array.isArray(settings.capture_rules)
+        ? settings.capture_rules
+        : [];
+
+    rules.forEach((rule, index) => {
+        const base = `capture_rules.${index}`;
+
+        if (!getString(rule?.name)) {
+            addIssue(fields, `${base}.name`, "warning", "Rule name is empty.");
+        }
+
+        const condition = Array.isArray(rule?.conditions)
+            ? rule.conditions[0]
+            : null;
+        if (condition && !getString(condition.value)) {
+            addIssue(
+                fields,
+                `${base}.condition.value`,
+                "warning",
+                "Trigger value is empty — the rule will never match.",
+            );
+        }
+
+        const action = Array.isArray(rule?.actions)
+            ? rule.actions.find((candidate) => candidate?.type === "append")
+            : null;
+        if (action) {
+            const note = getString(action.note);
+            if (!note) {
+                addIssue(
+                    fields,
+                    `${base}.action.note`,
+                    "warning",
+                    "Target note is empty — the rule will not save anywhere.",
+                );
+            } else if (!note.toLowerCase().endsWith(".md")) {
+                addIssue(
+                    fields,
+                    `${base}.action.note`,
+                    "warning",
+                    "Target note must be a .md path in the vault.",
+                );
+            }
+        }
+    });
+}
+
 export function validateSettings(settings = {}) {
     const fields = {};
 
-    validateNumberRange(fields, settings, "window_width", "Capture width", 200, 800);
-    validateNumberRange(fields, settings, "window_height", "Capture height", 200, 1200);
-    validateNumberRange(fields, settings, "reader_width", "Reader width", 200, 800);
-    validateNumberRange(fields, settings, "reader_height", "Reader height", 200, 1200);
+    validateCaptureRules(fields, settings);
+
+    validateNumberRange(
+        fields,
+        settings,
+        "window_width",
+        "Capture width",
+        200,
+        800,
+    );
+    validateNumberRange(
+        fields,
+        settings,
+        "window_height",
+        "Capture height",
+        200,
+        1200,
+    );
+    validateNumberRange(
+        fields,
+        settings,
+        "reader_width",
+        "Reader width",
+        200,
+        800,
+    );
+    validateNumberRange(
+        fields,
+        settings,
+        "reader_height",
+        "Reader height",
+        200,
+        1200,
+    );
     validateNumberRange(
         fields,
         settings,
@@ -364,10 +473,31 @@ export function validateSettings(settings = {}) {
         50,
         2000,
     );
-    validateNumberRange(fields, settings, "border_radius", "Corner radius", 0, 30);
+    validateNumberRange(
+        fields,
+        settings,
+        "border_radius",
+        "Corner radius",
+        0,
+        30,
+    );
     validateNumberRange(fields, settings, "font_size", "Font size", 10, 24);
-    validateNumberRange(fields, settings, "overlay_strength", "Tint strength", 0, 100);
-    validateNumberRange(fields, settings, "window_blur", "Background blur", 0, 200);
+    validateNumberRange(
+        fields,
+        settings,
+        "overlay_strength",
+        "Tint strength",
+        0,
+        100,
+    );
+    validateNumberRange(
+        fields,
+        settings,
+        "window_blur",
+        "Background blur",
+        0,
+        200,
+    );
     validateNumberRange(
         fields,
         settings,
@@ -391,20 +521,43 @@ export function validateSettings(settings = {}) {
 
     const vaultPath = getString(settings.vault_path);
     if (!vaultPath) {
-        addIssue(fields, "vault_path", "error", "Choose your Obsidian vault folder.");
+        addIssue(
+            fields,
+            "vault_path",
+            "error",
+            "Choose your Obsidian vault folder.",
+        );
     } else if (!isAbsolutePath(vaultPath)) {
-        addIssue(fields, "vault_path", "error", "Vault path must be a full folder path.");
+        addIssue(
+            fields,
+            "vault_path",
+            "error",
+            "Vault path must be a full folder path.",
+        );
     }
 
-    validateRelativeFolder(fields, settings, "daily_note_folder", "Daily note path", {
-        emptyWarning: "Daily-note actions will fail until this path is configured.",
-    });
+    validateRelativeFolder(
+        fields,
+        settings,
+        "daily_note_folder",
+        "Daily note path",
+        {
+            emptyWarning:
+                "Daily-note actions will fail until this path is configured.",
+        },
+    );
     validateRelativeFolder(fields, settings, "notes_folder", "Notes folder", {
         emptyWarning: "New notes will be created in the vault root.",
     });
-    validateRelativeFolder(fields, settings, "screenshot_path", "Image folder", {
-        emptyWarning: "Images will be saved in the vault root.",
-    });
+    validateRelativeFolder(
+        fields,
+        settings,
+        "screenshot_path",
+        "Image folder",
+        {
+            emptyWarning: "Images will be saved in the vault root.",
+        },
+    );
 
     const pinnedNotes = Array.isArray(settings.pinned_notes)
         ? settings.pinned_notes
@@ -428,18 +581,30 @@ export function validateSettings(settings = {}) {
         );
     }
 
-    validateFilenameTemplate(fields, settings, "daily_note_format", "Daily note format", {
-        dateTokensOnly: true,
-    });
+    validateFilenameTemplate(
+        fields,
+        settings,
+        "daily_note_format",
+        "Daily note format",
+        {
+            dateTokensOnly: true,
+        },
+    );
     validateFilenameTemplate(
         fields,
         settings,
         "note_filename_template",
         "Note filename template",
     );
-    validateFilenameTemplate(fields, settings, "image_filename", "Image filename template", {
-        warnWithoutSeconds: true,
-    });
+    validateFilenameTemplate(
+        fields,
+        settings,
+        "image_filename",
+        "Image filename template",
+        {
+            warnWithoutSeconds: true,
+        },
+    );
 
     const imageWidth = getString(settings.default_image_width);
     if (imageWidth && (!/^\d+$/.test(imageWidth) || Number(imageWidth) === 0)) {
@@ -479,7 +644,10 @@ export function validateSettings(settings = {}) {
         { field: "reader_previous_tab_shortcut", label: "Previous Tab" },
         { field: "capture_text_shortcut", label: "Copy Text to Collector" },
         { field: "capture_mode_shortcut", label: "Toggle Collect Mode" },
-        { field: "persist_capture_draft_shortcut", label: "Toggle Keep Unsaved Text" },
+        {
+            field: "persist_capture_draft_shortcut",
+            label: "Toggle Keep Unsaved Text",
+        },
         { field: "save_to_daily_shortcut", label: "Save to Daily Note" },
         { field: "save_as_note_shortcut", label: "Create New Note" },
         { field: "append_to_note_shortcut", label: "Append to Note" },
@@ -512,9 +680,13 @@ export function validateSettings(settings = {}) {
 
     const activeGlobalHotkeys = [
         { field: "global_shortcut" },
-        ...(!settings.global_shortcut_closes_window ? [{ field: "global_close_shortcut" }] : []),
+        ...(settings.global_shortcut_closes_window
+            ? []
+            : [{ field: "global_close_shortcut" }]),
         { field: "reader_shortcut" },
-        ...(!settings.reader_shortcut_closes_window ? [{ field: "reader_close_shortcut" }] : []),
+        ...(settings.reader_shortcut_closes_window
+            ? []
+            : [{ field: "reader_close_shortcut" }]),
         { field: "capture_text_shortcut" },
         { field: "capture_mode_shortcut" },
         { field: "persist_capture_draft_shortcut" },
@@ -535,18 +707,25 @@ export function validateSettings(settings = {}) {
         { field: "reader_close_shortcut", label: "Close Reader Window" },
         { field: "capture_text_shortcut", label: "Copy Text to Collector" },
         { field: "capture_mode_shortcut", label: "Toggle Collect Mode" },
-        { field: "persist_capture_draft_shortcut", label: "Toggle Keep Unsaved Text" },
+        {
+            field: "persist_capture_draft_shortcut",
+            label: "Toggle Keep Unsaved Text",
+        },
         { field: "save_as_note_shortcut", label: "Create New Note" },
     ];
 
     const ocrValue = getString(settings.ocr_shortcut);
     if (ocrValue && fields.ocr_shortcut?.type !== "error") {
-        const canonicalOcr = canonicalShortcut(ocrValue, { commandOrControl: true });
+        const canonicalOcr = canonicalShortcut(ocrValue, {
+            commandOrControl: true,
+        });
         if (canonicalOcr) {
             for (const { field, label } of globalHotkeys) {
                 const hotkeyValue = getString(settings[field]);
                 if (!hotkeyValue || fields[field]?.type === "error") continue;
-                const canonicalHotkey = canonicalShortcut(hotkeyValue, { commandOrControl: true });
+                const canonicalHotkey = canonicalShortcut(hotkeyValue, {
+                    commandOrControl: true,
+                });
                 if (canonicalOcr === canonicalHotkey) {
                     addIssue(
                         fields,
@@ -628,7 +807,9 @@ export function validateSettings(settings = {}) {
     return {
         fields,
         hasErrors: fieldValues.some((issue) => issue.type === "error"),
-        errorCount: fieldValues.filter((issue) => issue.type === "error").length,
-        warningCount: fieldValues.filter((issue) => issue.type === "warning").length,
+        errorCount: fieldValues.filter((issue) => issue.type === "error")
+            .length,
+        warningCount: fieldValues.filter((issue) => issue.type === "warning")
+            .length,
     };
 }
