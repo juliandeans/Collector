@@ -25,7 +25,13 @@
         computeClosedState,
         computeInputState,
         computeInsertion,
+        handleWikiKeydown,
     } from "./lib/app/wikiAutocomplete.js";
+    import {
+        createCaptureActions,
+        handleAppShortcut,
+    } from "./lib/app/captureActions.js";
+    import { createModifierWatcher } from "./lib/ocr/modifierWatcher.js";
     import * as appendPicker from "./lib/app/appendPicker.js";
     import AppendToPicker from "./lib/reader/AppendToPicker.svelte";
     import CaptureWikilinkOverlay from "./lib/capture/CaptureWikilinkOverlay.svelte";
@@ -38,23 +44,11 @@
     import CaptureAccentLine from "./lib/capture/CaptureAccentLine.svelte";
     import CaptureDropOverlay from "./lib/capture/CaptureDropOverlay.svelte";
     import OcrDropOverlay from "./lib/ocr/OcrDropOverlay.svelte";
-    import {
-        ocrClipboardImage,
-        getModifierFlags,
-        isOcrModifierActive,
-        normalizeOcrError,
-    } from "./lib/ocr/ocrClient.js";
-    import { insertTextIntoTextarea } from "./lib/ocr/insertUtils.js";
     import CaptureEditor from "./lib/capture/CaptureEditor.svelte";
     import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
-    import { matchesShortcut } from "./lib/capture/capture-utils.js";
-    import {
-        appendToDailyNoteAction,
-        saveAsNoteAction,
-        closeCaptureAction,
-        hideCaptureWhileCollectingAction,
-    } from "./lib/capture/capture-actions.js";
     import { appendCapturedText } from "./lib/capture/captureTextAppend.js";
+
+    import "./lib/capture/capture.css";
 
     let textareaRef = $state();
     let content = $state("");
@@ -62,6 +56,7 @@
     let pendingCaptureContent = $state("");
     let draftSaveTimer;
     let isDragging = $state(false);
+    let dragCounter = 0;
     let isLoading = $state(false);
     let isOcrLoading = $state(false);
     let isOcrModifierHeld = $state(false);
@@ -105,6 +100,40 @@
 
     let brightnessFilter = $derived(computeBrightnessFilter(appSettings.window_brightness));
 
+    const actions = createCaptureActions({
+        invoke,
+        getContent: () => content,
+        setContent: (v) => {
+            content = v;
+        },
+        getIsLoading: () => isLoading,
+        setIsLoading: (v) => {
+            isLoading = v;
+        },
+        getIsOcrLoading: () => isOcrLoading,
+        setIsOcrLoading: (v) => {
+            isOcrLoading = v;
+        },
+        getCaptureModeActive: () => captureModeActive,
+        setCaptureModeActive: (v) => {
+            captureModeActive = v;
+        },
+        showStatus,
+        freeBlobUrls,
+        resetCaptureState,
+        getTextarea: () => textareaRef,
+        tick,
+    });
+
+    const modifierWatcher = createModifierWatcher({
+        invoke,
+        getIsDragging: () => isDragging,
+        getModifierSetting: () => appSettings?.ocr_drag_modifier,
+        onActiveChange: (active) => {
+            isOcrModifierHeld = active;
+        },
+    });
+
     $effect(() => {
         const currentContent = content;
         clearTimeout(draftSaveTimer);
@@ -124,6 +153,14 @@
         const pending = pendingCaptureContent;
         pendingCaptureContent = "";
         content = appendCapturedText(content, pending);
+    });
+
+    $effect(() => {
+        if (isDragging) {
+            modifierWatcher.start();
+        } else {
+            modifierWatcher.stop();
+        }
     });
 
     function applyAppendPickerState(patch) {
@@ -229,7 +266,7 @@
                     resetCaptureState,
                     closeAppendPicker,
                     showStatus,
-                    handleSaveAsNote,
+                    handleSaveAsNote: actions.handleSaveAsNote,
                     setUnlistenReset: (fn) => {
                         unlistenReset = fn;
                     },
@@ -294,77 +331,12 @@
         cleanupGlobalDragListeners?.();
 
         freeBlobUrls();
-        stopModifierPolling();
+        modifierWatcher.stop();
     });
-
-    let ocrPollInterval = null;
-    function startModifierPolling() {
-        if (ocrPollInterval) return;
-        const check = async () => {
-            if (!isDragging) {
-                stopModifierPolling();
-                return;
-            }
-            try {
-                const flags = await getModifierFlags({ invoke });
-                isOcrModifierHeld = isOcrModifierActive(flags, appSettings?.ocr_drag_modifier);
-            } catch {
-                isOcrModifierHeld = false;
-            }
-        };
-        check();
-        ocrPollInterval = setInterval(check, 80);
-    }
-
-    function stopModifierPolling() {
-        if (ocrPollInterval) {
-            clearInterval(ocrPollInterval);
-            ocrPollInterval = null;
-        }
-        isOcrModifierHeld = false;
-    }
-
-    $effect(() => {
-        if (isDragging) {
-            startModifierPolling();
-        } else {
-            stopModifierPolling();
-        }
-    });
-
-    async function handleOcrClipboard() {
-        if (isOcrLoading) return;
-        isOcrLoading = true;
-        showStatus("Extracting text…", "info");
-        try {
-            const result = await ocrClipboardImage({ invoke });
-            if (!result?.text) {
-                showStatus("No text recognized", "error");
-                return;
-            }
-            const { nextContent, nextCursorPosition } = insertTextIntoTextarea(
-                textareaRef,
-                content,
-                result.text,
-            );
-            content = nextContent;
-            showStatus("Text extracted", "success");
-            await tick();
-            if (textareaRef) {
-                textareaRef.selectionStart = textareaRef.selectionEnd = nextCursorPosition;
-                textareaRef.focus();
-            }
-        } catch (err) {
-            showStatus(normalizeOcrError(err), "error");
-        } finally {
-            isOcrLoading = false;
-        }
-    }
 
     function showStatus(message, type = "success") {
         statusMessage = message;
         statusType = type;
-        // Hide the transient status toast after its display period.
         setTimeout(() => (statusMessage = ""), 2000);
     }
 
@@ -384,16 +356,6 @@
         isLoading = false;
     }
 
-    function deferHideCapture() {
-        setTimeout(async () => {
-            try {
-                await invoke("hide_capture");
-            } catch (e) {
-                console.error("Hide error:", e);
-            }
-        }, 200);
-    }
-
     function openAppendPicker() {
         if (!content.trim()) return;
 
@@ -407,72 +369,6 @@
                 appendPickerNotes = v;
             },
             showStatus,
-        });
-    }
-
-    async function handleAppendToDaily() {
-        if (!content.trim() || isLoading) {
-            if (!content.trim()) {
-                showStatus("Nothing to append", "error");
-            }
-            return;
-        }
-
-        isLoading = true;
-
-        await appendToDailyNoteAction({
-            content: content.trim(),
-            invoke,
-            showStatus,
-            freeBlobUrls,
-            resetCaptureState,
-            deferHideCapture,
-            setLoading: (v) => {
-                isLoading = v;
-            },
-        });
-    }
-
-    async function handleClose() {
-        if (captureModeActive) {
-            await hideCaptureWhileCollectingAction({
-                content,
-                invoke,
-            });
-            return;
-        }
-
-        await closeCaptureAction({
-            content,
-            invoke,
-            freeBlobUrls,
-            resetCaptureState,
-        });
-    }
-
-    async function toggleCaptureMode() {
-        try {
-            captureModeActive = await invoke("toggle_capture_mode");
-        } catch (e) {
-            showStatus("✗ " + e.toString(), "error");
-        }
-    }
-
-    async function handleSaveAsNote() {
-        if (!content.trim() || isLoading) return;
-
-        isLoading = true;
-
-        await saveAsNoteAction({
-            content,
-            invoke,
-            showStatus,
-            freeBlobUrls,
-            resetCaptureState,
-            deferHideCapture,
-            setLoading: (v) => {
-                isLoading = v;
-            },
         });
     }
 
@@ -508,7 +404,7 @@
             getEntryHeaderTemplate: () => appSettings.entry_header,
             freeBlobUrls,
             resetCaptureState,
-            deferHideCapture,
+            deferHideCapture: actions.deferHideCapture,
             showStatus,
         });
     }
@@ -516,71 +412,28 @@
     async function handleKeydown(e) {
         if (showAppendPicker) return;
 
-        if (wikiAutocompleteOpen) {
-            if (e.key === "ArrowDown") {
-                e.preventDefault();
-                wikiAutocompleteIndex = Math.min(
-                    wikiAutocompleteIndex + 1,
-                    wikiAutocompleteMatches.length - 1,
-                );
-                return;
-            }
-            if (e.key === "ArrowUp") {
-                e.preventDefault();
-                wikiAutocompleteIndex = Math.max(wikiAutocompleteIndex - 1, 0);
-                return;
-            }
-            if (e.key === "Enter" || e.key === "Tab") {
-                e.preventDefault();
-                if (wikiAutocompleteMatches[wikiAutocompleteIndex]) {
-                    insertWikilink(
-                        wikiAutocompleteMatches[wikiAutocompleteIndex],
-                    );
-                }
-                return;
-            }
-            if (e.key === "Escape") {
-                e.preventDefault();
-                closeWikiAutocomplete();
-                return;
-            }
-        }
-
-        if (e.metaKey && e.key === ",") {
-            e.preventDefault();
-            openSettings();
+        if (
+            handleWikiKeydown({
+                event: e,
+                isOpen: wikiAutocompleteOpen,
+                currentIndex: wikiAutocompleteIndex,
+                matches: wikiAutocompleteMatches,
+                onSelect: insertWikilink,
+                onClose: closeWikiAutocomplete,
+                setIndex: (i) => {
+                    wikiAutocompleteIndex = i;
+                },
+            })
+        ) {
             return;
         }
 
-        if (matchesShortcut(e, appSettings.ocr_shortcut)) {
-            e.preventDefault();
-            handleOcrClipboard();
-            return;
-        }
-
-        if (matchesShortcut(e, appSettings.append_to_note_shortcut)) {
-            e.preventDefault();
-            openAppendPicker();
-            return;
-        }
-
-        if (matchesShortcut(e, appSettings.save_to_daily_shortcut)) {
-            e.preventDefault();
-            handleAppendToDaily();
-            return;
-        }
-
-        if (matchesShortcut(e, appSettings.save_as_note_shortcut)) {
-            e.preventDefault();
-            handleSaveAsNote();
-            return;
-        }
-
-        if (e.key === "Escape") {
-            e.preventDefault();
-            handleClose();
-            return;
-        }
+        handleAppShortcut({
+            event: e,
+            appSettings,
+            actions,
+            openAppendPicker,
+        });
     }
 
     function applyWikiState({ open, query, matches, index, position, anchorPos }) {
@@ -617,16 +470,6 @@
     function closeWikiAutocomplete() {
         applyWikiState(computeClosedState());
     }
-
-    async function openSettings() {
-        try {
-            await invoke("open_settings");
-        } catch (e) {
-            console.error("Failed to open settings:", e);
-        }
-    }
-
-    let dragCounter = 0;
 
     function handleDragEnter(e) {
         dragDropImages.handleDragEnter(e, {
@@ -798,8 +641,8 @@
             saveToDailyShortcut={appSettings.save_to_daily_shortcut}
             saveAsNoteShortcut={appSettings.save_as_note_shortcut}
             appendToNoteShortcut={appSettings.append_to_note_shortcut}
-            onDaily={handleAppendToDaily}
-            onNewNote={handleSaveAsNote}
+            onDaily={actions.handleAppendToDaily}
+            onNewNote={actions.handleSaveAsNote}
             onAppend={openAppendPicker}
         />
 
@@ -807,7 +650,7 @@
             show={appSettings.show_capture_mode_button}
             active={captureModeActive}
             shortcut={appSettings.capture_mode_shortcut}
-            onToggle={toggleCaptureMode}
+            onToggle={actions.toggleCaptureMode}
         />
     </div>
 
@@ -866,136 +709,3 @@
 
     <CaptureLoadingIndicator active={isLoading} />
 </div>
-
-<style>
-    :global(*) {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-    }
-
-    :global(body) {
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        background: transparent;
-    }
-
-    .capture-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: color-mix(
-            in srgb,
-            var(--app-background, #1e1e2e) var(--app-transparency, 55%),
-            transparent
-        );
-        backdrop-filter: saturate(var(--app-saturation, 200%))
-            var(--app-brightness-filter);
-        -webkit-backdrop-filter: saturate(var(--app-saturation, 200%))
-            var(--app-brightness-filter);
-        border-radius: var(--app-corner-radius, var(--app-border-radius, 12px));
-        border: 0.5px solid rgba(0, 0, 0, 0.08);
-        box-shadow:
-            var(--shadow-md),
-            0 2px 8px var(--shadow-sm);
-        overflow: clip;
-        display: flex;
-        flex-direction: column;
-        font-family: var(
-            --app-font-family,
-            -apple-system,
-            BlinkMacSystemFont,
-            "SF Pro Display",
-            sans-serif
-        );
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
-    }
-
-    .capture-container.dragging {
-        background: rgba(255, 255, 255, 0.7);
-        border-color: rgba(255, 255, 255, 0.7);
-        border-width: 2px;
-        box-shadow:
-            var(--shadow-md),
-            0 2px 8px var(--shadow-sm);
-    }
-
-    /* Effects for the JavaScript resize fallback. The native macOS handler
-       leaves these effects unchanged. */
-    .capture-container.resizing {
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        box-shadow: none;
-    }
-
-    .content-wrapper {
-        transition:
-            filter 0.12s ease,
-            opacity 0.12s ease,
-            transform 0.12s ease;
-    }
-
-    .capture-container.append-picker-open :global(.accent-line),
-    .capture-container.append-picker-open .content-wrapper,
-    .capture-container.append-picker-open :global(.action-bar),
-    .capture-container.append-picker-open :global(.status-toast),
-    .capture-container.append-picker-open :global(.resize-handle),
-    .capture-container.append-picker-open :global(.capture-mode-button) {
-        filter: blur(4px) brightness(0.62);
-        opacity: 0.56;
-        transform: scale(0.997);
-        pointer-events: none;
-    }
-
-    .content-wrapper {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-    }
-
-    .capture-actions-row {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        padding: 4px 12px 6px;
-        flex-shrink: 0;
-    }
-
-    .capture-container:hover :global(.resize-handle) {
-        opacity: 0.6;
-    }
-
-    .capture-container.demo-fake-bg {
-        background:
-            radial-gradient(
-                circle at 18% 10%,
-                rgba(96, 165, 250, 0.13),
-                transparent 40%
-            ),
-            radial-gradient(
-                circle at 78% 18%,
-                rgba(139, 92, 246, 0.1),
-                transparent 44%
-            ),
-            radial-gradient(
-                circle at 52% 88%,
-                rgba(59, 130, 246, 0.1),
-                transparent 54%
-            ),
-            linear-gradient(
-                145deg,
-                rgba(25, 40, 54, 0.96),
-                rgba(31, 38, 55, 0.96) 48%,
-                rgba(24, 48, 52, 0.97)
-            );
-
-        -webkit-backdrop-filter: none;
-        backdrop-filter: none;
-    }
-</style>

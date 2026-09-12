@@ -144,3 +144,39 @@ export function computeInsertion({ textarea, query, note }) {
 
     return textarea.value;
 }
+
+export function handleWikiKeydown({
+    event,
+    isOpen,
+    currentIndex,
+    matches,
+    onSelect,
+    onClose,
+    setIndex,
+}) {
+    if (!isOpen) return false;
+
+    if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setIndex(Math.min(currentIndex + 1, matches.length - 1));
+        return true;
+    }
+    if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setIndex(Math.max(currentIndex - 1, 0));
+        return true;
+    }
+    if (event.key === "Enter" || event.key === "Tab") {
+        event.preventDefault();
+        if (matches[currentIndex]) {
+            onSelect(matches[currentIndex]);
+        }
+        return true;
+    }
+    if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return true;
+    }
+    return false;
+}
