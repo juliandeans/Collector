@@ -158,8 +158,8 @@ export function computeListIndentation({
         return { nextContent, nextCursorPosition: selectionStart + step };
     }
 
-    const leadingSpaces = /^ */.exec(line)[0].length;
-    const removable = Math.min(step, leadingSpaces);
+    const leadingWhitespace = /^[\t ]*/.exec(line)[0].length;
+    const removable = Math.min(step, leadingWhitespace);
     if (removable === 0) {
         return null;
     }

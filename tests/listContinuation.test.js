@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { computeListContinuation } from "../src/lib/capture/list-continuation.js";
+import {
+    computeListContinuation,
+    computeListIndentation,
+} from "../src/lib/capture/list-continuation.js";
 
 function cursorAt(content, index = content.length) {
     return {
@@ -146,7 +149,21 @@ test("out-of-range cursor is rejected", () => {
         null,
     );
 });
-import { computeListIndentation } from "../src/lib/capture/list-continuation.js";
+test("Shift+Tab removes leading tab characters from pasted content", () => {
+    const result = computeListIndentation({
+        content: "\t- item",
+        selectionStart: 7,
+        selectionEnd: 7,
+        key: "Tab",
+        shiftKey: true,
+    });
+    assert.deepEqual(result, {
+        nextContent: "- item",
+        nextCursorPosition: 6,
+    });
+});
+
+
 
 test("Tab indents a bullet item by its marker width", () => {
     const result = computeListIndentation({
