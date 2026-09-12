@@ -62,3 +62,6 @@ docs/
 
 # Local git worktrees
 .worktrees/
+
+# Claude Code local tooling (dev-server launch config, local permissions, lock files)
+.claude/
