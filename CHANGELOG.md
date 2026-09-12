@@ -3,31 +3,47 @@
 All notable changes to Collector are documented here.  
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [1.3.0] - 2026-09-08
+## [1.3.0] - 2026-09-12
 
 ### Added
-- Configurable "Next Tab" / "Previous Tab" keyboard shortcuts in the Reader
-  (default: Option+Right / Option+Left).
+- Capture Mode / Auto-Collect: automatically appends copied plain text from
+  the clipboard into the Capture window while active. Can be toggled via
+  the "Collect" button in the action bar or a global keyboard shortcut.
+- Capture draft persistence: unsubmitted text in the Capture window is
+  now preserved across closes (Escape, clicking outside, toggle shortcut)
+  and restored when reopening. Can be disabled in Settings → Capture.
+- Window geometry memory: Capture and Reader windows can now remember their
+  custom size and position across sessions (configurable in Settings).
 - OCR (image to text): a configurable shortcut (default Cmd+Shift+T) extracts
   text from a clipboard image at the cursor, in both Capture and the Reader.
   Dragging an image while holding a configurable modifier key (default
   Option) does the same instead of the normal image import. Runs fully
   locally via Apple's Vision framework — no image ever leaves the device.
+- Configurable "Next Tab" / "Previous Tab" keyboard shortcuts in the Reader
+  (default: Option+Right / Option+Left).
 - Keyboard shortcuts in Settings can now be disabled: press Backspace or
   Delete inside any shortcut field, or click the clear button (✕) that
   appears on hover or focus.
 
 ### Changed
-- The "Save Actions" shortcuts (Save to Daily Note, Create New Note, Append
-  to Note) now sit right below "Capture Window" in Settings → Shortcuts
-  instead of at the bottom of the tab.
-- The "Corner Radius" slider moved to the bottom of "Glass Effect", below
-  Background Brightness, next to its new "Round all four corners" checkbox.
+- Background blur switched to macOS native `NSVisualEffectView` (WindowServer)
+  instead of CSS `backdrop-filter`. Eliminates hard unblurred strips along
+  screen edges when windows dock flush, and offers four clean native strengths
+  (Off / Light / Medium / Strong) instead of a continuous slider.
+- Settings → "Look & Feel" is now "Appearance", reorganized into cleaner
+  sections: Background Blur is a 4-step segmented control instead of a slider,
+  slider values display beside tracks, Background Brightness has a visible
+  zero mark, the color tint is part of "Glass Effect" as "Tint" fields, and
+  Corner Radius / "Round all four corners" moved into a new "Window Shape"
+  section below Glass Effect.
 - By default, the two window corners against the screen edge Capture/Reader
   dock to now stay square instead of rounded — only the corners facing the
   screen's interior are rounded, so the flush edge reads as one clean line.
-  Enable "Round all four corners" in Settings → Look & Feel to get the old
-  all-rounded look back.
+  Enable "Round all four corners" in Settings → Appearance → Window Shape to
+  get the old all-rounded look back.
+- The "Save Actions" shortcuts (Save to Daily Note, Create New Note, Append
+  to Note) now sit right below "Capture Window" in Settings → Shortcuts
+  instead of at the bottom of the tab.
 - The wikilink suggestion popups (Reader and Capture), the "append to note"
   picker, and the command palette now share one consistent visual design
   (background, accent highlight bar, text colors) instead of three
@@ -36,18 +52,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   (note paths, headings, quotes, list markers) now derives automatically
   from your chosen Text Color setting instead of being a fixed color —
   adapts correctly to both dark and light text setups.
-- The "Background Blur" setting is now four fixed strengths (Max/Light/
-  Medium/Strong) instead of a freely adjustable 0–200 value — macOS's
-  native window blur only offers a handful of built-in looks, not a
-  continuous amount.
-- Settings → "Look & Feel" is now "Appearance". Background Blur is a 4-step
-  segmented control instead of a slider, slider values now show beside the
-  track instead of inside the label, Background Brightness has a visible
-  zero mark, the color tint is now part of "Glass Effect" as "Tint" fields,
-  and Corner Radius / "Round all four corners" moved into a new "Window
-  Shape" section below Glass Effect.
 
 ### Fixed
+- Prevented creating an empty note when the Capture window contains only a
+  heading.
+- Prevented potential race conditions and dropped changes during settings
+  auto-save and window geometry debouncing.
+- Fixed off-screen window restore bugs on multi-monitor setups.
 - The shortcut recorder in Settings now shows "Option" instead of "Alt"
   when capturing a key combo that uses the Option key.
 - Wikilink suggestion path text in the Reader rendered in black instead of
@@ -61,14 +72,6 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   radius is now applied directly to the WKWebView's own layer instead of
   reaching into WebKit's internal sublayers, which macOS 26 can replace
   out from under the app.
-- Background Blur left a hard, unblurred strip along the screen edge when
-  the Capture or Reader window was docked flush against it, especially at
-  high blur values. The blur now uses macOS's native window-background
-  blur instead of a CSS effect, which handles screen edges correctly.
-- Resizing the Capture and Reader windows from most edges and corners either
-  dragged the window instead of resizing it, or made it flicker. Resizing
-  now goes through a native macOS handler for all edges and corners,
-  without flicker.
 
 ## [1.2.5] - 2026-06-09
 
