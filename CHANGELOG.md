@@ -52,6 +52,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   (note paths, headings, quotes, list markers) now derives automatically
   from your chosen Text Color setting instead of being a fixed color —
   adapts correctly to both dark and light text setups.
+- Window dragging vs. text selection: Disabled macOS `setMovableByWindowBackground`
+  so clicking and dragging in textareas and the note editor selects text normally
+  without moving the window. Moving windows is now performed via `Cmd+Drag` anywhere
+  across the window (Capture, Reader, Settings), while standard titlebar dragging
+  in the Reader topbar remains intact. Interactive links (such as wikilinks) and
+  controls remain fully clickable with Cmd.
 - Internal architecture refactoring: modularized the 7 largest files in the
   codebase (shortcuts registration, capture window actions, settings themes
   and styles, capture tests/templates, reader image/content preprocessing,
