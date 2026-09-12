@@ -68,6 +68,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   2,300 lines without changing behavior or public APIs.
 
 ### Fixed
+- Fixed draft persistence shortcut toggle order so switching on immediately writes unsubmitted text to disk before background gates check setting state.
 - Prevented creating an empty note when the Capture window contains only a
   heading.
 - Prevented potential race conditions and dropped changes during settings
