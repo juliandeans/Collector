@@ -6,7 +6,7 @@ import {
   getReaderFilterSettings,
   haveReaderFilterChanges,
 } from "./settingsBridge.js";
-import { imagePathCache } from "./contentProcessing.js";
+import { clearImageCache } from "./contentProcessing.js";
 
 export async function applyTabSettings(settings, options = {}, bag) {
   const { preserveOpened = true, forceReloadActive = false } = options;
@@ -55,7 +55,7 @@ export async function handleSettingsChanged(settings, bag) {
 
   if (filtersChanged) {
     getEditorComponent()?.finalizeBlock?.();
-    imagePathCache.clear();
+    clearImageCache();
     await renderContentToEditor(getRawContent());
   }
 }

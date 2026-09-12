@@ -16,7 +16,7 @@ pub struct CaptureResult {
     pub message: String,
 }
 mod template;
-pub use template::{generate_header, render_datetime_template};
+pub(crate) use template::{generate_header, render_datetime_template};
 #[cfg(test)]
 pub(crate) use template::generate_header_with_time;
 

@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 const MAX_CACHE_ENTRIES = 150;
 
-export const imagePathCache = new Map();
+const imagePathCache = new Map();
 
 export function getCachedImageSrc(path) {
   return imagePathCache.get(path) ?? "";

@@ -1,14 +1,14 @@
 use chrono::Local;
 
-pub fn generate_header(template: &str) -> String {
+pub(crate) fn generate_header(template: &str) -> String {
     generate_header_with_time(template, Local::now())
 }
 
-pub fn render_datetime_template(template: &str) -> String {
+pub(crate) fn render_datetime_template(template: &str) -> String {
     render_datetime_template_with_time(template, Local::now())
 }
 
-pub fn render_datetime_template_with_time<Tz: chrono::TimeZone>(
+pub(crate) fn render_datetime_template_with_time<Tz: chrono::TimeZone>(
     template: &str,
     dt: chrono::DateTime<Tz>,
 ) -> String
@@ -59,7 +59,7 @@ where
     result
 }
 
-pub fn generate_header_with_time<Tz: chrono::TimeZone>(
+pub(crate) fn generate_header_with_time<Tz: chrono::TimeZone>(
     template: &str,
     dt: chrono::DateTime<Tz>,
 ) -> String

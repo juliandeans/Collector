@@ -22,7 +22,7 @@
   import { createModifierWatcher } from "./lib/ocr/modifierWatcher.js";
   import { createReaderOcr } from "./lib/reader/readerOcr.js";
   import { createSearchCoordinator } from "./lib/reader/readerSearchCoordinator.js";
-  import { imagePathCache } from "./lib/reader/contentProcessing.js";
+  import { clearImageCache } from "./lib/reader/contentProcessing.js";
   import * as editorBridge from "./lib/reader/editorBridge.js";
   import * as tabLifecycle from "./lib/reader/tabLifecycle.js";
   import * as tabSettingsSync from "./lib/reader/tabSettingsSync.js";
@@ -392,7 +392,7 @@
       showStatus(normalizeError(error), "error", 2200);
     }
 
-    imagePathCache.clear();
+    clearImageCache();
   }
 
   async function openSettings() {

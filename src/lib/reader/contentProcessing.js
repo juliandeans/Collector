@@ -1,5 +1,4 @@
 export {
-  imagePathCache,
   getCachedImageSrc,
   setCachedImageSrc,
   clearImageCache,
@@ -10,7 +9,6 @@ export {
 
 export {
   normalizeNewlines,
-  stashHiddenBlock,
   parseRawBlocks,
   stripInlineFields,
   stripHtmlTags,

@@ -70,8 +70,8 @@ export function createReaderOcr({
       const paths = payload.paths;
       if (!Array.isArray(paths) || paths.length === 0) return;
 
-      const appSettings = getAppSettings();
       const modifierFlags = await getModifierFlags({ invoke });
+      const appSettings = getAppSettings();
       const isOcr = isOcrModifierActive(modifierFlags, appSettings?.ocr_drag_modifier);
 
       // Reader ignores image drop without OCR modifier

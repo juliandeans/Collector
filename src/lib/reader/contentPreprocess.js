@@ -64,7 +64,7 @@ export function normalizeNewlines(content = "") {
   return content.replace(/\r\n/g, "\n");
 }
 
-export function stashHiddenBlock(block = "", hiddenBlockMap = new Map()) {
+function stashHiddenBlock(block = "", hiddenBlockMap = new Map()) {
   const hiddenId = `__HD_${hiddenBlockMap.size}__`;
   hiddenBlockMap.set(hiddenId, block);
   return `\u200B${hiddenId}`;

@@ -122,9 +122,10 @@ export function createCaptureActions({
             setContent(nextContent);
             showStatus("Text extracted", "success");
             await tick();
-            if (textarea) {
-                textarea.selectionStart = textarea.selectionEnd = nextCursorPosition;
-                textarea.focus();
+            const currentTextarea = getTextarea();
+            if (currentTextarea) {
+                currentTextarea.selectionStart = currentTextarea.selectionEnd = nextCursorPosition;
+                currentTextarea.focus();
             }
         } catch (err) {
             showStatus(normalizeOcrError(err), "error");
