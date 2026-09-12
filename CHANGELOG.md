@@ -8,6 +8,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - Clear Capture Shortcut: `Cmd+Backspace` (configurable under Settings → Shortcuts) empties the Capture window in one keystroke — text, images and the persisted draft — even when draft persistence is on; if the draft file cannot be removed, an error status is shown instead of the success banner.
+- List continuation: pressing Enter at the end of a list item (`-`, `*`, `+`, `1.`) in the Capture window starts the next item automatically — checkbox items restart as unchecked, empty items are removed instead of continued, indentation is preserved.
 
 ## [1.3.0] - 2026-09-12
 
