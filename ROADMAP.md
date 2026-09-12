@@ -7,7 +7,6 @@ Features may shift between versions based on feedback.
 
 ## In Progress / Next
 
-- `[[` Wikilink autocomplete in the Note Window
 - Light / Dark Mode for all windows
 
 ---
