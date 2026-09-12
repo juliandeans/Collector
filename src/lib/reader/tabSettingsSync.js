@@ -46,8 +46,12 @@ export async function handleSettingsChanged(settings, bag) {
   const nextFilters = getReaderFilterSettings(nextSettings);
   const nextPinnedNotes = getPinnedNotesSignature(nextSettings.pinned_notes);
   const filtersChanged = haveReaderFilterChanges(previousFilters, nextFilters);
+  // undefined counts as true (legacy configs): normalize before comparing
+  const dailyNoteVisibilityChanged =
+    (previousSettings.reader_show_daily_note ?? true) !==
+    (nextSettings.reader_show_daily_note ?? true);
 
-  if (previousPinnedNotes !== nextPinnedNotes) {
+  if (previousPinnedNotes !== nextPinnedNotes || dailyNoteVisibilityChanged) {
     await flushPendingSave(false);
     await applyTabSettings(settings, { preserveOpened: true, forceReloadActive: false }, bag);
     return;
