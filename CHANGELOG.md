@@ -3,6 +3,12 @@
 All notable changes to Collector are documented here.  
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+
+- Clear Capture Shortcut: `Cmd+Backspace` (configurable under Settings → Shortcuts) empties the Capture window in one keystroke — text, images and the persisted draft — even when draft persistence is on; if the draft file cannot be removed, an error status is shown instead of the success banner.
+
 ## [1.3.0] - 2026-09-12
 
 ### Added
