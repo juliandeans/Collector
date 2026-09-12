@@ -15,8 +15,8 @@ Features may shift between versions based on feedback.
 
 ### Reader
 
-- **Daily Note toggle** — option to disable Daily Note functionality in the Reader entirely for users who don't use it
-- **Pinned notes sorting** — ability to reorder pinned notes in Settings
+- **Daily Note toggle** — option to disable Daily Note functionality in the Reader entirely for users who don't use it *(umgesetzt in 1.3.0)*
+- **Pinned notes sorting** — ability to reorder pinned notes in Settings *(umgesetzt in 1.3.0)*
 
 ### Capture
 
