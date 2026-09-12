@@ -32,6 +32,7 @@
         handleAppShortcut,
     } from "./lib/app/captureActions.js";
     import { createModifierWatcher } from "./lib/ocr/modifierWatcher.js";
+    import { setupCmdWindowDrag } from "./lib/windowDrag.js";
     import * as appendPicker from "./lib/app/appendPicker.js";
     import AppendToPicker from "./lib/reader/AppendToPicker.svelte";
     import CaptureWikilinkOverlay from "./lib/capture/CaptureWikilinkOverlay.svelte";
@@ -86,6 +87,7 @@
     let isResizing = $state(false);
     let isTauri = false;
     let cleanupGlobalDragListeners;
+    let cleanupCmdWindowDrag;
     let wikiAutocompleteOpen = $state(false);
     let wikiAutocompleteQuery = "";
     let wikiAutocompleteIndex = $state(0);
@@ -315,6 +317,7 @@
                 console.error("Failed to listen to events:", e);
             }
         }
+        cleanupCmdWindowDrag = setupCmdWindowDrag();
     });
 
     onDestroy(() => {
@@ -329,6 +332,7 @@
         unlistenDragDrop?.();
         cleanupResizeFlicker?.();
         cleanupGlobalDragListeners?.();
+        cleanupCmdWindowDrag?.();
 
         freeBlobUrls();
         modifierWatcher.stop();

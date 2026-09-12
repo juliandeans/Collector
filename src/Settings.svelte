@@ -14,6 +14,7 @@
     import { validateSettings } from "./lib/settings/validation.js";
     import { defaultSettings } from "./lib/stores.js";
     import { lightTheme, darkTheme } from "./lib/settings/themes.js";
+    import { setupCmdWindowDrag } from "./lib/windowDrag.js";
     import "./lib/settings/settings.css";
 
     let settings = $state({ ...defaultSettings });
@@ -23,6 +24,7 @@
     let statusType = $state("");
     let activePanel = $state("vault");
     let statusTimeout;
+    let cleanupCmdWindowDrag;
 
     const settingsPanels = [
         { id: "vault", label: "Vault" },
@@ -152,11 +154,13 @@
         } catch (e) {
             console.error("Failed to load vault notes:", e);
         }
+        cleanupCmdWindowDrag = setupCmdWindowDrag();
     });
 
     onDestroy(() => {
         clearTimeout(statusTimeout);
         flushPendingSave();
+        cleanupCmdWindowDrag?.();
     });
 
     // ── ui helpers ─────────────────────────────────────────

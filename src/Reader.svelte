@@ -22,6 +22,7 @@
   import { createModifierWatcher } from "./lib/ocr/modifierWatcher.js";
   import { createReaderOcr } from "./lib/reader/readerOcr.js";
   import { createSearchCoordinator } from "./lib/reader/readerSearchCoordinator.js";
+  import { setupCmdWindowDrag } from "./lib/windowDrag.js";
   import { clearImageCache } from "./lib/reader/contentProcessing.js";
   import * as editorBridge from "./lib/reader/editorBridge.js";
   import * as tabLifecycle from "./lib/reader/tabLifecycle.js";
@@ -98,6 +99,7 @@
   let armResize = $state(() => {});
   let isResizing = $state(false);
   let cleanupGlobalListeners = () => {};
+  let cleanupCmdWindowDrag;
   const saveScheduler = createDebouncedJob(600);
 
   let isOcrLoading = $state(false);
@@ -570,6 +572,7 @@
       } catch (e) {
         console.warn("Could not register onDragDropEvent in Reader:", e);
       }
+      cleanupCmdWindowDrag = setupCmdWindowDrag();
     } catch (error) {
       showStatus(normalizeError(error), "error", 2400);
     }
@@ -584,6 +587,7 @@
     unlistenSettingsChanged?.();
     cleanupResizeFlicker?.();
     unlistenDragDrop?.();
+    cleanupCmdWindowDrag?.();
     modifierWatcher.stop();
   });
 </script>

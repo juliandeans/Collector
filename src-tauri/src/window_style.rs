@@ -4,7 +4,7 @@
 // during startup and every time settings are saved.
 
 #[cfg(target_os = "macos")]
-use cocoa::base::{id, BOOL, YES};
+use cocoa::base::{id, BOOL, NO, YES};
 #[cfg(target_os = "macos")]
 use cocoa::foundation::NSInteger;
 #[cfg(target_os = "macos")]
@@ -136,7 +136,7 @@ pub(crate) fn configure_macos_window(
                 return;
             }
 
-            let _: () = msg_send![ns_window, setMovableByWindowBackground: YES];
+            let _: () = msg_send![ns_window, setMovableByWindowBackground: NO];
 
             let content_view: id = msg_send![ns_window, contentView];
             if content_view.is_null() {
