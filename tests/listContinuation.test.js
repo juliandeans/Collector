@@ -67,6 +67,30 @@ test("empty numbered item is removed instead of continued", () => {
     });
 });
 
+test("empty checkbox item is removed instead of continued", () => {
+    const result = computeListContinuation(cursorAt("- erste\n- [ ] "));
+    assert.deepEqual(result, {
+        nextContent: "- erste\n",
+        nextCursorPosition: 8,
+    });
+});
+
+test("checked empty checkbox item is removed too", () => {
+    const result = computeListContinuation(cursorAt("- erste\n- [x] "));
+    assert.deepEqual(result, {
+        nextContent: "- erste\n",
+        nextCursorPosition: 8,
+    });
+});
+
+test("checkbox followed by text is still continued", () => {
+    const result = computeListContinuation(cursorAt("- [ ] aufgabe"));
+    assert.deepEqual(result, {
+        nextContent: "- [ ] aufgabe\n- [ ] ",
+        nextCursorPosition: 20,
+    });
+});
+
 test("cursor mid-line splits the item", () => {
     const content = "- hello world";
     const result = computeListContinuation(cursorAt(content, 7));

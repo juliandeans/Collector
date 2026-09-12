@@ -60,15 +60,20 @@ export function computeListContinuation({
 
     const [, indent, marker, spaces = "", itemText = ""] = match;
 
-    // Empty item: remove the list prefix instead of spawning another one.
-    if (itemText.trim() === "") {
-        const prefixLength = indent.length + marker.length + spaces.length;
-        const nextContent = content.slice(0, lineStart) + content.slice(lineStart + prefixLength);
+    // Empty item (plain or checkbox-only): remove the list prefix instead of
+    // spawning another one.
+    const checkboxToken = CHECKBOX_PATTERN.exec(itemText)?.[0] ?? "";
+    const withoutCheckbox = itemText.slice(checkboxToken.length);
+    if (withoutCheckbox.trim() === "") {
+        const prefixLength =
+            indent.length + marker.length + spaces.length + checkboxToken.length;
+        const nextContent =
+            content.slice(0, lineStart) + content.slice(lineStart + prefixLength);
         return { nextContent, nextCursorPosition: lineStart };
     }
 
     const nextMarker = isNumberedMarker(marker) ? `${parseInt(marker, 10) + 1}.` : marker;
-    const separator = spaces.length > 0 ? spaces : " ";
+    const separator = spaces;
     const checkboxPrefix = getCheckboxPrefix(itemText);
     const nextPrefix =
         indent + nextMarker + separator + (checkboxPrefix !== null ? `${checkboxPrefix} ` : "");
