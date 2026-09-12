@@ -103,6 +103,7 @@
       class="picker-panel"
       role="dialog"
       aria-modal="true"
+      tabindex="-1"
       onclick={(event) => event.stopPropagation()}
       onkeydown={handleKeydown}
     >

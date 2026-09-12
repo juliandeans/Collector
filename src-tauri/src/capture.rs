@@ -16,10 +16,9 @@ pub struct CaptureResult {
     pub message: String,
 }
 mod template;
-pub(crate) use template::{generate_header, render_datetime_template};
 #[cfg(test)]
 pub(crate) use template::generate_header_with_time;
-
+pub(crate) use template::{generate_header, render_datetime_template};
 
 pub fn build_daily_note_path(settings: &Settings) -> String {
     let now = Local::now();
@@ -229,9 +228,7 @@ pub async fn append_to_daily_note(
         return Err("Nothing to append".to_string());
     }
     if settings.daily_note_folder.trim().is_empty() {
-        return Err(
-            "Daily Note folder is not configured. Please set it in Settings.".to_string(),
-        );
+        return Err("Daily Note folder is not configured. Please set it in Settings.".to_string());
     }
 
     log::info!(
@@ -364,4 +361,3 @@ pub fn append_to_note(
 
 #[cfg(test)]
 mod tests;
-

@@ -15,6 +15,10 @@ mod image_handler;
 mod log_safety;
 mod markdown_sections;
 mod ocr;
+#[cfg(all(debug_assertions, target_os = "macos"))]
+mod resize_diagnostics;
+#[cfg(target_os = "macos")]
+mod resize_geometry;
 mod selected_text;
 mod settings;
 mod shortcuts;
@@ -23,13 +27,9 @@ mod updater;
 mod vault_index;
 mod vault_paths;
 mod window_geometry;
-mod window_style;
-#[cfg(target_os = "macos")]
-mod resize_geometry;
 #[cfg(target_os = "macos")]
 mod window_resize;
-#[cfg(all(debug_assertions, target_os = "macos"))]
-mod resize_diagnostics;
+mod window_style;
 
 use std::sync::Arc;
 use tauri::{AppHandle, Listener, Manager, WindowEvent};

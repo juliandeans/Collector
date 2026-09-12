@@ -140,11 +140,7 @@ pub(crate) async fn save_settings(
 
     if let Err(e) = state
         .capture_mode_shortcut_manager
-        .register_capture_mode(
-            &app,
-            &new_settings,
-            state.capture_mode_controller.clone(),
-        )
+        .register_capture_mode(&app, &new_settings, state.capture_mode_controller.clone())
         .await
     {
         log::warn!("Failed to update capture_mode shortcut (non-fatal): {}", e);

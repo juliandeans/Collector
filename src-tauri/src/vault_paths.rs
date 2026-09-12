@@ -37,7 +37,10 @@ fn ensure_markdown_path(path: &Path) -> Result<(), String> {
     }
 }
 
-pub(crate) fn resolve_vault_read_path(settings: &Settings, requested_path: &str) -> Result<PathBuf, String> {
+pub(crate) fn resolve_vault_read_path(
+    settings: &Settings,
+    requested_path: &str,
+) -> Result<PathBuf, String> {
     let vault_root = canonical_vault_root(settings)?;
     let normalized = normalize_path(Path::new(requested_path))?;
     let candidate = if normalized.is_absolute() {
@@ -83,8 +86,7 @@ pub(crate) fn resolve_vault_write_path(
             .map_err(|e| format!("Failed to create note directory: {}", e))?;
     } else if !parent.exists() {
         return Err(
-            "Daily Notes folder not found. Please check your folder path in Settings."
-                .to_string(),
+            "Daily Notes folder not found. Please check your folder path in Settings.".to_string(),
         );
     }
 

@@ -139,7 +139,10 @@ impl ShortcutManager {
 
         if !open_shortcut_str.trim().is_empty() {
             let shortcut: Shortcut = open_shortcut_str.parse().map_err(|e| {
-                let err_msg = format!("Invalid {} shortcut '{}': {:?}", context, open_shortcut_str, e);
+                let err_msg = format!(
+                    "Invalid {} shortcut '{}': {:?}",
+                    context, open_shortcut_str, e
+                );
                 log::error!("{}", err_msg);
                 err_msg
             })?;
@@ -231,7 +234,10 @@ impl ShortcutManager {
             &settings.global_close_shortcut,
             settings.global_shortcut_closes_window,
             |app| {
-                warn_if_failed(app.emit("reset_capture", ()), "Failed to emit reset_capture");
+                warn_if_failed(
+                    app.emit("reset_capture", ()),
+                    "Failed to emit reset_capture",
+                );
                 show_and_focus_capture(app);
             },
         )
@@ -247,44 +253,50 @@ impl ShortcutManager {
         app: &AppHandle,
         settings: &Settings,
     ) -> Result<(), String> {
-        self.register_single_action(app, "capture_text", &settings.capture_text_shortcut, |app| async move {
-            let controller = app
-                .state::<crate::app_state::AppState>()
-                .capture_mode_controller
-                .clone();
-            controller.suppress_watcher(true);
-            let selected_result = tauri::async_runtime::spawn_blocking(
-                crate::selected_text::capture_selected_text,
-            )
-            .await;
-            controller.suppress_watcher(false);
-            let selected = selected_result.ok().flatten().unwrap_or_default();
+        self.register_single_action(
+            app,
+            "capture_text",
+            &settings.capture_text_shortcut,
+            |app| async move {
+                let controller = app
+                    .state::<crate::app_state::AppState>()
+                    .capture_mode_controller
+                    .clone();
+                controller.suppress_watcher(true);
+                let selected_result = tauri::async_runtime::spawn_blocking(
+                    crate::selected_text::capture_selected_text,
+                )
+                .await;
+                controller.suppress_watcher(false);
+                let selected = selected_result.ok().flatten().unwrap_or_default();
 
-            log::info!("Captured text length={}", summarize_text_len(&selected));
-            show_and_focus_capture(&app);
+                log::info!("Captured text length={}", summarize_text_len(&selected));
+                show_and_focus_capture(&app);
 
-            if selected.trim().is_empty() {
-                log::warn!("No text was captured");
+                if selected.trim().is_empty() {
+                    log::warn!("No text was captured");
+                    warn_if_failed(
+                        app.emit(
+                            "capture_text_failed",
+                            "No text was captured. Select text in another app and try again.",
+                        ),
+                        "Failed to emit capture_text_failed",
+                    );
+                    return;
+                }
+
+                tokio::time::sleep(tokio::time::Duration::from_millis(
+                    CAPTURE_TEXT_INSERT_DELAY_MS,
+                ))
+                .await;
+
                 warn_if_failed(
-                    app.emit(
-                        "capture_text_failed",
-                        "No text was captured. Select text in another app and try again.",
-                    ),
-                    "Failed to emit capture_text_failed",
+                    app.emit("insert_capture_text", selected),
+                    "Failed to emit insert_capture_text",
                 );
-                return;
-            }
-
-            tokio::time::sleep(tokio::time::Duration::from_millis(
-                CAPTURE_TEXT_INSERT_DELAY_MS,
-            ))
-            .await;
-
-            warn_if_failed(
-                app.emit("insert_capture_text", selected),
-                "Failed to emit insert_capture_text",
-            );
-        }).await
+            },
+        )
+        .await
     }
 
     pub async fn register_save_as_note(
@@ -292,12 +304,15 @@ impl ShortcutManager {
         app: &AppHandle,
         settings: &Settings,
     ) -> Result<(), String> {
-        self.register_single_action(app, "save_as_note", &settings.save_as_note_shortcut, |app| async move {
-            warn_if_failed(
-                app.emit("save_as_note", ()),
-                "Failed to emit save_as_note",
-            );
-        }).await
+        self.register_single_action(
+            app,
+            "save_as_note",
+            &settings.save_as_note_shortcut,
+            |app| async move {
+                warn_if_failed(app.emit("save_as_note", ()), "Failed to emit save_as_note");
+            },
+        )
+        .await
     }
 
     pub async fn register_capture_mode(
@@ -306,26 +321,25 @@ impl ShortcutManager {
         settings: &Settings,
         controller: Arc<CaptureModeController>,
     ) -> Result<(), String> {
-        self.register_single_action(app, "capture_mode", &settings.capture_mode_shortcut, move |app| {
-            let controller = controller.clone();
-            async move {
-                if let Err(error) = controller.toggle(&app).await {
-                    log::warn!("Failed to toggle capture mode: {}", error);
+        self.register_single_action(
+            app,
+            "capture_mode",
+            &settings.capture_mode_shortcut,
+            move |app| {
+                let controller = controller.clone();
+                async move {
+                    if let Err(error) = controller.toggle(&app).await {
+                        log::warn!("Failed to toggle capture mode: {}", error);
+                    }
                 }
-            }
-        }).await
+            },
+        )
+        .await
     }
 
-    pub async fn register_ocr(
-        &self,
-        app: &AppHandle,
-        settings: &Settings,
-    ) -> Result<(), String> {
+    pub async fn register_ocr(&self, app: &AppHandle, settings: &Settings) -> Result<(), String> {
         self.register_single_action(app, "ocr", &settings.ocr_shortcut, |app| async move {
-            let ocr_result = tauri::async_runtime::spawn_blocking(
-                crate::ocr::ocr_clipboard,
-            )
-            .await;
+            let ocr_result = tauri::async_runtime::spawn_blocking(crate::ocr::ocr_clipboard).await;
 
             show_and_focus_capture(&app);
 
@@ -354,15 +368,13 @@ impl ShortcutManager {
                 Err(e) => {
                     log::error!("OCR task join error: {}", e);
                     warn_if_failed(
-                        app.emit(
-                            "capture_text_failed",
-                            "OCR failed to process image",
-                        ),
+                        app.emit("capture_text_failed", "OCR failed to process image"),
                         "Failed to emit capture_text_failed",
                     );
                 }
             }
-        }).await
+        })
+        .await
     }
 
     pub async fn register_reader(

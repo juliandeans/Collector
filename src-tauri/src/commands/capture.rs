@@ -56,9 +56,7 @@ pub(crate) async fn append_to_daily_note(
     let settings = state.settings.read().await.clone();
     settings.validate()?;
     if settings.daily_note_folder.trim().is_empty() {
-        return Err(
-            "Daily Note folder is not configured. Please set it in Settings.".to_string(),
-        );
+        return Err("Daily Note folder is not configured. Please set it in Settings.".to_string());
     }
     let daily_path = capture::build_daily_note_path(&settings);
     let resolved = resolve_vault_write_path(&settings, &daily_path, true)?;
@@ -90,9 +88,7 @@ pub(crate) async fn get_daily_note_path(
     let settings = state.settings.read().await.clone();
     settings.validate()?;
     if settings.daily_note_folder.trim().is_empty() {
-        return Err(
-            "Daily Note folder is not configured. Please set it in Settings.".to_string(),
-        );
+        return Err("Daily Note folder is not configured. Please set it in Settings.".to_string());
     }
     let create_parent = daily_note_folder_has_date_tokens(&settings.daily_note_folder);
     let daily_path = capture::build_daily_note_path(&settings);
@@ -114,7 +110,9 @@ pub(crate) async fn save_capture_draft(
 }
 
 #[tauri::command]
-pub(crate) async fn load_capture_draft(state: tauri::State<'_, AppState>) -> Result<String, String> {
+pub(crate) async fn load_capture_draft(
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
     let persist_enabled = state.settings.read().await.persist_capture_draft;
     if !persist_enabled {
         return Ok(String::new());

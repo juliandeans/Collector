@@ -97,9 +97,15 @@ pub fn capture_selected_text() -> Option<String> {
     }
 
     if captured.is_none() {
-        log::warn!("no text captured; sentinel unchanged after {} ms", max_attempts * 50);
+        log::warn!(
+            "no text captured; sentinel unchanged after {} ms",
+            max_attempts * 50
+        );
     } else {
-        log::info!("captured text length={}", captured.as_ref().map(|s| s.len()).unwrap_or(0));
+        log::info!(
+            "captured text length={}",
+            captured.as_ref().map(|s| s.len()).unwrap_or(0)
+        );
     }
 
     // 7. Restore original clipboard
@@ -174,7 +180,11 @@ fn run_frontmost_app_name() -> Option<String> {
         .ok()?;
     if output.status.success() {
         let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if name.is_empty() { None } else { Some(name) }
+        if name.is_empty() {
+            None
+        } else {
+            Some(name)
+        }
     } else {
         None
     }

@@ -257,7 +257,7 @@
                 {:else if activePanel === "reader"}
                     <PanelReader bind:settings validation={fieldIssues} {vaultNotes} onChange={scheduleAutoSave} />
                 {:else if activePanel === "look"}
-                    <PanelLook bind:settings {showStatus} validation={fieldIssues} onChange={scheduleAutoSave} />
+                    <PanelLook bind:settings validation={fieldIssues} onChange={scheduleAutoSave} />
                 {:else if activePanel === "shortcuts"}
                     <PanelShortcuts bind:settings {showStatus} validation={fieldIssues} onChange={scheduleAutoSave} />
                 {:else if activePanel === "activation"}

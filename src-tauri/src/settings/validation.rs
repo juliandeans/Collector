@@ -23,8 +23,13 @@ impl Settings {
             return Err("edge_side must be 'left' or 'right'".to_string());
         }
 
-        if !matches!(self.ocr_drag_modifier.as_str(), "Option" | "Shift" | "Control" | "Command") {
-            return Err("ocr_drag_modifier must be 'Option', 'Shift', 'Control', or 'Command'".to_string());
+        if !matches!(
+            self.ocr_drag_modifier.as_str(),
+            "Option" | "Shift" | "Control" | "Command"
+        ) {
+            return Err(
+                "ocr_drag_modifier must be 'Option', 'Shift', 'Control', or 'Command'".to_string(),
+            );
         }
 
         if self.window_width < 200 || self.window_width > 800 {

@@ -19,10 +19,7 @@ pub(crate) fn setup_tray(app: &tauri::App, settings: Settings) -> tauri::Result<
     let menu = create_tray_menu(app.handle());
     let settings_for_tray = settings;
     let _tray = TrayIconBuilder::with_id("main")
-        .icon(
-            tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
-                .unwrap(),
-        )
+        .icon(tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon.png")).unwrap())
         .menu(&menu)
         .on_menu_event(move |app, event| match event.id().as_ref() {
             "quick_capture" => {
@@ -60,14 +57,9 @@ pub(crate) fn spawn_update_watcher(app_handle: AppHandle) {
                 None::<String>,
             )
             .unwrap();
-            let settings = MenuItem::with_id(
-                &app_handle,
-                "settings",
-                "Settings...",
-                true,
-                None::<String>,
-            )
-            .unwrap();
+            let settings =
+                MenuItem::with_id(&app_handle, "settings", "Settings...", true, None::<String>)
+                    .unwrap();
             let open_update = MenuItem::with_id(
                 &app_handle,
                 "open_update",
@@ -155,7 +147,10 @@ fn show_capture_window(app: &AppHandle, settings: &Settings) {
         );
         warn_if_failed(window.show(), "Failed to show capture window");
         warn_if_failed(window.set_focus(), "Failed to focus capture window");
-        warn_if_failed(app.emit("reset_capture", ()), "Failed to emit reset_capture");
+        warn_if_failed(
+            app.emit("reset_capture", ()),
+            "Failed to emit reset_capture",
+        );
         warn_if_failed(app.emit("show_capture", ()), "Failed to emit show_capture");
     }
 }

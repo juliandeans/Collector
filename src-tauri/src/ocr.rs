@@ -156,8 +156,8 @@ pub fn validate_image_file_path(path_str: &str) -> Result<std::path::PathBuf, St
     ) {
         return Err("Unsupported file type for OCR".to_string());
     }
-    let metadata = std::fs::metadata(&path)
-        .map_err(|e| format!("Failed to inspect image file: {e}"))?;
+    let metadata =
+        std::fs::metadata(&path).map_err(|e| format!("Failed to inspect image file: {e}"))?;
     if metadata.len() as usize > crate::vault_paths::MAX_IMAGE_PAYLOAD_BYTES {
         return Err(format!(
             "Image too large to load: {:.1} MB",
@@ -257,7 +257,9 @@ pub fn read_clipboard_image_bytes() -> Result<Vec<u8>, String> {
                 if path != nil {
                     let path_bytes: *const std::os::raw::c_char = msg_send![path, UTF8String];
                     if !path_bytes.is_null() {
-                        let path_str = std::ffi::CStr::from_ptr(path_bytes).to_string_lossy().to_string();
+                        let path_str = std::ffi::CStr::from_ptr(path_bytes)
+                            .to_string_lossy()
+                            .to_string();
                         if let Ok(valid_path) = validate_image_file_path(&path_str) {
                             if let Ok(bytes) = std::fs::read(valid_path) {
                                 let _: () = msg_send![pool, drain];
@@ -309,7 +311,8 @@ pub fn recognize_text_from_bytes(bytes: &[u8]) -> Result<OcrResult, String> {
             }
         };
 
-        let ns_data: id = msg_send![class!(NSData), dataWithBytes:bytes.as_ptr() length:bytes.len()];
+        let ns_data: id =
+            msg_send![class!(NSData), dataWithBytes:bytes.as_ptr() length:bytes.len()];
         if ns_data == nil {
             let _: () = msg_send![pool, drain];
             return Err("Failed to create NSData from image bytes".to_string());
@@ -343,7 +346,9 @@ pub fn recognize_text_from_bytes(bytes: &[u8]) -> Result<OcrResult, String> {
                 let desc: id = msg_send![error, localizedDescription];
                 let c_str: *const std::os::raw::c_char = msg_send![desc, UTF8String];
                 if !c_str.is_null() {
-                    std::ffi::CStr::from_ptr(c_str).to_string_lossy().into_owned()
+                    std::ffi::CStr::from_ptr(c_str)
+                        .to_string_lossy()
+                        .into_owned()
                 } else {
                     "Unknown Vision error".to_string()
                 }
@@ -386,7 +391,9 @@ pub fn recognize_text_from_bytes(bytes: &[u8]) -> Result<OcrResult, String> {
                 if ns_str != nil {
                     let c_str: *const std::os::raw::c_char = msg_send![ns_str, UTF8String];
                     if !c_str.is_null() {
-                        let text = std::ffi::CStr::from_ptr(c_str).to_string_lossy().into_owned();
+                        let text = std::ffi::CStr::from_ptr(c_str)
+                            .to_string_lossy()
+                            .into_owned();
                         lines.push(OcrLine {
                             text,
                             x: bbox.origin.x,
@@ -426,8 +433,8 @@ pub fn ocr_clipboard() -> Result<OcrResult, String> {
 
 pub fn ocr_file(path: &str) -> Result<OcrResult, String> {
     let validated_path = validate_image_file_path(path)?;
-    let bytes = std::fs::read(&validated_path)
-        .map_err(|e| format!("Failed to read image file: {e}"))?;
+    let bytes =
+        std::fs::read(&validated_path).map_err(|e| format!("Failed to read image file: {e}"))?;
     recognize_text_from_bytes(&bytes)
 }
 
@@ -531,10 +538,7 @@ mod tests {
 
         let sorted = sort_ocr_lines(lines);
         let texts: Vec<String> = sorted.into_iter().map(|l| l.text).collect();
-        assert_eq!(
-            texts,
-            vec!["Top", "Middle Left", "Middle Right", "Bottom"]
-        );
+        assert_eq!(texts, vec!["Top", "Middle Left", "Middle Right", "Bottom"]);
     }
 
     #[test]
@@ -580,7 +584,8 @@ mod tests {
 
         // Valid base64 but not image bytes
         use base64::Engine;
-        let non_image = base64::engine::general_purpose::STANDARD.encode(b"This is just plain text");
+        let non_image =
+            base64::engine::general_purpose::STANDARD.encode(b"This is just plain text");
         let err2 = decode_image_bytes(&non_image);
         assert!(err2.is_err());
         assert!(err2.unwrap_err().contains("Unsupported image format"));

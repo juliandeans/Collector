@@ -3,9 +3,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 mod defaults;
 use self::defaults::*;
 
-mod validation;
 mod migration;
 mod persistence;
+mod validation;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PinnedNote {
