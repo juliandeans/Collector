@@ -1,0 +1,33 @@
+export const lightTheme = {
+    bg: "#f2f2f2",
+    surface: "rgba(255,255,255,0.95)",
+    text: "#1a1a1a",
+    textSecondary: "#6b7280",
+    inputBg: "#ffffff",
+    border: "rgba(0,0,0,0.08)",
+    inputBorder: "rgba(0,0,0,0.10)",
+    navText: "#374151",
+    navLabel: "#111827",
+    sectionTitle: "#9ca3af",
+    fieldLabel: "#111827",
+    btnBg: "rgba(0,0,0,0.07)",
+    btnText: "#111827",
+    indicator: "#6b7280",
+};
+
+export const darkTheme = {
+    bg: "#1e1e2e",
+    surface: "rgba(255,255,255,0.06)",
+    text: "#e4e4e7",
+    textSecondary: "rgba(255,255,255,0.5)",
+    inputBg: "rgba(255,255,255,0.08)",
+    border: "rgba(255,255,255,0.08)",
+    inputBorder: "rgba(255,255,255,0.12)",
+    navText: "rgba(255,255,255,0.65)",
+    navLabel: "rgba(255,255,255,0.9)",
+    sectionTitle: "rgba(255,255,255,0.4)",
+    fieldLabel: "rgba(255,255,255,0.8)",
+    btnBg: "rgba(255,255,255,0.08)",
+    btnText: "rgba(255,255,255,0.85)",
+    indicator: "rgba(255,255,255,0.45)",
+};
