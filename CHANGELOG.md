@@ -13,6 +13,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   Dragging an image while holding a configurable modifier key (default
   Option) does the same instead of the normal image import. Runs fully
   locally via Apple's Vision framework — no image ever leaves the device.
+- Keyboard shortcuts in Settings can now be disabled: press Backspace or
+  Delete inside any shortcut field, or click the clear button (✕) that
+  appears on hover or focus.
 
 ### Changed
 - The "Save Actions" shortcuts (Save to Daily Note, Create New Note, Append
@@ -62,6 +65,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   the Capture or Reader window was docked flush against it, especially at
   high blur values. The blur now uses macOS's native window-background
   blur instead of a CSS effect, which handles screen edges correctly.
+- Resizing the Capture and Reader windows from most edges and corners either
+  dragged the window instead of resizing it, or made it flicker. Resizing
+  now goes through a native macOS handler for all edges and corners,
+  without flicker.
 
 ## [1.2.5] - 2026-06-09
 

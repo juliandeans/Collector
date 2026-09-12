@@ -44,11 +44,29 @@ export function handleShortcutKeyDown(event, field, settings, onChange = () => {
         return;
     }
 
+    function updateValue(val) {
+        if (typeof field === "function") {
+            field(val);
+        } else if (settings && field) {
+            settings[field] = val;
+        }
+        onChange();
+    }
+
     if (modifiers.length === 0) {
+        if (key === "Backspace" || key === "Delete") {
+            updateValue("");
+            return;
+        }
+        if (key === "Escape") {
+            if (event.currentTarget && typeof event.currentTarget.blur === "function") {
+                event.currentTarget.blur();
+            }
+            return;
+        }
         return;
     }
 
     const shortcut = [...modifiers, key].join("+");
-    settings[field] = shortcut;
-    onChange();
+    updateValue(shortcut);
 }
