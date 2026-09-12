@@ -52,6 +52,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   (note paths, headings, quotes, list markers) now derives automatically
   from your chosen Text Color setting instead of being a fixed color —
   adapts correctly to both dark and light text setups.
+- Internal architecture refactoring: modularized the 7 largest files in the
+  codebase (shortcuts registration, capture window actions, settings themes
+  and styles, capture tests/templates, reader image/content preprocessing,
+  and editor/reader coordination), reducing monolithic file sizes by over
+  2,300 lines without changing behavior or public APIs.
 
 ### Fixed
 - Prevented creating an empty note when the Capture window contains only a
