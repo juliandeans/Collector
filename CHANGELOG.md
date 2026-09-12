@@ -11,6 +11,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - List continuation: pressing Enter at the end of a list item (`-`, `*`, `+`, `1.`) in the Capture window starts the next item automatically — checkbox items restart as unchecked, empty items are removed instead of continued, indentation is preserved.
 - Reader: "Show Daily Note" checkbox (Settings → Reader → Pinned Notes, on by default) — when off, the Daily Note tab is not shown in the Reader window.
 - Reader: pinned notes can be reordered in Settings with ↑/↓ buttons (same pattern as capture rules); tab order follows the list order.
+- List indentation: Tab / Shift+Tab on a list item in the Capture window indents/outdents one step, aligned under the parent item's content column.
+- Markdown basics: `Cmd+B` / `Cmd+I` in the Capture window wrap the selection with **bold** / *italic* markers, toggle them off when already applied, and insert an empty marker pair on empty selection.
 - Capture Rules: capture text containing a user-defined trigger (word or
   hashtag, e.g. `#heute`) can be routed automatically into a chosen note —
   optionally appended under a specific heading, with or without the timestamp
