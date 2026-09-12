@@ -114,6 +114,18 @@
         onChange();
     }
 
+    function movePinnedNote(index, offset) {
+        const notes = normalizePinnedNotes(settings.pinned_notes);
+        const targetIndex = index + offset;
+        if (targetIndex < 0 || targetIndex >= notes.length) return;
+
+        const next = [...notes];
+        [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+        settings.pinned_notes = next;
+        settings = { ...settings };
+        onChange();
+    }
+
     function updatePinnedNote(pathToUpdate, field, value) {
         settings.pinned_notes = normalizePinnedNotes(settings.pinned_notes).map(
             (note) =>
@@ -169,9 +181,15 @@
     </Section>
 
     <Section title="Pinned Notes">
+        <div class="field">
+            <Checkbox bind:checked={settings.reader_show_daily_note}>
+                Show Daily Note
+            </Checkbox>
+            <small>Uncheck to hide the daily note tab in the reader window.</small>
+        </div>
         {#if normalizePinnedNotes(settings.pinned_notes).length > 0}
             <div class="note-list">
-                {#each normalizePinnedNotes(settings.pinned_notes) as note}
+                {#each normalizePinnedNotes(settings.pinned_notes) as note, index}
                     <div class="note-list-item">
                         <div class="note-list-copy">
                             <div class="note-list-editors">
@@ -219,13 +237,40 @@
                             </div>
                             <small>{note.path}</small>
                         </div>
-                        <button
-                            class="remove-note"
-                            type="button"
-                            onclick={() => removePinnedNote(note.path)}
-                        >
-                            ✕
-                        </button>
+                        <div class="pinned-note-actions">
+                            <div class="pinned-note-reorder">
+                                <button
+                                    class="pinned-reorder-button"
+                                    type="button"
+                                    title="Move note up"
+                                    aria-label="Move note up"
+                                    disabled={index === 0}
+                                    onclick={() => movePinnedNote(index, -1)}
+                                >
+                                    ↑
+                                </button>
+                                <button
+                                    class="pinned-reorder-button"
+                                    type="button"
+                                    title="Move note down"
+                                    aria-label="Move note down"
+                                    disabled={
+                                        index ===
+                                        normalizePinnedNotes(settings.pinned_notes).length - 1
+                                    }
+                                    onclick={() => movePinnedNote(index, 1)}
+                                >
+                                    ↓
+                                </button>
+                            </div>
+                            <button
+                                class="remove-note"
+                                type="button"
+                                onclick={() => removePinnedNote(note.path)}
+                            >
+                                ✕
+                            </button>
+                        </div>
                     </div>
                 {/each}
             </div>
@@ -428,6 +473,45 @@
         border: 1px dashed var(--settings-border, rgba(0, 0, 0, 0.08));
         color: var(--settings-text-secondary, #6b7280);
         font-size: 12px;
+    }
+
+    .pinned-note-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+
+    .pinned-note-reorder {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .pinned-reorder-button {
+        width: 22px;
+        height: 15px;
+        padding: 0;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--settings-section-title, #9ca3af);
+        font-size: 11px;
+        line-height: 1;
+        cursor: pointer;
+        transition:
+            background 0.2s ease,
+            color 0.2s ease;
+    }
+
+    .pinned-reorder-button:hover:not(:disabled) {
+        background: rgba(139, 92, 246, 0.1);
+        color: var(--settings-accent, #7c3aed);
+    }
+
+    .pinned-reorder-button:disabled {
+        opacity: 0.3;
+        cursor: default;
     }
 
     .remove-note {

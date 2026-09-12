@@ -450,6 +450,8 @@ pub struct Settings {
     pub remembered_window_height: Option<u32>,
     #[serde(default)]
     pub remember_reader_geometry: bool,
+    #[serde(default = "default_true")]
+    pub reader_show_daily_note: bool,
     #[serde(default)]
     pub remembered_reader_x: Option<i32>,
     #[serde(default)]
@@ -556,6 +558,7 @@ impl Default for Settings {
             remembered_window_width: None,
             remembered_window_height: None,
             remember_reader_geometry: false,
+            reader_show_daily_note: true,
             remembered_reader_x: None,
             remembered_reader_y: None,
             remembered_reader_width: None,
@@ -582,6 +585,7 @@ mod new_field_tests {
         assert_eq!(settings.remembered_window_width, None);
         assert_eq!(settings.remembered_window_height, None);
         assert!(!settings.remember_reader_geometry);
+        assert!(settings.reader_show_daily_note);
         assert_eq!(settings.remembered_reader_x, None);
         assert_eq!(settings.remembered_reader_y, None);
         assert_eq!(settings.remembered_reader_width, None);
@@ -601,6 +605,7 @@ mod new_field_tests {
         object.remove("remembered_window_width");
         object.remove("remembered_window_height");
         object.remove("remember_reader_geometry");
+        object.remove("reader_show_daily_note");
         object.remove("remembered_reader_x");
         object.remove("remembered_reader_y");
         object.remove("remembered_reader_width");
@@ -615,6 +620,7 @@ mod new_field_tests {
 
         assert!(!settings.remember_window_geometry);
         assert!(!settings.remember_reader_geometry);
+        assert!(settings.reader_show_daily_note);
         assert!(!settings.persist_capture_draft);
         assert_eq!(settings.persist_capture_draft_shortcut, "Cmd+Shift+D");
         assert_eq!(settings.clear_capture_shortcut, "Cmd+Backspace");

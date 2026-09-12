@@ -14,6 +14,7 @@ export const defaultSettings = {
   reader_width: 400,
   reader_height: 800,
   remember_reader_geometry: false,
+  reader_show_daily_note: true,
   remembered_reader_x: null,
   remembered_reader_y: null,
   remembered_reader_width: null,

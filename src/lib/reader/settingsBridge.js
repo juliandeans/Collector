@@ -76,6 +76,8 @@ export function applySettings(currentSettings = {}, settings = {}) {
     daily_note_create_if_missing:
       settings.daily_note_create_if_missing ??
       currentSettings.daily_note_create_if_missing,
+    reader_show_daily_note:
+      settings.reader_show_daily_note ?? currentSettings.reader_show_daily_note,
     save_to_daily_shortcut:
       settings.save_to_daily_shortcut ??
       currentSettings.save_to_daily_shortcut,

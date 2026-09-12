@@ -72,16 +72,23 @@ export function rebuildTabsFromSettings(
   const pinnedNotes = normalizePinnedNotes(settings?.pinned_notes ?? []);
   const existingByPath = new Map(currentTabs.map((tab) => [tab.path, tab]));
 
+  // undefined = legacy config without the setting → show daily note (default on)
+  const showDailyNote = settings?.reader_show_daily_note !== false;
+
   const nextTabs = [
-    createTab({
-      kind: "daily",
-      path: dailyPath,
-      label: "Daily",
-      isPinned: true,
-      existingTab:
-        currentTabs.find((tab) => tab.kind === "daily") ??
-        existingByPath.get(dailyPath),
-    }),
+    ...(showDailyNote
+      ? [
+          createTab({
+            kind: "daily",
+            path: dailyPath,
+            label: "Daily",
+            isPinned: true,
+            existingTab:
+              currentTabs.find((tab) => tab.kind === "daily") ??
+              existingByPath.get(dailyPath),
+          }),
+        ]
+      : []),
     ...pinnedNotes.map((note) =>
       createTab({
         kind: "pinned",
