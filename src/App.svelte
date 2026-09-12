@@ -222,6 +222,7 @@
     /* ── onMount ── */
 
     onMount(async () => {
+        cleanupCmdWindowDrag = setupCmdWindowDrag();
         try {
             await getCurrentWindow();
             isTauri = true;
@@ -317,7 +318,6 @@
                 console.error("Failed to listen to events:", e);
             }
         }
-        cleanupCmdWindowDrag = setupCmdWindowDrag();
     });
 
     onDestroy(() => {

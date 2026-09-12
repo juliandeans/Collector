@@ -148,13 +148,13 @@
     }
 
     onMount(async () => {
+        cleanupCmdWindowDrag = setupCmdWindowDrag();
         await loadSettings();
         try {
             vaultNotes = await invoke("list_vault_notes");
         } catch (e) {
             console.error("Failed to load vault notes:", e);
         }
-        cleanupCmdWindowDrag = setupCmdWindowDrag();
     });
 
     onDestroy(() => {

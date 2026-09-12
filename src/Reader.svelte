@@ -491,6 +491,7 @@
   // TODO: move to ReaderEditor once window-wide drag/drop can be preserved cleanly.
 
   onMount(async () => {
+    cleanupCmdWindowDrag = setupCmdWindowDrag();
     try {
       await buildInitialTabs();
       ensureVaultNotes(vaultNotes)
@@ -572,7 +573,6 @@
       } catch (e) {
         console.warn("Could not register onDragDropEvent in Reader:", e);
       }
-      cleanupCmdWindowDrag = setupCmdWindowDrag();
     } catch (error) {
       showStatus(normalizeError(error), "error", 2400);
     }
