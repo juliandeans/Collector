@@ -232,6 +232,10 @@ impl Settings {
             crate::shortcuts::validate_shortcut(&self.persist_capture_draft_shortcut)?;
         }
 
+        if !self.clear_capture_shortcut.trim().is_empty() {
+            crate::shortcuts::validate_shortcut(&self.clear_capture_shortcut)?;
+        }
+
         if !self.global_shortcut_closes_window
             && !self.global_shortcut.trim().is_empty()
             && !self.global_close_shortcut.trim().is_empty()
@@ -255,7 +259,7 @@ impl Settings {
         }
 
         // Cross-slot shortcut conflict check
-        let shortcut_fields: [(&str, &str); 9] = [
+        let shortcut_fields: [(&str, &str); 10] = [
             ("Note window shortcut", &self.global_shortcut),
             ("Note close shortcut", &self.global_close_shortcut),
             ("Reader shortcut", &self.reader_shortcut),
@@ -268,6 +272,7 @@ impl Settings {
                 "Toggle keep unsaved text shortcut",
                 &self.persist_capture_draft_shortcut,
             ),
+            ("Clear capture shortcut", &self.clear_capture_shortcut),
         ];
 
         for i in 0..shortcut_fields.len() {
@@ -619,6 +624,29 @@ mod tests {
     fn rejects_invalid_persist_capture_draft_shortcut_syntax() {
         let mut settings = Settings::default();
         settings.persist_capture_draft_shortcut = "NotAShortcut".to_string();
+        assert!(settings.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_clear_capture_shortcut_conflicts_with_global_shortcuts() {
+        let mut settings = Settings::default();
+        // global_shortcut is Cmd+Shift+N
+        settings.clear_capture_shortcut = "Cmd+Shift+N".to_string();
+        assert!(settings.validate().is_err());
+
+        // capture_text_shortcut is Cmd+Shift+C
+        settings.clear_capture_shortcut = "Cmd+Shift+C".to_string();
+        assert!(settings.validate().is_err());
+
+        // Unique shortcut passes
+        settings.clear_capture_shortcut = "Cmd+Backspace".to_string();
+        assert!(settings.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_clear_capture_shortcut_syntax() {
+        let mut settings = Settings::default();
+        settings.clear_capture_shortcut = "NotAShortcut".to_string();
         assert!(settings.validate().is_err());
     }
 }

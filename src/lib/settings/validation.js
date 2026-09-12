@@ -648,6 +648,7 @@ export function validateSettings(settings = {}) {
             field: "persist_capture_draft_shortcut",
             label: "Toggle Keep Unsaved Text",
         },
+        { field: "clear_capture_shortcut", label: "Clear Capture Window" },
         { field: "save_to_daily_shortcut", label: "Save to Daily Note" },
         { field: "save_as_note_shortcut", label: "Create New Note" },
         { field: "append_to_note_shortcut", label: "Append to Note" },
@@ -690,6 +691,7 @@ export function validateSettings(settings = {}) {
         { field: "capture_text_shortcut" },
         { field: "capture_mode_shortcut" },
         { field: "persist_capture_draft_shortcut" },
+        { field: "clear_capture_shortcut" },
         { field: "save_as_note_shortcut" },
         { field: "ocr_shortcut" },
     ];
@@ -711,6 +713,7 @@ export function validateSettings(settings = {}) {
             field: "persist_capture_draft_shortcut",
             label: "Toggle Keep Unsaved Text",
         },
+        { field: "clear_capture_shortcut", label: "Clear Capture Window" },
         { field: "save_as_note_shortcut", label: "Create New Note" },
     ];
 
@@ -765,8 +768,9 @@ export function validateSettings(settings = {}) {
             { field: "save_as_note_shortcut" },
             { field: "append_to_note_shortcut" },
             { field: "ocr_shortcut" },
+            { field: "clear_capture_shortcut" },
         ],
-        "Save action shortcuts must be unique.",
+        "Capture action shortcuts must be unique.",
     );
     addReaderPrecedenceWarnings(fields, settings, [
         {

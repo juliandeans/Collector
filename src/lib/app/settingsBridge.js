@@ -78,6 +78,8 @@ export function buildInitialAppSettings(settings) {
         persist_capture_draft_shortcut:
             settings.persist_capture_draft_shortcut ??
             defaultSettings.persist_capture_draft_shortcut,
+        clear_capture_shortcut:
+            settings.clear_capture_shortcut ?? defaultSettings.clear_capture_shortcut,
         ocr_shortcut: settings.ocr_shortcut ?? defaultSettings.ocr_shortcut,
         ocr_drag_modifier:
             settings.ocr_drag_modifier ?? defaultSettings.ocr_drag_modifier,
@@ -140,6 +142,8 @@ export function applySettingsUpdate(current, incoming) {
         persist_capture_draft_shortcut:
             incoming.persist_capture_draft_shortcut ??
             current.persist_capture_draft_shortcut,
+        clear_capture_shortcut:
+            incoming.clear_capture_shortcut ?? current.clear_capture_shortcut,
         ocr_shortcut: incoming.ocr_shortcut ?? current.ocr_shortcut,
         ocr_drag_modifier:
             incoming.ocr_drag_modifier ?? current.ocr_drag_modifier,

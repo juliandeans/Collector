@@ -45,6 +45,7 @@ export const defaultSettings = {
   capture_text_shortcut: "Cmd+Shift+C",
   capture_mode_shortcut: "Cmd+Shift+M",
   persist_capture_draft_shortcut: "Cmd+Shift+D",
+  clear_capture_shortcut: "Cmd+Backspace",
   capture_rules: [],
   show_capture_mode_button: true,
   autostart_enabled: false,

@@ -61,6 +61,17 @@
             />
             <FieldIssue issue={validation.persist_capture_draft_shortcut} />
         </div>
+        <div class="field">
+            <label for="clear_capture_shortcut">Clear Capture Window</label>
+            <ShortcutInput
+                id="clear_capture_shortcut"
+                bind:value={settings.clear_capture_shortcut}
+                placeholder="Cmd+Backspace"
+                {onChange}
+            />
+            <FieldIssue issue={validation.clear_capture_shortcut} />
+            <small>Clears text, images and the persisted draft</small>
+        </div>
 
         <div class="divider"></div>
 

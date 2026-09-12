@@ -144,6 +144,30 @@ export function createCaptureActions({
         }
     }
 
+    async function handleClearCapture() {
+        if (getIsLoading() || getIsOcrLoading()) return;
+
+        freeBlobUrls();
+        resetCaptureState();
+        let draftCleared = true;
+        try {
+            await invoke("clear_capture_draft");
+        } catch (e) {
+            console.error("Failed to clear capture draft:", e);
+            draftCleared = false;
+        }
+        await tick();
+        getTextarea()?.focus();
+        if (draftCleared) {
+            showStatus("Capture cleared", "success", 1800);
+        } else {
+            showStatus(
+                "Capture cleared, but the saved draft could not be removed",
+                "error",
+            );
+        }
+    }
+
     let isTogglingDraft = false;
 
     async function handleToggleDraftPersistence() {
@@ -207,6 +231,7 @@ export function createCaptureActions({
         handleOcrClipboard,
         openSettings,
         handleToggleDraftPersistence,
+        handleClearCapture,
     };
 }
 
@@ -231,6 +256,12 @@ export function handleAppShortcut({
     if (matchesShortcut(event, appSettings.persist_capture_draft_shortcut)) {
         event.preventDefault();
         actions.handleToggleDraftPersistence();
+        return true;
+    }
+
+    if (matchesShortcut(event, appSettings.clear_capture_shortcut)) {
+        event.preventDefault();
+        actions.handleClearCapture();
         return true;
     }
 
