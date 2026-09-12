@@ -1,0 +1,257 @@
+.editor-scroll {
+    position: relative;
+    flex: 1;
+    overflow-y: auto;
+    background: transparent;
+    transition:
+        filter 0.18s ease,
+        opacity 0.18s ease,
+        transform 0.18s ease;
+}
+
+.missing-file-banner {
+    margin: 12px 16px 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 12px;
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+}
+
+.editor-body {
+    min-height: 100%;
+    padding: 16px 20px 40px;
+    outline: none;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+    line-height: 1.7;
+    word-break: break-word;
+    white-space: pre-wrap;
+    caret-color: var(--accent-color, #8b5cf6);
+    -webkit-user-modify: read-write;
+}
+
+.editor-body[data-placeholder]:empty::before {
+    content: attr(data-placeholder);
+    color: var(--placeholder-color);
+    pointer-events: none;
+}
+
+.editor-body p {
+    margin: 0;
+    min-height: 1.7em;
+}
+
+.editor-body h1 {
+    margin: 8px 0 4px;
+    font-size: 1.5em;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.editor-body h2 {
+    margin: 6px 0 3px;
+    font-size: 1.25em;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.editor-body h3 {
+    margin: 4px 0 2px;
+    font-size: 1.1em;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.editor-body h4 {
+    margin: 3px 0 2px;
+    font-size: 1em;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.editor-body h5 {
+    margin: 2px 0 1px;
+    font-size: 0.94em;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: 0.01em;
+}
+
+.editor-body h6 {
+    margin: 2px 0 1px;
+    font-size: 0.88em;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
+}
+
+.editor-body blockquote {
+    margin: 2px 0;
+    padding-left: 12px;
+    border-left: 3px solid var(--accent-color, #8b5cf6);
+    color: var(--text-secondary);
+}
+
+.editor-body .callout {
+    margin: 6px 0;
+    padding: 10px 14px;
+    border-left: 3px solid;
+    border-radius: 6px;
+    white-space: normal;
+}
+
+.editor-body .callout-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.editor-body .callout-icon {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.editor-body .callout-content {
+    font-size: 13px;
+    line-height: 1.6;
+    opacity: 0.9;
+}
+
+.editor-body code {
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.08);
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 0.88em;
+}
+
+.editor-body strong {
+    font-weight: 600;
+}
+
+.editor-body em {
+    font-style: italic;
+}
+
+.editor-body a {
+    color: var(--external-link-color, #60a5fa);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.editor-body a:hover {
+    text-decoration: underline;
+}
+
+.editor-body hr {
+    margin: 8px 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
+}
+
+.editor-body p.list-item::before {
+    content: "•";
+    margin-right: 8px;
+    color: var(--text-secondary);
+}
+
+.editor-body .md-checkbox {
+    margin-right: 6px;
+    accent-color: var(--accent-color, #8b5cf6);
+    cursor: pointer;
+}
+
+.editor-body .wikilink {
+    color: var(--internal-link-color, #a78bfa);
+    opacity: 0.9;
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+    transition:
+        border-color 0.15s ease,
+        opacity 0.15s ease;
+}
+
+.editor-body .wikilink:hover {
+    opacity: 1;
+    border-bottom-color: var(--internal-link-color, #a78bfa);
+}
+
+.editor-body .md-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 8px 0;
+    border-radius: 6px;
+    cursor: default;
+}
+
+.editor-body p:has(.md-image) {
+    margin: 4px 0;
+}
+
+.editor-body .md-image[src=""] {
+    display: none;
+}
+
+.editor-body .codeblock-pill {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    min-height: 20px;
+    gap: 5px;
+    margin: 2px 0;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.78);
+    cursor: default;
+}
+
+.editor-body .codeblock-pill:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.editor-body .codeblock-icon {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--accent-color, #8b5cf6);
+    opacity: 0.85;
+}
+
+.editor-body .codeblock-lang {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: lowercase;
+}
+
+.editor-body .hidden-marker {
+    display: none;
+}
+
+.editor-body .raw-mode {
+    margin-left: -4px;
+    padding-left: 4px;
+    border-radius: 3px;
+}
+
+.editor-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.editor-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.editor-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 3px;
+}
