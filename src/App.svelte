@@ -89,6 +89,7 @@
     let isTauri = false;
     let cleanupGlobalDragListeners;
     let cleanupCmdWindowDrag;
+    let statusTimeout;
     let wikiAutocompleteOpen = $state(false);
     let wikiAutocompleteQuery = "";
     let wikiAutocompleteIndex = $state(0);
@@ -343,15 +344,20 @@
         cleanupResizeFlicker?.();
         cleanupGlobalDragListeners?.();
         cleanupCmdWindowDrag?.();
+        clearTimeout(statusTimeout);
 
         freeBlobUrls();
         modifierWatcher.stop();
     });
 
-    function showStatus(message, type = "success") {
+    function showStatus(message, type = "success", duration = 2000) {
+        clearTimeout(statusTimeout);
         statusMessage = message;
         statusType = type;
-        setTimeout(() => (statusMessage = ""), 2000);
+        statusTimeout = setTimeout(() => {
+            statusMessage = "";
+            statusType = "";
+        }, duration);
     }
 
     function freeBlobUrls() {

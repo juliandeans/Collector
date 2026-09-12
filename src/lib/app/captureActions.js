@@ -144,32 +144,46 @@ export function createCaptureActions({
         }
     }
 
-    async function handleToggleDraftPersistence() {
-        if (!getAppSettings || !setAppSettings) return;
-        const currentSettings = getAppSettings();
-        const nextState = !currentSettings.persist_capture_draft;
-        const nextSettings = { ...currentSettings, persist_capture_draft: nextState };
-        setAppSettings(nextSettings);
+    let isTogglingDraft = false;
 
-        if (nextState) {
-            const content = getContent();
-            if (content.trim()) {
-                await invoke("save_capture_draft", { content }).catch((e) => {
-                    console.error("Failed to persist capture draft:", e);
-                });
-            }
-            showStatus("Keep unsaved text: ON", "info", 1800);
-        } else {
-            await invoke("clear_capture_draft").catch((e) => {
-                console.error("Failed to clear capture draft:", e);
-            });
-            showStatus("Keep unsaved text: OFF", "info", 1800);
-        }
+    async function handleToggleDraftPersistence() {
+        if (!getAppSettings || !setAppSettings || isTogglingDraft) return;
+        isTogglingDraft = true;
 
         try {
-            await invoke("save_settings", { newSettings: nextSettings });
-        } catch (e) {
-            console.error("Failed to save draft persistence setting:", e);
+            const currentSettings = getAppSettings();
+            const nextState = !currentSettings.persist_capture_draft;
+            const nextSettings = { ...currentSettings, persist_capture_draft: nextState };
+
+            // 1. Save settings to backend first so the backend gate in save_capture_draft is open
+            try {
+                await invoke("save_settings", { newSettings: nextSettings });
+            } catch (e) {
+                console.error("Failed to save draft persistence setting:", e);
+                showStatus("Failed to update setting: " + e.toString(), "error");
+                return;
+            }
+
+            // 2. Update local state
+            setAppSettings(nextSettings);
+
+            // 3. Save or clear draft according to the new state
+            if (nextState) {
+                const content = getContent();
+                if (content.trim()) {
+                    await invoke("save_capture_draft", { content }).catch((e) => {
+                        console.error("Failed to persist capture draft:", e);
+                    });
+                }
+                showStatus("Keep unsaved text: ON", "info", 1800);
+            } else {
+                await invoke("clear_capture_draft").catch((e) => {
+                    console.error("Failed to clear capture draft:", e);
+                });
+                showStatus("Keep unsaved text: OFF", "info", 1800);
+            }
+        } finally {
+            isTogglingDraft = false;
         }
     }
 

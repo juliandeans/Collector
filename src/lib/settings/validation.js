@@ -510,6 +510,24 @@ export function validateSettings(settings = {}) {
         ]);
     }
 
+    const activeGlobalHotkeys = [
+        { field: "global_shortcut" },
+        ...(!settings.global_shortcut_closes_window ? [{ field: "global_close_shortcut" }] : []),
+        { field: "reader_shortcut" },
+        ...(!settings.reader_shortcut_closes_window ? [{ field: "reader_close_shortcut" }] : []),
+        { field: "capture_text_shortcut" },
+        { field: "capture_mode_shortcut" },
+        { field: "persist_capture_draft_shortcut" },
+        { field: "save_as_note_shortcut" },
+        { field: "ocr_shortcut" },
+    ];
+    addShortcutGroupCollisions(
+        fields,
+        settings,
+        activeGlobalHotkeys,
+        "Global shortcuts must be unique.",
+    );
+
     const globalHotkeys = [
         { field: "global_shortcut", label: "Open Capture Window" },
         { field: "global_close_shortcut", label: "Close Capture Window" },
