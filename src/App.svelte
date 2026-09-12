@@ -27,6 +27,7 @@
         computeInsertion,
         handleWikiKeydown,
     } from "./lib/app/wikiAutocomplete.js";
+    import { computeListContinuation } from "./lib/capture/list-continuation.js";
     import {
         createCaptureActions,
         handleAppShortcut,
@@ -475,12 +476,44 @@
             return;
         }
 
+        if (await handleListContinuation(e)) {
+            return;
+        }
+
         handleAppShortcut({
             event: e,
             appSettings,
             actions,
             openAppendPicker,
         });
+    }
+
+    async function handleListContinuation(e) {
+        if (wikiAutocompleteOpen) return false;
+
+        const textarea = textareaRef;
+        if (!textarea || e.target !== textarea) return false;
+
+        const result = computeListContinuation({
+            content,
+            selectionStart: textarea.selectionStart,
+            selectionEnd: textarea.selectionEnd,
+            key: e.key,
+            metaKey: e.metaKey,
+            ctrlKey: e.ctrlKey,
+            shiftKey: e.shiftKey,
+            altKey: e.altKey,
+        });
+        if (!result) return false;
+
+        e.preventDefault();
+        content = result.nextContent;
+        await tick();
+        if (textareaRef) {
+            textareaRef.selectionStart = textareaRef.selectionEnd =
+                result.nextCursorPosition;
+        }
+        return true;
     }
 
     function applyWikiState({ open, query, matches, index, mode, position, anchorPos }) {
