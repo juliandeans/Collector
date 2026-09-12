@@ -187,10 +187,25 @@
     }
 
     async function handleReset() {
-        const confirmed = await dialogConfirm(
-            "Reset all settings to defaults? Your vault connection will be kept.",
-            { title: "Reset settings", kind: "warning" }
-        );
+        let confirmed = false;
+        try {
+            confirmed = await dialogConfirm(
+                "Reset all settings to defaults? Your vault connection will be kept.",
+                {
+                    title: "Reset Settings",
+                    kind: "warning",
+                    okLabel: "Reset All",
+                    cancelLabel: "Cancel",
+                },
+            );
+        } catch (e) {
+            // Fallback for non-Tauri preview environments
+            confirmed = Boolean(
+                window.confirm?.(
+                    "Reset all settings to defaults? Your vault connection will be kept.",
+                ),
+            );
+        }
         if (!confirmed) return;
 
         const vaultPath = settings.vault_path || defaultSettings.vault_path;
@@ -200,7 +215,10 @@
             vault_path: vaultPath,
             vault_name: vaultName,
         };
-        await performSave();
+        const saved = await performSave();
+        if (saved) {
+            showStatus("Settings reset to defaults", "success");
+        }
     }
 </script>
 
