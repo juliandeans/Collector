@@ -8,7 +8,7 @@ pub fn summarize_bytes(bytes: usize) -> String {
     if bytes < 1024 {
         format!("{}B", bytes)
     } else {
-        format!("{}KB", (bytes + 1023) / 1024)
+        format!("{}KB", bytes.div_ceil(1024))
     }
 }
 
@@ -25,10 +25,7 @@ pub fn redact_path(path: &Path) -> String {
 }
 
 pub fn redact_path_str(path: &str) -> String {
-    let parts: Vec<&str> = path
-        .split(|c| c == '/' || c == '\\')
-        .filter(|p| !p.is_empty())
-        .collect();
+    let parts: Vec<&str> = path.split(['/', '\\']).filter(|p| !p.is_empty()).collect();
 
     redact_parts_str(&parts)
 }

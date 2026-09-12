@@ -207,9 +207,7 @@ pub fn process_dropped_file(
 
     // Check if it's a supported image
     if !is_supported_image(source_path) {
-        return Err(format!(
-            "Unsupported file type. Supported: PNG, JPG, JPEG, WebP, GIF"
-        ));
+        return Err("Unsupported file type. Supported: PNG, JPG, JPEG, WebP, GIF".to_string());
     }
 
     // Save and compress the image (KEIN vault_path mehr!)
@@ -246,9 +244,7 @@ pub fn process_dropped_file_from_bytes(
     let source_path = Path::new(&temp_path);
     if !is_supported_image(source_path) {
         let _ = fs::remove_file(&temp_path);
-        return Err(format!(
-            "Unsupported file type. Supported: PNG, JPG, JPEG, WebP, GIF"
-        ));
+        return Err("Unsupported file type. Supported: PNG, JPG, JPEG, WebP, GIF".to_string());
     }
 
     let saved = save_image(source_path, settings);

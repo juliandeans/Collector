@@ -116,10 +116,9 @@ pub fn save_note_at_path(
         content.to_string()
     };
 
-    fs::write(&file_path, final_content)
-        .map_err(|e| format!("Failed to write note file: {}", e))?;
+    fs::write(file_path, final_content).map_err(|e| format!("Failed to write note file: {}", e))?;
 
-    log::info!("Note saved (file={})", redact_path(&file_path));
+    log::info!("Note saved (file={})", redact_path(file_path));
 
     Ok(CaptureResult {
         success: true,
@@ -314,7 +313,6 @@ pub fn append_to_note(
 
     let mut file = OpenOptions::new()
         .read(true)
-        .write(true)
         .append(true)
         .open(file_path)
         .map_err(|e| format!("Cannot open note: {}", e))?;
@@ -325,7 +323,7 @@ pub fn append_to_note(
         .len();
 
     if file_size > 0 {
-        let seek_pos = if file_size >= 2 { file_size - 2 } else { 0 };
+        let seek_pos = file_size.saturating_sub(2);
         file.seek(SeekFrom::Start(seek_pos))
             .map_err(|e| format!("Cannot set file position: {}", e))?;
 

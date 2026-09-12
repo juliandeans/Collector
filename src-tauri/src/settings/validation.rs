@@ -264,7 +264,10 @@ impl Settings {
             ("Capture mode shortcut", &self.capture_mode_shortcut),
             ("Save as note shortcut", &self.save_as_note_shortcut),
             ("OCR shortcut", &self.ocr_shortcut),
-            ("Toggle keep unsaved text shortcut", &self.persist_capture_draft_shortcut),
+            (
+                "Toggle keep unsaved text shortcut",
+                &self.persist_capture_draft_shortcut,
+            ),
         ];
 
         for i in 0..shortcut_fields.len() {

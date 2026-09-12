@@ -411,10 +411,10 @@ pub fn get_all_monitor_bounds_from_app(app: &AppHandle) -> Vec<MonitorBounds> {
     vec![get_primary_monitor_bounds()]
 }
 
-pub fn get_monitor_for_cursor<'a>(
+pub fn get_monitor_for_cursor(
     cursor: (i32, i32),
-    monitors: &'a [MonitorBounds],
-) -> Option<&'a MonitorBounds> {
+    monitors: &[MonitorBounds],
+) -> Option<&MonitorBounds> {
     monitors.iter().find(|monitor| {
         cursor.0 >= monitor.x
             && cursor.0 < monitor.x + monitor.width

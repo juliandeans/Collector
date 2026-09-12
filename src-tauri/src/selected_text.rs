@@ -172,7 +172,7 @@ fn run_pbcopy(text: &str) -> bool {
 /// Get the name of the currently frontmost application via `osascript`.
 fn run_frontmost_app_name() -> Option<String> {
     let output = std::process::Command::new("osascript")
-        .args(&[
+        .args([
             "-e",
             "tell application \"System Events\" to get name of first application process whose frontmost is true",
         ])
@@ -195,7 +195,7 @@ fn run_frontmost_app_name() -> Option<String> {
 /// This may require macOS Accessibility or Automation permission.
 fn run_keystroke_copy() -> bool {
     let output = std::process::Command::new("osascript")
-        .args(&[
+        .args([
             "-e",
             "tell application \"System Events\" to keystroke \"c\" using command down",
         ])

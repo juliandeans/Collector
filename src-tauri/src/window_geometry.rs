@@ -11,7 +11,7 @@ pub(crate) fn position_window_logical(
     settings: &Settings,
 ) -> Result<(), String> {
     let app = window.app_handle();
-    let monitor = crate::edge_detect::get_screen_bounds(&app);
+    let monitor = crate::edge_detect::get_screen_bounds(app);
 
     if settings.remember_window_geometry {
         if let (Some(x), Some(y), Some(width), Some(height)) = (
@@ -20,7 +20,7 @@ pub(crate) fn position_window_logical(
             settings.remembered_window_width,
             settings.remembered_window_height,
         ) {
-            let all_monitors = crate::edge_detect::get_all_monitor_bounds_from_app(&app);
+            let all_monitors = crate::edge_detect::get_all_monitor_bounds_from_app(app);
             let overlaps_any_monitor = all_monitors.iter().any(|m| {
                 (x as f64) < (m.x as f64 + m.width as f64)
                     && (x as f64 + width as f64) > m.x as f64
@@ -142,7 +142,7 @@ pub(crate) fn position_reader_window_logical(
     settings: &Settings,
 ) -> Result<(), String> {
     let app = window.app_handle();
-    let monitor = crate::edge_detect::get_screen_bounds(&app);
+    let monitor = crate::edge_detect::get_screen_bounds(app);
 
     if settings.remember_reader_geometry {
         if let (Some(x), Some(y), Some(width), Some(height)) = (
@@ -151,7 +151,7 @@ pub(crate) fn position_reader_window_logical(
             settings.remembered_reader_width,
             settings.remembered_reader_height,
         ) {
-            let all_monitors = crate::edge_detect::get_all_monitor_bounds_from_app(&app);
+            let all_monitors = crate::edge_detect::get_all_monitor_bounds_from_app(app);
             let overlaps_any_monitor = all_monitors.iter().any(|m| {
                 (x as f64) < (m.x as f64 + m.width as f64)
                     && (x as f64 + width as f64) > m.x as f64

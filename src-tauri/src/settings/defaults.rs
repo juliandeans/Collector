@@ -36,7 +36,7 @@ pub(super) fn default_reader_edge_side() -> String {
 pub(super) fn default_vault_path() -> String {
     dirs::home_dir()
         .map(|h| h.join("Vault").to_string_lossy().to_string())
-        .unwrap_or_else(|| String::new())
+        .unwrap_or_default()
 }
 
 pub(super) fn default_screenshot_path() -> String {

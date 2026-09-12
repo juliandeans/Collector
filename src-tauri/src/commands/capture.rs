@@ -28,7 +28,7 @@ pub(crate) async fn save_as_note(
         .ok_or_else(|| "Invalid note filename".to_string())?
         .to_string();
 
-    let result = capture::save_note_at_path(&content.trim(), &resolved, &filename, &settings)?;
+    let result = capture::save_note_at_path(content.trim(), &resolved, &filename, &settings)?;
 
     state.edge_detector.set_capture_open(false).await;
 
