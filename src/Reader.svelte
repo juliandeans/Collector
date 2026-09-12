@@ -19,13 +19,9 @@
   import TabContextMenu from "./lib/reader/TabContextMenu.svelte";
   import ResizeHandle from "./lib/ResizeHandle.svelte";
   import OcrDropOverlay from "./lib/ocr/OcrDropOverlay.svelte";
-  import {
-    ocrClipboardImage,
-    ocrFilePath,
-    getModifierFlags,
-    isOcrModifierActive,
-    normalizeOcrError,
-  } from "./lib/ocr/ocrClient.js";
+  import { createModifierWatcher } from "./lib/ocr/modifierWatcher.js";
+  import { createReaderOcr } from "./lib/reader/readerOcr.js";
+  import { createSearchCoordinator } from "./lib/reader/readerSearchCoordinator.js";
   import { imagePathCache } from "./lib/reader/contentProcessing.js";
   import * as editorBridge from "./lib/reader/editorBridge.js";
   import * as tabLifecycle from "./lib/reader/tabLifecycle.js";
@@ -35,12 +31,6 @@
   import { ensureVaultNotes } from "./lib/reader/navigation.js";
   import { createDebouncedJob } from "./lib/reader/saveLoadPipeline.js";
   import { computeBrightnessFilter } from "./lib/reader/settingsBridge.js";
-  import {
-    applySearchHighlights,
-    clearSearchHighlights,
-    runSearch as collectSearchMatches,
-    stepSearch as getNextSearchIndex,
-  } from "./lib/reader/searchLogic.js";
   import { getDailyNotePath } from "./lib/reader/tabIO.js";
   import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
   import { defaultSettings } from "./lib/stores.js";
@@ -72,6 +62,26 @@
   let searchMatches = $state([]);
   let searchIndex = $state(0);
   let searchInputRef = $state();
+
+  const searchCoordinator = createSearchCoordinator({
+    getEditorComponent: () => editorComponent,
+    getSearchInputRef: () => searchInputRef,
+    getSearchQuery: () => searchQuery,
+    setSearchQuery: (value) => { searchQuery = value; },
+    getSearchMatches: () => searchMatches,
+    setSearchMatches: (value) => { searchMatches = value; },
+    getSearchIndex: () => searchIndex,
+    setSearchIndex: (value) => { searchIndex = value; },
+    getShowSearch: () => showSearch,
+    setShowSearch: (value) => { showSearch = value; },
+    tick,
+  });
+
+  const runSearch = (event) => searchCoordinator.runSearch(event);
+  const stepSearch = (direction) => searchCoordinator.stepSearch(direction);
+  const closeSearch = () => searchCoordinator.closeSearch();
+  const openSearch = () => searchCoordinator.openSearch();
+  const clearHighlights = () => searchCoordinator.clearHighlights();
   let tabContextMenu = $state({
     open: false,
     x: 0,
@@ -105,143 +115,35 @@
     }
   });
 
-  let ocrPollInterval = null;
-  function startModifierPolling() {
-    if (ocrPollInterval) return;
-    const check = async () => {
-      if (!isDragging) {
-        stopModifierPolling();
-        return;
-      }
-      try {
-        const flags = await getModifierFlags({ invoke });
-        isOcrModifierHeld = isOcrModifierActive(flags, appSettings?.ocr_drag_modifier);
-      } catch {
-        isOcrModifierHeld = false;
-      }
-    };
-    check();
-    ocrPollInterval = setInterval(check, 80);
-  }
+  const readerOcr = createReaderOcr({
+    invoke,
+    getAppSettings: () => appSettings,
+    getEditorComponent: () => editorComponent,
+    showStatus,
+    setIsDragging: (value) => { isDragging = value; },
+    setIsOcrLoading: (value) => { isOcrLoading = value; },
+    getIsOcrLoading: () => isOcrLoading,
+  });
 
-  function stopModifierPolling() {
-    if (ocrPollInterval) {
-      clearInterval(ocrPollInterval);
-      ocrPollInterval = null;
-    }
-    isOcrModifierHeld = false;
-  }
+  const modifierWatcher = createModifierWatcher({
+    invoke,
+    getIsDragging: () => isDragging,
+    getModifierSetting: () => appSettings?.ocr_drag_modifier,
+    onActiveChange: (active) => {
+      isOcrModifierHeld = active;
+    },
+  });
 
   $effect(() => {
     if (isDragging) {
-      startModifierPolling();
+      modifierWatcher.start();
     } else {
-      stopModifierPolling();
+      modifierWatcher.stop();
     }
   });
 
-  async function handleOcrClipboard() {
-    if (isOcrLoading) return;
-    isOcrLoading = true;
-    showStatus("Extracting text…", "info", 1500);
-    try {
-      const result = await ocrClipboardImage({ invoke });
-      if (!result?.text) {
-        showStatus("No text recognized", "error", 2400);
-        return;
-      }
-      const success = editorComponent?.insertPlainText(result.text);
-      if (success) {
-        showStatus("Text extracted", "success", 1500);
-      } else {
-        showStatus("Failed to insert text", "error", 2400);
-      }
-    } catch (err) {
-      showStatus(normalizeOcrError(err), "error", 2400);
-    } finally {
-      isOcrLoading = false;
-    }
-  }
-
-  async function handleDragDropEvent(event) {
-    const payload = event?.payload;
-    if (!payload) return;
-
-    if (payload.type === "enter" || payload.type === "over") {
-      isDragging = true;
-      return;
-    }
-
-    if (payload.type === "leave") {
-      isDragging = false;
-      return;
-    }
-
-    if (payload.type === "drop") {
-      isDragging = false;
-      const paths = payload.paths;
-      if (!Array.isArray(paths) || paths.length === 0) return;
-
-      const modifierFlags = await getModifierFlags({ invoke });
-      const isOcr = isOcrModifierActive(modifierFlags, appSettings?.ocr_drag_modifier);
-
-      // Section 7: Reader ignores image drop without OCR modifier
-      if (!isOcr) {
-        return;
-      }
-
-      if (isOcrLoading) return;
-
-      const supportedExts = ["png", "jpg", "jpeg", "webp", "gif", "tiff", "tif", "bmp", "heic", "heif"];
-      const imagePaths = paths.filter((path) => {
-        const ext = path.split(".").pop()?.toLowerCase();
-        return supportedExts.includes(ext);
-      });
-
-      if (imagePaths.length === 0) {
-        showStatus("No supported image files found", "error", 2400);
-        return;
-      }
-
-      isOcrLoading = true;
-      try {
-        showStatus("Extracting text…", "info", 1500);
-        const ocrTexts = [];
-        let failedCount = 0;
-        for (const filePath of imagePaths) {
-          try {
-            const res = await ocrFilePath(filePath, { invoke });
-            if (res?.text) {
-              ocrTexts.push(res.text);
-            } else {
-              failedCount++;
-            }
-          } catch {
-            failedCount++;
-          }
-        }
-        if (ocrTexts.length === 0) {
-          showStatus("No text recognized", "error", 2400);
-          return;
-        }
-        const combinedText = ocrTexts.join("\n\n");
-        const success = editorComponent?.insertPlainText(combinedText);
-        if (success) {
-          showStatus(
-            failedCount > 0
-              ? `Text extracted (${failedCount} image${failedCount > 1 ? "s" : ""} failed)`
-              : "Text extracted",
-            "success",
-            1500,
-          );
-        } else {
-          showStatus("Failed to insert text", "error", 2400);
-        }
-      } finally {
-        isOcrLoading = false;
-      }
-    }
-  }
+  const handleOcrClipboard = () => readerOcr.handleOcrClipboard();
+  const handleDragDropEvent = (event) => readerOcr.handleDragDropEvent(event);
 
   let activeTab = $derived(tabs[activeTabIndex] ?? null);
   let fileMissing = $derived(missingFileMessage.trim() !== "");
@@ -305,78 +207,6 @@
     };
   }
 
-  function clearHighlights() {
-    clearSearchHighlights();
-  }
-
-  function highlightMatches() {
-    applySearchHighlights(searchMatches, searchIndex);
-  }
-
-  function scrollToMatch(index) {
-    const range = searchMatches[index];
-    const scrollEl = editorComponent?.getScrollElement?.();
-    if (!range || !scrollEl) return;
-
-    const rect = range.getClientRects()[0] ?? range.getBoundingClientRect();
-    const scrollRect = scrollEl.getBoundingClientRect();
-    if (!rect) return;
-
-    if (rect.top < scrollRect.top || rect.bottom > scrollRect.bottom) {
-      const targetTop =
-        scrollEl.scrollTop +
-        (rect.top - scrollRect.top) -
-        scrollEl.clientHeight / 2 +
-        rect.height / 2;
-
-      scrollEl.scrollTo({
-        top: Math.max(targetTop, 0),
-        behavior: "smooth",
-      });
-    }
-  }
-
-  function runSearch(event) {
-    if (event?.currentTarget?.value !== undefined) {
-      searchQuery = event.currentTarget.value;
-    }
-
-    clearHighlights();
-    searchMatches = [];
-    searchIndex = 0;
-
-    const editorEl = editorComponent?.getEditorElement?.();
-    searchMatches = collectSearchMatches(searchQuery, editorEl);
-    highlightMatches();
-
-    if (searchMatches.length > 0) {
-      scrollToMatch(0);
-    }
-  }
-
-  function stepSearch(direction) {
-    if (searchMatches.length === 0) return;
-
-    searchIndex = getNextSearchIndex(searchMatches, searchIndex, direction);
-    highlightMatches();
-    scrollToMatch(searchIndex);
-  }
-
-  function closeSearch() {
-    showSearch = false;
-    searchQuery = "";
-    clearHighlights();
-    searchMatches = [];
-    searchIndex = 0;
-    editorComponent?.focus();
-  }
-
-  async function openSearch() {
-    showSearch = true;
-    await tick();
-    searchInputRef?.focus();
-    searchInputRef?.select();
-  }
 
   function saveScrollPosition() {
     tabLifecycle.saveScrollPosition({
@@ -754,7 +584,7 @@
     unlistenSettingsChanged?.();
     cleanupResizeFlicker?.();
     unlistenDragDrop?.();
-    stopModifierPolling();
+    modifierWatcher.stop();
   });
 </script>
 
