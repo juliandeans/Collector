@@ -25,10 +25,8 @@
 
 <style>
     .capture-mode-button {
-        align-self: flex-start;
         flex-shrink: 0;
-        margin: 0 12px 5px;
-        padding: 5px 9px;
+        padding: 5px 10px;
         border: 1px solid rgba(255, 255, 255, 0.16);
         border-radius: calc(var(--app-border-radius) / 2);
         background: transparent;

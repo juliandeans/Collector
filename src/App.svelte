@@ -788,23 +788,25 @@
         />
     </div>
 
-    <CaptureActionBar
-        show={appSettings.show_capture_action_bar}
-        {isLoading}
-        saveToDailyShortcut={appSettings.save_to_daily_shortcut}
-        saveAsNoteShortcut={appSettings.save_as_note_shortcut}
-        appendToNoteShortcut={appSettings.append_to_note_shortcut}
-        onDaily={handleAppendToDaily}
-        onNewNote={handleSaveAsNote}
-        onAppend={openAppendPicker}
-    />
+    <div class="capture-actions-row">
+        <CaptureActionBar
+            show={appSettings.show_capture_action_bar}
+            {isLoading}
+            saveToDailyShortcut={appSettings.save_to_daily_shortcut}
+            saveAsNoteShortcut={appSettings.save_as_note_shortcut}
+            appendToNoteShortcut={appSettings.append_to_note_shortcut}
+            onDaily={handleAppendToDaily}
+            onNewNote={handleSaveAsNote}
+            onAppend={openAppendPicker}
+        />
 
-    <CaptureModeButton
-        show={appSettings.show_capture_mode_button}
-        active={captureModeActive}
-        shortcut={appSettings.capture_mode_shortcut}
-        onToggle={toggleCaptureMode}
-    />
+        <CaptureModeButton
+            show={appSettings.show_capture_mode_button}
+            active={captureModeActive}
+            shortcut={appSettings.capture_mode_shortcut}
+            onToggle={toggleCaptureMode}
+        />
+    </div>
 
     <ResizeHandle onResizeStart={armResize} />
 
@@ -951,6 +953,15 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+    }
+
+    .capture-actions-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 4px 12px 6px;
+        flex-shrink: 0;
     }
 
     .capture-container:hover :global(.resize-handle) {

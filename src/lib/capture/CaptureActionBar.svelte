@@ -63,9 +63,7 @@
   .action-bar {
     display: flex;
     gap: 6px;
-    padding: 4px 12px 6px;
     flex-shrink: 0;
-    justify-content: center;
   }
 
   .action-btn {
