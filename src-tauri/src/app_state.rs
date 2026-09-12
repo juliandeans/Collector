@@ -4,6 +4,7 @@ use tokio::sync::RwLock;
 
 use crate::capture_mode::CaptureModeController;
 use crate::edge_detect::EdgeDetector;
+use crate::note_metadata_cache::NoteMetadataCache;
 use crate::settings::Settings;
 use crate::shortcuts::ShortcutManager;
 use crate::vault_index::VaultIndex;
@@ -20,4 +21,5 @@ pub(crate) struct AppState {
     pub(crate) ocr_shortcut_manager: Arc<ShortcutManager>,
     pub(crate) persist_draft_shortcut_manager: Arc<ShortcutManager>,
     pub(crate) vault_index: Arc<RwLock<Option<VaultIndex>>>,
+    pub(crate) note_metadata: Arc<RwLock<Option<NoteMetadataCache>>>,
 }

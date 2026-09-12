@@ -14,6 +14,8 @@ mod fs_util;
 mod image_handler;
 mod log_safety;
 mod markdown_sections;
+mod note_metadata;
+mod note_metadata_cache;
 mod ocr;
 #[cfg(all(debug_assertions, target_os = "macos"))]
 mod resize_diagnostics;
@@ -125,6 +127,7 @@ fn main() {
         ocr_shortcut_manager: ocr_shortcut_manager.clone(),
         persist_draft_shortcut_manager: persist_draft_shortcut_manager.clone(),
         vault_index: Arc::new(RwLock::new(None)),
+        note_metadata: Arc::new(RwLock::new(None)),
     };
 
     let window_geometry_debounce_for_setup = window_geometry_debounce.clone();
@@ -391,6 +394,7 @@ fn main() {
             commands::vault::load_image_data_url,
             commands::vault::load_images_batch,
             commands::vault::list_vault_notes,
+            commands::vault::list_vault_tags,
             commands::capture::get_daily_note_path,
             commands::vault::reindex_vault,
             commands::images::save_image,

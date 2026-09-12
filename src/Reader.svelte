@@ -42,6 +42,7 @@
   let showPalette = $state(false);
   let paletteQuery = $state("");
   let vaultNotes = $state([]);
+  let vaultTags = $state([]);
   let isSaving = false;
   let rawContent = $state("");
   let strippedFrontmatter = $state("");
@@ -58,6 +59,7 @@
   let autocompleteIndex = $state(0);
   let autocompleteResults = $state([]);
   let autocompleteRange = $state(null);
+  let autocompleteMode = $state(null);
   let showSearch = $state(false);
   let searchQuery = $state("");
   let searchMatches = $state([]);
@@ -179,7 +181,18 @@
     autocompleteIndex = 0;
     autocompleteRange = null;
     autocompleteResults = [];
+    autocompleteMode = null;
     editorComponent?.clearAutocomplete?.();
+  }
+
+  function refreshVaultTags() {
+    invoke("list_vault_tags")
+      .then((tags) => {
+        vaultTags = tags;
+      })
+      .catch((error) => {
+        console.warn("Failed to load vault tags:", error);
+      });
   }
 
   function editorBridgeBag() {
@@ -200,6 +213,7 @@
       setAutocompleteResults: (value) => { autocompleteResults = value; },
       setAutocompleteRange: (value) => { autocompleteRange = value; },
       setAutocompleteIndex: (value) => { autocompleteIndex = value; },
+      setAutocompleteMode: (value) => { autocompleteMode = value; },
       updateActiveTabContent: (content) => {
         if (!activeTab) return;
         tabs = tabLifecycle.applyTabUpdate(tabs, activeTabIndex, { content, loaded: true });
@@ -456,6 +470,7 @@
   }
 
   async function handleShowReader() {
+    refreshVaultTags();
     saveScrollPosition();
     editorComponent?.finalizeBlock?.();
     await flushPendingSave(false);
@@ -497,6 +512,7 @@
       ensureVaultNotes(vaultNotes)
         .then((notes) => {
           vaultNotes = notes;
+          refreshVaultTags();
         })
         .catch((error) => {
           showStatus(normalizeError(error), "error", 2400);
@@ -649,6 +665,7 @@
     {rawContent}
     {appSettings}
     {vaultNotes}
+    {vaultTags}
     {showSearch}
     {showAutocomplete}
     activeTabKind={activeTab?.kind ?? ""}
@@ -718,7 +735,7 @@
         onmouseenter={() => (autocompleteIndex = index)}
       >
         <span class="overlay-name">{note.name}</span>
-        {#if showNotePaths}
+        {#if autocompleteMode !== "tag" && showNotePaths}
           <span class="overlay-path">{note.relative_path}</span>
         {/if}
       </button>

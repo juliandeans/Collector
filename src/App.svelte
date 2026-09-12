@@ -96,6 +96,8 @@
     let wikiAutocompleteMatches = $state([]);
     let wikiAutocompletePosition = $state({ left: 0, top: 0 });
     let wikiAnchorPos = 0;
+    let wikiAutocompleteMode = $state(null);
+    let vaultTags = $state([]);
 
     let appSettings = $state({ ...defaultSettings });
 
@@ -223,6 +225,17 @@
                 appendPickerNotes = v;
             },
         });
+        refreshVaultTags();
+    }
+
+    function refreshVaultTags() {
+        invoke("list_vault_tags")
+            .then((tags) => {
+                vaultTags = tags;
+            })
+            .catch((error) => {
+                console.warn("Failed to load vault tags:", error);
+            });
     }
 
     /* ── onMount ── */
@@ -270,7 +283,10 @@
                     },
                     // Required: after the native Tauri capture events, macOS needs a
                     // short delay before the textarea reliably accepts focus.
-                    focusTextarea: () => setTimeout(() => textareaRef?.focus(), 50),
+                    focusTextarea: () => {
+                        refreshVaultTags();
+                        setTimeout(() => textareaRef?.focus(), 50);
+                    },
                     freeBlobUrls,
                     resetCaptureState,
                     closeAppendPicker,
@@ -456,11 +472,12 @@
         });
     }
 
-    function applyWikiState({ open, query, matches, index, position, anchorPos }) {
+    function applyWikiState({ open, query, matches, index, mode, position, anchorPos }) {
         wikiAutocompleteOpen = open;
         wikiAutocompleteQuery = query;
         wikiAutocompleteMatches = matches;
         wikiAutocompleteIndex = index;
+        wikiAutocompleteMode = mode;
         wikiAutocompletePosition = position;
         wikiAnchorPos = anchorPos;
     }
@@ -469,6 +486,7 @@
         const state = computeInputState({
             textarea: textareaRef,
             notes: appendPickerNotes,
+            tags: vaultTags,
             limit: autocompleteResults,
         });
         if (state === null) return;
@@ -480,6 +498,7 @@
             textarea: textareaRef,
             query: wikiAutocompleteQuery,
             note,
+            mode: wikiAutocompleteMode,
         });
         if (newContent === null) return;
 
@@ -686,7 +705,7 @@
         matches={wikiAutocompleteMatches}
         selectedIndex={wikiAutocompleteIndex}
         position={wikiAutocompletePosition}
-        showPaths={showNotePaths}
+        showPaths={wikiAutocompleteMode !== "tag"}
         onSelect={(note) => insertWikilink(note)}
         onHover={(index) => {
             wikiAutocompleteIndex = index;

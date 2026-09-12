@@ -23,6 +23,7 @@
      * @property {string} [rawContent]
      * @property {any} [appSettings]
      * @property {any} [vaultNotes]
+     * @property {any} [vaultTags]
      * @property {string} [missingFileMessage]
      * @property {string} [activeTabKind]
      * @property {boolean} [showSearch]
@@ -51,6 +52,7 @@
         rawContent = "",
         appSettings = {},
         vaultNotes = [],
+        vaultTags = [],
         missingFileMessage = "",
         activeTabKind = "",
         showSearch = false,
@@ -103,6 +105,7 @@
     const autocompleteManager = createEditorAutocompleteManager({
         getEditorRef: () => editorRef,
         getVaultNotes: () => vaultNotes,
+        getVaultTags: () => vaultTags,
         getAutocompleteLimit: () => appSettings?.autocomplete_results ?? 20,
         getShowAutocomplete: () => showAutocomplete,
         getAutocompleteIndex: () => autocompleteIndex,

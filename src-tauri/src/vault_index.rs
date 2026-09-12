@@ -138,6 +138,16 @@ impl VaultIndex {
         notes
     }
 
+    pub(crate) fn all_note_paths(&self) -> Vec<PathBuf> {
+        let mut seen = HashSet::new();
+
+        self.notes_by_rel_path
+            .values()
+            .filter(|path| seen.insert(path.to_string_lossy().to_string()))
+            .cloned()
+            .collect()
+    }
+
     fn walk_dir(&mut self, vault_root: &Path, dir: &Path) -> Result<(), String> {
         let mut entries = fs::read_dir(dir)
             .map_err(|e| format!("Failed to read vault directory: {}", e))?

@@ -4,7 +4,14 @@ import { composeContentFromMarkdown } from "./editorSerialization.js";
 import { getAutocompleteResults } from "./autocomplete.js";
 
 export function getCurrentMarkdown(bag) {
-  const { getEditorComponent, getRawContent, getAppSettings, codeblockMap, hiddenBlockMap, setStrippedFrontmatter } = bag;
+  const {
+    getEditorComponent,
+    getRawContent,
+    getAppSettings,
+    codeblockMap,
+    hiddenBlockMap,
+    setStrippedFrontmatter,
+  } = bag;
   const editorComponent = getEditorComponent();
   if (!editorComponent) {
     return preprocessContent(getRawContent(), {
@@ -18,7 +25,13 @@ export function getCurrentMarkdown(bag) {
 }
 
 export async function renderContentToEditor(raw = "", bag) {
-  const { getEditorComponent, getAppSettings, codeblockMap, hiddenBlockMap, setStrippedFrontmatter } = bag;
+  const {
+    getEditorComponent,
+    getAppSettings,
+    codeblockMap,
+    hiddenBlockMap,
+    setStrippedFrontmatter,
+  } = bag;
   preprocessContent(raw, {
     appSettings: getAppSettings(),
     codeblockMap,
@@ -34,7 +47,8 @@ export async function renderContentToEditor(raw = "", bag) {
 
 // TODO: still needs a dedicated pipeline object for editor load/reset state.
 export async function loadEditorContent(raw = "", bag) {
-  const { getEditorComponent, setRawContent, closeAutocomplete, closeSearch } = bag;
+  const { getEditorComponent, setRawContent, closeAutocomplete, closeSearch } =
+    bag;
   getEditorComponent()?.finalizeBlock?.();
   closeAutocomplete();
   closeSearch();
@@ -67,14 +81,24 @@ export async function handleEditorSaveRequest(bag) {
 
 export function handleEditorAutocompleteChange(event, bag) {
   const {
-    getVaultNotes, getAutocompleteResultLimit, setShowAutocomplete,
-    setAutocompleteResults, setAutocompleteRange, setAutocompleteIndex,
+    getVaultNotes,
+    getAutocompleteResultLimit,
+    setShowAutocomplete,
+    setAutocompleteResults,
+    setAutocompleteRange,
+    setAutocompleteIndex,
+    setAutocompleteMode,
   } = bag;
   setShowAutocomplete(event.detail.open);
   setAutocompleteResults(
     event.detail.results ??
-      getAutocompleteResults(event.detail.query, getVaultNotes(), getAutocompleteResultLimit()),
+      getAutocompleteResults(
+        event.detail.query,
+        getVaultNotes(),
+        getAutocompleteResultLimit(),
+      ),
   );
   setAutocompleteRange(event.detail.range);
   setAutocompleteIndex(event.detail.index ?? 0);
+  setAutocompleteMode(event.detail.mode ?? null);
 }

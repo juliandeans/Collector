@@ -1,8 +1,10 @@
 import { getAutocompleteResults } from "./autocomplete.js";
+import { findTagTrigger, getTagAutocompleteResults } from "../tags.js";
 
 export function createEditorAutocompleteManager({
   getEditorRef,
   getVaultNotes,
+  getVaultTags,
   getAutocompleteLimit,
   getShowAutocomplete,
   getAutocompleteIndex,
@@ -12,6 +14,7 @@ export function createEditorAutocompleteManager({
   onChange,
 }) {
   let autocompleteRange = null;
+  let currentMode = "note";
 
   function getAutocompleteMatches(query) {
     return getAutocompleteResults(
@@ -21,20 +24,31 @@ export function createEditorAutocompleteManager({
     );
   }
 
+  function getTagAutocompleteMatches(query) {
+    return getTagAutocompleteResults(
+      query,
+      getVaultTags(),
+      getAutocompleteLimit(),
+    ).map((tag) => ({ name: tag, path: tag }));
+  }
+
   function emitAutocompleteChange({
     open = false,
     query = "",
     results = [],
     range = null,
     index = 0,
+    mode = "note",
   } = {}) {
     autocompleteRange = range;
+    currentMode = mode;
     onAutocompleteChange?.({
       open,
       query,
       results,
       range,
       index,
+      mode,
     });
   }
 
@@ -68,14 +82,35 @@ export function createEditorAutocompleteManager({
     const text = node.textContent ?? "";
     const cursor = range.startOffset;
     const before = text.slice(0, cursor);
-    const triggerIndex = before.lastIndexOf("[[");
+    const wikiTriggerIndex = before.lastIndexOf("[[");
+    const tagTrigger = findTagTrigger(text, cursor);
 
-    if (triggerIndex === -1) {
+    if (
+      tagTrigger &&
+      (wikiTriggerIndex === -1 || tagTrigger.triggerIndex > wikiTriggerIndex)
+    ) {
+      const results = getTagAutocompleteMatches(tagTrigger.query);
+      const triggerRange = document.createRange();
+      triggerRange.setStart(node, tagTrigger.triggerIndex);
+      triggerRange.collapse(true);
+
+      emitAutocompleteChange({
+        open: results.length > 0,
+        query: tagTrigger.query,
+        results,
+        range: triggerRange,
+        index: 0,
+        mode: "tag",
+      });
+      return;
+    }
+
+    if (wikiTriggerIndex === -1) {
       closeAutocompleteInternal();
       return;
     }
 
-    const between = before.slice(triggerIndex + 2);
+    const between = before.slice(wikiTriggerIndex + 2);
     if (between.includes("]]") || between.includes("\n")) {
       closeAutocompleteInternal();
       return;
@@ -83,7 +118,7 @@ export function createEditorAutocompleteManager({
 
     const results = getAutocompleteMatches(between);
     const triggerRange = document.createRange();
-    triggerRange.setStart(node, triggerIndex);
+    triggerRange.setStart(node, wikiTriggerIndex);
     triggerRange.collapse(true);
 
     emitAutocompleteChange({
@@ -92,6 +127,7 @@ export function createEditorAutocompleteManager({
       results,
       range: triggerRange,
       index: 0,
+      mode: "note",
     });
   }
 
@@ -111,13 +147,12 @@ export function createEditorAutocompleteManager({
       autocompleteRange.startContainer,
       autocompleteRange.startOffset,
     );
-    insertRange.setEnd(
-      currentRange.startContainer,
-      currentRange.startOffset,
-    );
+    insertRange.setEnd(currentRange.startContainer, currentRange.startOffset);
     insertRange.deleteContents();
 
-    const linkText = document.createTextNode(`[[${note.name}]]`);
+    const linkText = document.createTextNode(
+      currentMode === "tag" ? `#${note.name} ` : `[[${note.name}]]`,
+    );
     insertRange.insertNode(linkText);
 
     const afterRange = document.createRange();
@@ -138,17 +173,13 @@ export function createEditorAutocompleteManager({
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      onAutocompleteIndexChange?.(
-        Math.min(index + 1, results.length - 1),
-      );
+      onAutocompleteIndexChange?.(Math.min(index + 1, results.length - 1));
       return true;
     }
 
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      onAutocompleteIndexChange?.(
-        Math.max(index - 1, 0),
-      );
+      onAutocompleteIndexChange?.(Math.max(index - 1, 0));
       return true;
     }
 

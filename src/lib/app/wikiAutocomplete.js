@@ -1,5 +1,10 @@
-import { findWikiTrigger, computeWikilinkInsertion } from "../capture/wiki-utils.js";
+import {
+    findWikiTrigger,
+    computeWikilinkInsertion,
+    computeTagInsertion,
+} from "../capture/wiki-utils.js";
 import { getAutocompleteResults } from "../reader/autocomplete.js";
+import { findTagTrigger, getTagAutocompleteResults } from "../tags.js";
 import { clampOverlayLeft } from "../overlayPosition.js";
 
 function getTextareaPosition(textarea, position) {
@@ -86,17 +91,19 @@ export function computeClosedState() {
         query: "",
         matches: [],
         index: 0,
+        mode: null,
         position: { left: 0, top: 0 },
         anchorPos: 0,
     };
 }
 
-function computeOpenState({ textarea, trigger, matches }) {
+function computeOpenState({ textarea, trigger, matches, mode }) {
     return {
         open: matches.length > 0,
         query: trigger.query,
         matches,
         index: 0,
+        mode,
         position: getWikiDropdownPosition(
             textarea,
             trigger.triggerIndex,
@@ -106,27 +113,64 @@ function computeOpenState({ textarea, trigger, matches }) {
     };
 }
 
-export function computeInputState({ textarea, notes, limit }) {
+export function computeInputState({ textarea, notes, tags = [], limit }) {
     if (!textarea) return null;
 
     const val = textarea.value;
     const cursor = textarea.selectionStart;
-    const trigger = findWikiTrigger(val, cursor);
+    const wikiTrigger = findWikiTrigger(val, cursor);
+    const tagTrigger = findTagTrigger(val, cursor);
+
+    let trigger = wikiTrigger;
+    let mode = "wiki";
+    if (
+        tagTrigger &&
+        (!wikiTrigger || tagTrigger.triggerIndex > wikiTrigger.triggerIndex)
+    ) {
+        trigger = tagTrigger;
+        mode = "tag";
+    }
 
     if (!trigger) {
         return computeClosedState();
     }
 
-    const matches = getAutocompleteResults(trigger.query, notes, limit);
-    return computeOpenState({ textarea, trigger, matches });
+    const matches =
+        mode === "tag"
+            ? getTagAutocompleteResults(trigger.query, tags, limit).map(
+                  (tag) => ({
+                      name: tag,
+                      path: tag,
+                  }),
+              )
+            : getAutocompleteResults(trigger.query, notes, limit);
+    return computeOpenState({ textarea, trigger, matches, mode });
 }
 
-export function computeInsertion({ textarea, query, note }) {
+export function computeInsertion({ textarea, query, note, mode }) {
     if (!textarea) return null;
 
     const val = textarea.value;
     const cursor = textarea.selectionStart;
     const queryLen = query.length;
+
+    if (mode === "tag") {
+        if (cursor - queryLen - 1 < 0) return null;
+
+        const { before, after, insertion, newPosition } = computeTagInsertion(
+            val,
+            cursor,
+            queryLen,
+            note.name,
+        );
+
+        textarea.value = before + insertion + after;
+        textarea.selectionStart = newPosition;
+        textarea.selectionEnd = newPosition;
+        textarea.focus();
+
+        return textarea.value;
+    }
 
     if (cursor - queryLen - 2 < 0) return null;
 

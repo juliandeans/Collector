@@ -21,6 +21,7 @@
     } = $props();
 
     let pickerRef = $state();
+    let scrollRef = $state();
     let suppressPointerUntil = 0;
     let lastPointerX = null;
     let lastPointerY = null;
@@ -30,17 +31,17 @@
         await tick();
 
         const selectedItem = pickerRef?.querySelector(".wikilink-picker-item.selected");
-        if (!pickerRef || !selectedItem) return;
+        if (!scrollRef || !selectedItem) return;
 
-        const pickerRect = pickerRef.getBoundingClientRect();
+        const pickerRect = scrollRef.getBoundingClientRect();
         const itemRect = selectedItem.getBoundingClientRect();
 
         if (itemRect.top < pickerRect.top) {
             suppressPointerSelection();
-            pickerRef.scrollTop -= pickerRect.top - itemRect.top;
+            scrollRef.scrollTop -= pickerRect.top - itemRect.top;
         } else if (itemRect.bottom > pickerRect.bottom) {
             suppressPointerSelection();
-            pickerRef.scrollTop += itemRect.bottom - pickerRect.bottom;
+            scrollRef.scrollTop += itemRect.bottom - pickerRect.bottom;
         }
     }
 
@@ -78,23 +79,25 @@
 </script>
 
 <div class="wikilink-picker overlay-panel" bind:this={pickerRef}>
-    {#each notes.slice(0, 20) as note, index (note.path)}
-        <button
-            class="wikilink-picker-item overlay-item"
-            class:selected={index === selectedIndex}
-            type="button"
-            onmousedown={(event) => {
-                event.preventDefault();
-                onSelect(note);
-            }}
-            onpointermove={(event) => handlePointerMove(index, event)}
-        >
-            <span class="overlay-name">{note.name}</span>
-            {#if showPaths}
-                <span class="overlay-path">{note.relative_path}</span>
-            {/if}
-        </button>
-    {/each}
+    <div class="wikilink-picker-scroll" bind:this={scrollRef}>
+        {#each notes.slice(0, 20) as note, index (note.path)}
+            <button
+                class="wikilink-picker-item overlay-item"
+                class:selected={index === selectedIndex}
+                type="button"
+                onmousedown={(event) => {
+                    event.preventDefault();
+                    onSelect(note);
+                }}
+                onpointermove={(event) => handlePointerMove(index, event)}
+            >
+                <span class="overlay-name">{note.name}</span>
+                {#if showPaths}
+                    <span class="overlay-path">{note.relative_path}</span>
+                {/if}
+            </button>
+        {/each}
+    </div>
 </div>
 
 <style>
@@ -103,6 +106,15 @@
         display: flex;
         flex-direction: column;
         max-height: min(70vh, 400px);
+        overflow: hidden;
+    }
+
+    /* Inner scroller so the native scrollbar stays clear of the panel's
+       rounded corners (clip + small vertical inset). */
+    .wikilink-picker-scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        margin-block: 2px;
         overflow-y: auto;
     }
 

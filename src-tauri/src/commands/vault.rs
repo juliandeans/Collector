@@ -1,6 +1,7 @@
 use tokio::time::{timeout, Duration};
 
 use crate::app_state::AppState;
+use crate::note_metadata_cache::NoteMetadataCache;
 use crate::vault_index;
 use crate::vault_paths::{build_image_data_url, resolve_vault_read_path, resolve_vault_write_path};
 
@@ -107,13 +108,10 @@ pub(crate) async fn load_images_batch(
             continue;
         }
 
-        match idx.resolve_image(&clean) {
-            Some(resolved) => {
-                if let Ok(data_url) = build_image_data_url(resolved) {
-                    results.push((clean, data_url));
-                }
+        if let Some(resolved) = idx.resolve_image(&clean) {
+            if let Ok(data_url) = build_image_data_url(resolved) {
+                results.push((clean, data_url));
             }
-            None => {}
         }
     }
 
@@ -135,6 +133,56 @@ pub(crate) async fn list_vault_notes(
 }
 
 #[tauri::command]
+pub(crate) async fn list_vault_tags(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<String>, String> {
+    get_or_build_index(&state).await?;
+
+    let vault_path = {
+        let settings = state.settings.read().await;
+        settings.vault_path.clone()
+    };
+
+    {
+        let cache = state.note_metadata.read().await;
+        if let Some(cache) = cache.as_ref() {
+            if cache.vault_path() == vault_path.as_str() {
+                return Ok(cache.tags().to_vec());
+            }
+        }
+    }
+
+    let note_paths = {
+        let index = state.vault_index.read().await;
+        let idx = index
+            .as_ref()
+            .ok_or_else(|| "Vault index not available".to_string())?;
+
+        idx.all_note_paths()
+    };
+    let note_count = note_paths.len();
+    let build_vault_path = vault_path.clone();
+    let cache = tokio::task::spawn_blocking(move || {
+        NoteMetadataCache::build(&build_vault_path, &note_paths)
+    })
+    .await
+    .map_err(|error| format!("Failed to build tag cache: {}", error))?;
+
+    let build_duration_ms = cache.built_at().elapsed().as_millis();
+    log::info!(
+        "Tag cache built: {} tags from {} notes in {} ms",
+        cache.tags().len(),
+        note_count,
+        build_duration_ms
+    );
+
+    let tags = cache.tags().to_vec();
+    *state.note_metadata.write().await = Some(cache);
+
+    Ok(tags)
+}
+
+#[tauri::command]
 pub(crate) async fn reindex_vault(state: tauri::State<'_, AppState>) -> Result<usize, String> {
     let vault_path = {
         let settings = state.settings.read().await;
@@ -147,6 +195,7 @@ pub(crate) async fn reindex_vault(state: tauri::State<'_, AppState>) -> Result<u
     let build_duration_ms = new_index.built_at.elapsed().as_millis();
     let _ = new_index.resolve_note("");
     *state.vault_index.write().await = Some(new_index);
+    *state.note_metadata.write().await = None;
     log::info!(
         "Vault reindex complete: {} files in {} ms",
         count,
