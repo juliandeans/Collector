@@ -2,7 +2,7 @@
 
 Collector is a macOS menu bar app for fast text and image capture into Obsidian. It lets you save notes, screenshots, and pasted content into your vault without opening the full Obsidian app first.
 
-![Version](https://img.shields.io/badge/version-1.2.4-blue)
+![Version](https://img.shields.io/badge/version-1.3.0-blue)
 ![Platform](https://img.shields.io/badge/platform-macOS%2011%2B-lightgrey)
 ![Stack](https://img.shields.io/badge/stack-Tauri%20%2B%20Rust%20%2B%20Svelte-orange)
 
@@ -14,7 +14,7 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 - Section targeting — captures land under a specific heading in your Daily Note, top or bottom of the section
 - Image capture — drop or paste screenshots into the capture window with automatic compression
 - Reader Panel — tab-based reading view with your Daily Note, pinned notes, and on-demand tabs
-- Wikilink navigation — follow [[links]] inside the Reader, open in new tab with Cmd+Click
+- Wikilink navigation — follow `[[links]]` inside the Reader, open in new tab with Cmd+Click
 - Inline search — find and step through matches in the current note with Cmd+F
 - Command palette — open any vault note with Cmd+P or Cmd+K
 - Content filters — hide frontmatter, Dataview blocks, inline fields, callouts, HTML, and comments
@@ -46,6 +46,7 @@ Collector is a macOS menu bar app for fast text and image capture into Obsidian.
 - Obsidian installed
 
 ## Changelog
+
 See CHANGELOG.md for the full version history.
 
 ## Installation
@@ -60,9 +61,11 @@ See CHANGELOG.md for the full version history.
 3. Open the installer and move Collector into `Applications`
 
 ## Note Window
+
 <img src="public/screenshot/notewindow.jpg" width="400" alt="Reader Window" />
 
 ## Reader Window
+
 <img src="public/screenshot/readerwindow.png" width="400" alt="Reader Window" />
 
 ## macOS Security on First Launch

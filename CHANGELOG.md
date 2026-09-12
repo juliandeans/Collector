@@ -27,6 +27,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Keyboard shortcuts in Settings can now be disabled: press Backspace or
   Delete inside any shortcut field, or click the clear button (✕) that
   appears on hover or focus.
+- Tag autocomplete: typing `#` in the Capture textarea or the Reader editor
+  opens a suggestion dropdown with every tag found in the vault (inline
+  `#hashtags` plus frontmatter `tags:`), filterable while typing and
+  selectable with arrow keys (Enter inserts `#tag `, Escape closes).
+  A bare `#` right before the caret shows the full tag list, like Obsidian.
+  Tags are indexed once per session in the background (best-effort: files
+  that cannot be read, e.g. not-yet-downloaded iCloud items, are skipped);
+  the list refreshes on window show and manual reindex.
 
 ### Changed
 - Background blur switched to macOS native `NSVisualEffectView` (WindowServer)
@@ -69,6 +77,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - Fixed draft persistence shortcut toggle order so switching on immediately writes unsubmitted text to disk before background gates check setting state.
+- Tag suggestion dropdowns no longer let the scrollbar poke into the panel's
+  rounded corners: the scroll area is inset inside the glass panel
+  (Capture wikilink/tag picker).
 - Prevented creating an empty note when the Capture window contains only a
   heading.
 - Prevented potential race conditions and dropped changes during settings
