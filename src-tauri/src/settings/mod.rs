@@ -229,6 +229,8 @@ pub struct Settings {
     pub remembered_reader_height: Option<u32>,
     #[serde(default)]
     pub persist_capture_draft: bool,
+    #[serde(default = "default_persist_capture_draft_shortcut")]
+    pub persist_capture_draft_shortcut: String,
     #[serde(default = "default_ocr_shortcut")]
     pub ocr_shortcut: String,
     #[serde(default = "default_ocr_drag_modifier")]
@@ -325,6 +327,7 @@ impl Default for Settings {
             remembered_reader_width: None,
             remembered_reader_height: None,
             persist_capture_draft: false,
+            persist_capture_draft_shortcut: default_persist_capture_draft_shortcut(),
             ocr_shortcut: default_ocr_shortcut(),
             ocr_drag_modifier: default_ocr_drag_modifier(),
         }
@@ -349,6 +352,7 @@ mod new_field_tests {
         assert_eq!(settings.remembered_reader_width, None);
         assert_eq!(settings.remembered_reader_height, None);
         assert!(!settings.persist_capture_draft);
+        assert_eq!(settings.persist_capture_draft_shortcut, "Cmd+Shift+D");
     }
 
     #[test]
@@ -366,6 +370,7 @@ mod new_field_tests {
         object.remove("remembered_reader_width");
         object.remove("remembered_reader_height");
         object.remove("persist_capture_draft");
+        object.remove("persist_capture_draft_shortcut");
 
         let content = serde_json::to_string(&value).unwrap();
         let settings: Settings = serde_json::from_str(&content)
@@ -374,6 +379,7 @@ mod new_field_tests {
         assert!(!settings.remember_window_geometry);
         assert!(!settings.remember_reader_geometry);
         assert!(!settings.persist_capture_draft);
+        assert_eq!(settings.persist_capture_draft_shortcut, "Cmd+Shift+D");
     }
 
     #[test]

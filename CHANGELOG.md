@@ -21,6 +21,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   locally via Apple's Vision framework — no image ever leaves the device.
 - Configurable "Next Tab" / "Previous Tab" keyboard shortcuts in the Reader
   (default: Option+Right / Option+Left).
+- Configurable "Toggle Keep Unsaved Text" shortcut (default: Cmd+Shift+D)
+  to toggle draft persistence on and off from anywhere or inside Capture,
+  configurable in Settings → Shortcuts → Capture Window.
 - Keyboard shortcuts in Settings can now be disabled: press Backspace or
   Delete inside any shortcut field, or click the clear button (✕) that
   appears on hover or focus.

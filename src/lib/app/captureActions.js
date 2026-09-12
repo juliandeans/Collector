@@ -26,6 +26,8 @@ export function createCaptureActions({
     resetCaptureState,
     getTextarea,
     tick,
+    getAppSettings,
+    setAppSettings,
 }) {
     function deferHideCapture() {
         setTimeout(async () => {
@@ -142,6 +144,35 @@ export function createCaptureActions({
         }
     }
 
+    async function handleToggleDraftPersistence() {
+        if (!getAppSettings || !setAppSettings) return;
+        const currentSettings = getAppSettings();
+        const nextState = !currentSettings.persist_capture_draft;
+        const nextSettings = { ...currentSettings, persist_capture_draft: nextState };
+        setAppSettings(nextSettings);
+
+        if (nextState) {
+            const content = getContent();
+            if (content.trim()) {
+                await invoke("save_capture_draft", { content }).catch((e) => {
+                    console.error("Failed to persist capture draft:", e);
+                });
+            }
+            showStatus("Keep unsaved text: ON", "info", 1800);
+        } else {
+            await invoke("clear_capture_draft").catch((e) => {
+                console.error("Failed to clear capture draft:", e);
+            });
+            showStatus("Keep unsaved text: OFF", "info", 1800);
+        }
+
+        try {
+            await invoke("save_settings", { newSettings: nextSettings });
+        } catch (e) {
+            console.error("Failed to save draft persistence setting:", e);
+        }
+    }
+
     return {
         deferHideCapture,
         handleAppendToDaily,
@@ -150,6 +181,7 @@ export function createCaptureActions({
         toggleCaptureMode,
         handleOcrClipboard,
         openSettings,
+        handleToggleDraftPersistence,
     };
 }
 
@@ -168,6 +200,12 @@ export function handleAppShortcut({
     if (matchesShortcut(event, appSettings.ocr_shortcut)) {
         event.preventDefault();
         actions.handleOcrClipboard();
+        return true;
+    }
+
+    if (matchesShortcut(event, appSettings.persist_capture_draft_shortcut)) {
+        event.preventDefault();
+        actions.handleToggleDraftPersistence();
         return true;
     }
 

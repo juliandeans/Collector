@@ -228,6 +228,10 @@ impl Settings {
             crate::shortcuts::validate_shortcut(&self.ocr_shortcut)?;
         }
 
+        if !self.persist_capture_draft_shortcut.trim().is_empty() {
+            crate::shortcuts::validate_shortcut(&self.persist_capture_draft_shortcut)?;
+        }
+
         if !self.global_shortcut_closes_window
             && !self.global_shortcut.trim().is_empty()
             && !self.global_close_shortcut.trim().is_empty()
@@ -251,7 +255,7 @@ impl Settings {
         }
 
         // Cross-slot shortcut conflict check
-        let shortcut_fields: [(&str, &str); 8] = [
+        let shortcut_fields: [(&str, &str); 9] = [
             ("Note window shortcut", &self.global_shortcut),
             ("Note close shortcut", &self.global_close_shortcut),
             ("Reader shortcut", &self.reader_shortcut),
@@ -260,6 +264,7 @@ impl Settings {
             ("Capture mode shortcut", &self.capture_mode_shortcut),
             ("Save as note shortcut", &self.save_as_note_shortcut),
             ("OCR shortcut", &self.ocr_shortcut),
+            ("Toggle keep unsaved text shortcut", &self.persist_capture_draft_shortcut),
         ];
 
         for i in 0..shortcut_fields.len() {
@@ -584,6 +589,29 @@ mod tests {
     fn rejects_invalid_capture_mode_shortcut_syntax() {
         let mut settings = Settings::default();
         settings.capture_mode_shortcut = "NotAShortcut".to_string();
+        assert!(settings.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_persist_capture_draft_shortcut_conflicts_with_global_shortcuts() {
+        let mut settings = Settings::default();
+        // global_shortcut is Cmd+Shift+N
+        settings.persist_capture_draft_shortcut = "Cmd+Shift+N".to_string();
+        assert!(settings.validate().is_err());
+
+        // capture_text_shortcut is Cmd+Shift+C
+        settings.persist_capture_draft_shortcut = "Cmd+Shift+C".to_string();
+        assert!(settings.validate().is_err());
+
+        // Unique shortcut passes
+        settings.persist_capture_draft_shortcut = "Cmd+Shift+D".to_string();
+        assert!(settings.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_persist_capture_draft_shortcut_syntax() {
+        let mut settings = Settings::default();
+        settings.persist_capture_draft_shortcut = "NotAShortcut".to_string();
         assert!(settings.validate().is_err());
     }
 }

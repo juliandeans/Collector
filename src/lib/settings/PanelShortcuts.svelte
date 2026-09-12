@@ -51,6 +51,16 @@
             />
             <FieldIssue issue={validation.capture_mode_shortcut} />
         </div>
+        <div class="field">
+            <label for="persist_capture_draft_shortcut">Toggle Keep Unsaved Text</label>
+            <ShortcutInput
+                id="persist_capture_draft_shortcut"
+                bind:value={settings.persist_capture_draft_shortcut}
+                placeholder="Cmd+Shift+D"
+                {onChange}
+            />
+            <FieldIssue issue={validation.persist_capture_draft_shortcut} />
+        </div>
 
         <div class="divider"></div>
 

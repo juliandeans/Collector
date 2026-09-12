@@ -163,6 +163,10 @@ pub(super) fn default_ocr_shortcut() -> String {
     "Cmd+Shift+T".to_string()
 }
 
+pub(super) fn default_persist_capture_draft_shortcut() -> String {
+    "Cmd+Shift+D".to_string()
+}
+
 pub(super) fn default_ocr_drag_modifier() -> String {
     "Option".to_string()
 }

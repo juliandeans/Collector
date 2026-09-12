@@ -377,6 +377,25 @@ impl ShortcutManager {
         .await
     }
 
+    pub async fn register_persist_capture_draft(
+        &self,
+        app: &AppHandle,
+        settings: &Settings,
+    ) -> Result<(), String> {
+        self.register_single_action(
+            app,
+            "persist_capture_draft",
+            &settings.persist_capture_draft_shortcut,
+            |app| async move {
+                warn_if_failed(
+                    app.emit("toggle_persist_capture_draft", ()),
+                    "Failed to emit toggle_persist_capture_draft",
+                );
+            },
+        )
+        .await
+    }
+
     pub async fn register_reader(
         &self,
         app: &AppHandle,

@@ -75,6 +75,8 @@ export async function setupCaptureWindowListeners({
     setUnlistenSaveAsNote,
     setUnlistenCaptureModeStateChanged,
     setUnlistenCaptureModeAppend,
+    handleToggleDraftPersistence,
+    setUnlistenTogglePersistDraft,
 }) {
     function appendText(text, shouldFocus = false) {
         if (typeof text !== "string" || !text.trim()) return;
@@ -170,6 +172,14 @@ export async function setupCaptureWindowListeners({
             handleSaveAsNote();
         }),
     );
+
+    if (handleToggleDraftPersistence && setUnlistenTogglePersistDraft) {
+        setUnlistenTogglePersistDraft(
+            await listen("toggle_persist_capture_draft", () => {
+                handleToggleDraftPersistence();
+            }),
+        );
+    }
 }
 
 export async function setupSettingsListener({

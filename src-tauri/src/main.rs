@@ -109,6 +109,7 @@ fn main() {
     let capture_mode_controller = Arc::new(capture_mode::CaptureModeController::new());
     let capture_mode_shortcut_manager = Arc::new(ShortcutManager::new());
     let ocr_shortcut_manager = Arc::new(ShortcutManager::new());
+    let persist_draft_shortcut_manager = Arc::new(ShortcutManager::new());
     let window_geometry_debounce = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let reader_window_geometry_debounce = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
@@ -122,6 +123,7 @@ fn main() {
         capture_mode_controller: capture_mode_controller.clone(),
         capture_mode_shortcut_manager: capture_mode_shortcut_manager.clone(),
         ocr_shortcut_manager: ocr_shortcut_manager.clone(),
+        persist_draft_shortcut_manager: persist_draft_shortcut_manager.clone(),
         vault_index: Arc::new(RwLock::new(None)),
     };
 
@@ -246,6 +248,21 @@ fn main() {
                     .await
                 {
                     log::error!("Failed to register OCR shortcut: {}", e);
+                }
+            });
+
+            let persist_draft_mgr = persist_draft_shortcut_manager.clone();
+            let app_handle_persist_draft = app_handle.clone();
+            let settings_for_persist_draft = settings.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = persist_draft_mgr
+                    .register_persist_capture_draft(
+                        &app_handle_persist_draft,
+                        &settings_for_persist_draft,
+                    )
+                    .await
+                {
+                    log::error!("Failed to register persist_draft shortcut: {}", e);
                 }
             });
 

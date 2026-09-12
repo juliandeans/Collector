@@ -80,6 +80,7 @@
     let unlistenSaveAsNote;
     let unlistenCaptureModeStateChanged;
     let unlistenCaptureModeAppend;
+    let unlistenTogglePersistDraft;
     let unlistenSettingsChanged;
     let unlistenDragDrop;
     let cleanupResizeFlicker;
@@ -125,6 +126,10 @@
         resetCaptureState,
         getTextarea: () => textareaRef,
         tick,
+        getAppSettings: () => appSettings,
+        setAppSettings: (v) => {
+            appSettings = v;
+        },
     });
 
     const modifierWatcher = createModifierWatcher({
@@ -291,6 +296,10 @@
                     setUnlistenCaptureModeAppend: (fn) => {
                         unlistenCaptureModeAppend = fn;
                     },
+                    handleToggleDraftPersistence: actions.handleToggleDraftPersistence,
+                    setUnlistenTogglePersistDraft: (fn) => {
+                        unlistenTogglePersistDraft = fn;
+                    },
                 });
                 unlistenSettingsChanged = await setupSettingsListener({
                     getAppSettings: () => appSettings,
@@ -328,6 +337,7 @@
         unlistenSaveAsNote?.();
         unlistenCaptureModeStateChanged?.();
         unlistenCaptureModeAppend?.();
+        unlistenTogglePersistDraft?.();
         unlistenSettingsChanged?.();
         unlistenDragDrop?.();
         cleanupResizeFlicker?.();

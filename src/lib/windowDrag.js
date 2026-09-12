@@ -5,7 +5,10 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
  * In a pure browser or Vite dev preview without Tauri, window.__TAURI_INTERNALS__ is undefined.
  */
 export function isTauriContext() {
-  return typeof window !== "undefined" && Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__);
+   return (
+      typeof window !== "undefined" &&
+      Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__)
+   );
 }
 
 /**
@@ -22,8 +25,12 @@ export function isTauriContext() {
  * @returns {boolean}
  */
 export function isDragExemptElement(target) {
-  if (!target || typeof target.closest !== "function") return false;
-  return Boolean(target.closest(".wikilink, a[href], button, input, select, .resize-handle"));
+   if (!target || typeof target.closest !== "function") return false;
+   return Boolean(
+      target.closest(
+         ".wikilink, a[href], button, input, select, .resize-handle",
+      ),
+   );
 }
 
 /**
@@ -33,38 +40,42 @@ export function isDragExemptElement(target) {
  * @param {HTMLElement|Window} [target=window] The element or window to listen on.
  * @returns {() => void} Cleanup function to remove the listener.
  */
-export function setupCmdWindowDrag(target = typeof window !== "undefined" ? window : null) {
-  if (!target || !isTauriContext()) {
-    return () => {};
-  }
+export function setupCmdWindowDrag(
+   target = typeof window === "undefined" ? null : window,
+) {
+   if (!target || !isTauriContext()) {
+      return () => {};
+   }
 
-  const handleMouseDown = (event) => {
-    // Only trigger for primary (left) click while Command (metaKey) is held.
-    if (event.button !== 0 || !event.metaKey) {
-      return;
-    }
-
-    // Allow Cmd-clicks on interactive elements (e.g. Cmd+click wikilink to open in new tab, buttons, or resize handle)
-    if (isDragExemptElement(event.target)) {
-      return;
-    }
-
-    event.preventDefault();
-    try {
-      const promise = getCurrentWindow().startDragging();
-      if (promise && typeof promise.catch === "function") {
-        promise.catch((error) => {
-          console.warn("Could not start window drag:", error);
-        });
+   const handleMouseDown = (event) => {
+      // Only trigger for primary (left) click while Command (metaKey) is held.
+      if (event.button !== 0 || !event.metaKey) {
+         return;
       }
-    } catch (error) {
-      console.warn("Could not start window drag:", error);
-    }
-  };
 
-  target.addEventListener("mousedown", handleMouseDown, { capture: true });
+      // Allow Cmd-clicks on interactive elements (e.g. Cmd+click wikilink to open in new tab, buttons, or resize handle)
+      if (isDragExemptElement(event.target)) {
+         return;
+      }
 
-  return () => {
-    target.removeEventListener("mousedown", handleMouseDown, { capture: true });
-  };
+      event.preventDefault();
+      try {
+         const promise = getCurrentWindow().startDragging();
+         if (promise && typeof promise.catch === "function") {
+            promise.catch((error) => {
+               console.warn("Could not start window drag:", error);
+            });
+         }
+      } catch (error) {
+         console.warn("Could not start window drag:", error);
+      }
+   };
+
+   target.addEventListener("mousedown", handleMouseDown, { capture: true });
+
+   return () => {
+      target.removeEventListener("mousedown", handleMouseDown, {
+         capture: true,
+      });
+   };
 }

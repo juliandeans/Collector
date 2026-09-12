@@ -154,6 +154,14 @@ pub(crate) async fn save_settings(
         log::warn!("Failed to update OCR shortcut (non-fatal): {}", e);
     }
 
+    if let Err(e) = state
+        .persist_draft_shortcut_manager
+        .register_persist_capture_draft(&app, &new_settings)
+        .await
+    {
+        log::warn!("Failed to update persist draft shortcut (non-fatal): {}", e);
+    }
+
     Ok(())
 }
 
