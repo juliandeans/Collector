@@ -171,6 +171,10 @@ impl Settings {
             crate::shortcuts::validate_shortcut(&self.capture_text_shortcut)?;
         }
 
+        if !self.capture_mode_shortcut.trim().is_empty() {
+            crate::shortcuts::validate_shortcut(&self.capture_mode_shortcut)?;
+        }
+
         if !self.global_close_shortcut.trim().is_empty() {
             crate::shortcuts::validate_shortcut(&self.global_close_shortcut)?;
         }
@@ -242,12 +246,13 @@ impl Settings {
         }
 
         // Cross-slot shortcut conflict check
-        let shortcut_fields: [(&str, &str); 7] = [
+        let shortcut_fields: [(&str, &str); 8] = [
             ("Note window shortcut", &self.global_shortcut),
             ("Note close shortcut", &self.global_close_shortcut),
             ("Reader shortcut", &self.reader_shortcut),
             ("Reader close shortcut", &self.reader_close_shortcut),
             ("Capture text shortcut", &self.capture_text_shortcut),
+            ("Capture mode shortcut", &self.capture_mode_shortcut),
             ("Save as note shortcut", &self.save_as_note_shortcut),
             ("OCR shortcut", &self.ocr_shortcut),
         ];
@@ -553,5 +558,27 @@ mod tests {
         settings.ocr_shortcut = "Cmd+Shift+T".to_string();
         assert!(settings.validate().is_ok());
     }
-}
 
+    #[test]
+    fn rejects_capture_mode_shortcut_conflicts_with_global_shortcuts() {
+        let mut settings = Settings::default();
+        // global_shortcut is Cmd+Shift+N
+        settings.capture_mode_shortcut = "Cmd+Shift+N".to_string();
+        assert!(settings.validate().is_err());
+
+        // capture_text_shortcut is Cmd+Shift+C
+        settings.capture_mode_shortcut = "Cmd+Shift+C".to_string();
+        assert!(settings.validate().is_err());
+
+        // Unique shortcut passes
+        settings.capture_mode_shortcut = "Cmd+Shift+M".to_string();
+        assert!(settings.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_capture_mode_shortcut_syntax() {
+        let mut settings = Settings::default();
+        settings.capture_mode_shortcut = "NotAShortcut".to_string();
+        assert!(settings.validate().is_err());
+    }
+}

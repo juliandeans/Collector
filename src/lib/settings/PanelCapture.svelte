@@ -174,6 +174,11 @@
                 Show action buttons
             </Checkbox>
         </div>
+        <div class="field">
+            <Checkbox bind:checked={settings.show_capture_mode_button}>
+                Show Collect button
+            </Checkbox>
+        </div>
     </Section>
 
     <Section title="Pickers">

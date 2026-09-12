@@ -3,6 +3,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tokio::sync::Mutex;
 
+use crate::capture_mode::CaptureModeController;
 use crate::log_safety::summarize_text_len;
 use crate::settings::Settings;
 
@@ -184,13 +185,17 @@ impl ShortcutManager {
                     let app_handle2 = app_handle.clone();
 
                     tauri::async_runtime::spawn(async move {
-                        let selected = tauri::async_runtime::spawn_blocking(
+                        let controller = app_handle2
+                            .state::<crate::app_state::AppState>()
+                            .capture_mode_controller
+                            .clone();
+                        controller.suppress_watcher(true);
+                        let selected_result = tauri::async_runtime::spawn_blocking(
                             crate::selected_text::capture_selected_text,
                         )
-                        .await
-                        .ok()
-                        .flatten()
-                        .unwrap_or_default();
+                        .await;
+                        controller.suppress_watcher(false);
+                        let selected = selected_result.ok().flatten().unwrap_or_default();
 
                         log::info!("Captured text length={}", summarize_text_len(&selected));
                         warn_if_failed(
@@ -278,6 +283,55 @@ impl ShortcutManager {
             })?;
 
         *self.current_shortcuts.lock().await = vec![shortcut_str.clone()];
+        Ok(())
+    }
+
+    pub async fn register_capture_mode(
+        &self,
+        app: &AppHandle,
+        settings: &Settings,
+        controller: Arc<CaptureModeController>,
+    ) -> Result<(), String> {
+        let shortcut_str = normalize_shortcut(&settings.capture_mode_shortcut);
+        if shortcut_str.trim().is_empty() {
+            self.unregister_current_shortcuts(app, "capture_mode").await;
+            return Ok(());
+        }
+
+        self.unregister_current_shortcuts(app, "capture_mode").await;
+
+        let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
+            let err_msg = format!(
+                "Invalid capture_mode shortcut '{}': {:?}",
+                shortcut_str, e
+            );
+            log::error!("{}", err_msg);
+            err_msg
+        })?;
+
+        let app_handle = app.clone();
+        app.global_shortcut()
+            .on_shortcut(shortcut, move |_app, _shortcut, event| {
+                if event.state == ShortcutState::Pressed {
+                    let app_handle = app_handle.clone();
+                    let controller = controller.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(error) = controller.toggle(&app_handle).await {
+                            log::warn!("Failed to toggle capture mode: {}", error);
+                        }
+                    });
+                }
+            })
+            .map_err(|e| {
+                let err_msg = format!(
+                    "Failed to register capture_mode shortcut '{}': {:?}",
+                    shortcut_str, e
+                );
+                log::error!("{}", err_msg);
+                err_msg
+            })?;
+
+        *self.current_shortcuts.lock().await = vec![shortcut_str];
         Ok(())
     }
 

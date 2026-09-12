@@ -114,3 +114,28 @@ export async function closeCaptureAction({
         console.error("Failed to hide window:", e);
     }
 }
+
+/**
+ * Hide the capture window without clearing its in-memory buffer while the
+ * backend-owned capture mode continues collecting clipboard text.
+ */
+export async function hideCaptureWhileCollectingAction({
+    content,
+    invoke,
+}) {
+    try {
+        if (content && content.trim()) {
+            await invoke("save_capture_draft", { content });
+        } else {
+            await invoke("clear_capture_draft");
+        }
+    } catch (e) {
+        console.error("Failed to persist capture draft:", e);
+    }
+
+    try {
+        await invoke("hide_capture");
+    } catch (e) {
+        console.error("Failed to hide window:", e);
+    }
+}

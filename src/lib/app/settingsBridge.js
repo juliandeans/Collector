@@ -68,6 +68,10 @@ function buildInitialAppSettings(settings) {
         append_to_note_shortcut:
             settings.append_to_note_shortcut ?? "Cmd+Option+Enter",
         show_capture_action_bar: settings.show_capture_action_bar ?? true,
+        show_capture_mode_button:
+            settings.show_capture_mode_button ?? true,
+        capture_mode_shortcut:
+            settings.capture_mode_shortcut ?? defaultSettings.capture_mode_shortcut,
         ocr_shortcut: settings.ocr_shortcut ?? defaultSettings.ocr_shortcut,
         ocr_drag_modifier:
             settings.ocr_drag_modifier ?? defaultSettings.ocr_drag_modifier,
@@ -120,6 +124,10 @@ export function applySettingsUpdate(current, incoming) {
             incoming.append_to_note_shortcut ?? current.append_to_note_shortcut,
         show_capture_action_bar:
             incoming.show_capture_action_bar ?? current.show_capture_action_bar,
+        show_capture_mode_button:
+            incoming.show_capture_mode_button ?? current.show_capture_mode_button,
+        capture_mode_shortcut:
+            incoming.capture_mode_shortcut ?? current.capture_mode_shortcut,
         ocr_shortcut: incoming.ocr_shortcut ?? current.ocr_shortcut,
         ocr_drag_modifier:
             incoming.ocr_drag_modifier ?? current.ocr_drag_modifier,

@@ -107,6 +107,8 @@ pub struct Settings {
     #[serde(default = "default_true")]
     pub show_capture_action_bar: bool,
     #[serde(default = "default_true")]
+    pub show_capture_mode_button: bool,
+    #[serde(default = "default_true")]
     pub show_note_paths: bool,
     #[serde(default = "default_autocomplete_results")]
     pub autocomplete_results: u32,
@@ -117,6 +119,8 @@ pub struct Settings {
     pub global_close_shortcut: String,
     #[serde(default = "default_capture_text_shortcut")]
     pub capture_text_shortcut: String,
+    #[serde(default = "default_capture_mode_shortcut")]
+    pub capture_mode_shortcut: String,
     pub compression_max_kb: u32,
     #[serde(default = "default_edge_enabled")]
     pub edge_detection_enabled: bool,
@@ -259,12 +263,14 @@ impl Default for Settings {
             daily_note_create_if_missing: default_false(),
             daily_note_create_timeout_ms: default_daily_note_create_timeout_ms(),
             show_capture_action_bar: default_true(),
+            show_capture_mode_button: default_true(),
             show_note_paths: default_true(),
             autocomplete_results: default_autocomplete_results(),
             global_shortcut: "Cmd+Shift+N".to_string(),
             global_shortcut_closes_window: default_false(),
             global_close_shortcut: String::new(),
             capture_text_shortcut: default_capture_text_shortcut(),
+            capture_mode_shortcut: default_capture_mode_shortcut(),
             compression_max_kb: 200,
             edge_detection_enabled: true,
             edge_reaction_time_ms: default_reaction_time_ms(),
@@ -368,6 +374,28 @@ mod new_field_tests {
         assert!(!settings.remember_window_geometry);
         assert!(!settings.remember_reader_geometry);
         assert!(!settings.persist_capture_draft);
+    }
+
+    #[test]
+    fn capture_mode_defaults_are_button_shown_and_cmd_shift_m() {
+        let settings = Settings::default();
+        assert!(settings.show_capture_mode_button);
+        assert_eq!(settings.capture_mode_shortcut, "Cmd+Shift+M");
+    }
+
+    #[test]
+    fn old_config_without_capture_mode_fields_still_deserializes() {
+        let mut value = serde_json::to_value(Settings::default()).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("show_capture_mode_button");
+        object.remove("capture_mode_shortcut");
+
+        let content = serde_json::to_string(&value).unwrap();
+        let settings: Settings = serde_json::from_str(&content)
+            .expect("old config without capture mode fields must still deserialize");
+
+        assert!(settings.show_capture_mode_button);
+        assert_eq!(settings.capture_mode_shortcut, "Cmd+Shift+M");
     }
 
     #[test]

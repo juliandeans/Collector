@@ -7,6 +7,7 @@
 mod app_state;
 mod capture;
 mod capture_draft;
+mod capture_mode;
 mod commands;
 mod edge_detect;
 mod fs_util;
@@ -105,6 +106,8 @@ fn main() {
     let reader_shortcut_manager = Arc::new(ShortcutManager::new());
     let capture_text_shortcut_manager = Arc::new(ShortcutManager::new());
     let save_as_note_shortcut_manager = Arc::new(ShortcutManager::new());
+    let capture_mode_controller = Arc::new(capture_mode::CaptureModeController::new());
+    let capture_mode_shortcut_manager = Arc::new(ShortcutManager::new());
     let window_geometry_debounce = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let reader_window_geometry_debounce = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
@@ -115,6 +118,8 @@ fn main() {
         reader_shortcut_manager: reader_shortcut_manager.clone(),
         capture_text_shortcut_manager: capture_text_shortcut_manager.clone(),
         save_as_note_shortcut_manager: save_as_note_shortcut_manager.clone(),
+        capture_mode_controller: capture_mode_controller.clone(),
+        capture_mode_shortcut_manager: capture_mode_shortcut_manager.clone(),
         vault_index: Arc::new(RwLock::new(None)),
     };
 
@@ -210,6 +215,23 @@ fn main() {
                     .await
                 {
                     log::error!("Failed to register save_as_note shortcut: {}", e);
+                }
+            });
+
+            let capture_mode_mgr = capture_mode_shortcut_manager.clone();
+            let capture_mode_controller_for_shortcut = capture_mode_controller.clone();
+            let app_handle_capture_mode = app_handle.clone();
+            let settings_for_capture_mode = settings.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = capture_mode_mgr
+                    .register_capture_mode(
+                        &app_handle_capture_mode,
+                        &settings_for_capture_mode,
+                        capture_mode_controller_for_shortcut,
+                    )
+                    .await
+                {
+                    log::error!("Failed to register capture_mode shortcut: {}", e);
                 }
             });
 
@@ -327,6 +349,9 @@ fn main() {
             commands::capture::save_capture_draft,
             commands::capture::load_capture_draft,
             commands::capture::clear_capture_draft,
+            commands::capture_mode::get_capture_mode_state,
+            commands::capture_mode::set_capture_mode_enabled,
+            commands::capture_mode::toggle_capture_mode,
             commands::vault::read_note_file,
             commands::vault::write_note_file,
             commands::system::open_external_url,

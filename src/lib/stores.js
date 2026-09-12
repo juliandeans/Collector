@@ -46,6 +46,8 @@ export const defaultSettings = {
   global_shortcut_closes_window: false,
   global_close_shortcut: '',
   capture_text_shortcut: 'Cmd+Shift+C',
+  capture_mode_shortcut: 'Cmd+Shift+M',
+  show_capture_mode_button: true,
   autostart_enabled: false,
 
   compression_max_kb: 200,

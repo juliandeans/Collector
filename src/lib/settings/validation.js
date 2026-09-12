@@ -478,6 +478,7 @@ export function validateSettings(settings = {}) {
         { field: "reader_next_tab_shortcut", label: "Next Tab" },
         { field: "reader_previous_tab_shortcut", label: "Previous Tab" },
         { field: "capture_text_shortcut", label: "Copy Text to Collector" },
+        { field: "capture_mode_shortcut", label: "Toggle Collect Mode" },
         { field: "save_to_daily_shortcut", label: "Save to Daily Note" },
         { field: "save_as_note_shortcut", label: "Create New Note" },
         { field: "append_to_note_shortcut", label: "Append to Note" },

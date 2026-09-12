@@ -138,6 +138,18 @@ pub(crate) async fn save_settings(
         log::warn!("Failed to update save_as_note shortcut (non-fatal): {}", e);
     }
 
+    if let Err(e) = state
+        .capture_mode_shortcut_manager
+        .register_capture_mode(
+            &app,
+            &new_settings,
+            state.capture_mode_controller.clone(),
+        )
+        .await
+    {
+        log::warn!("Failed to update capture_mode shortcut (non-fatal): {}", e);
+    }
+
     Ok(())
 }
 

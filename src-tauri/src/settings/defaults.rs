@@ -147,6 +147,10 @@ pub(super) fn default_capture_text_shortcut() -> String {
     "Cmd+Shift+C".to_string()
 }
 
+pub(super) fn default_capture_mode_shortcut() -> String {
+    "Cmd+Shift+M".to_string()
+}
+
 pub(super) fn default_daily_note_folder() -> String {
     String::new()
 }
@@ -162,4 +166,3 @@ pub(super) fn default_ocr_shortcut() -> String {
 pub(super) fn default_ocr_drag_modifier() -> String {
     "Option".to_string()
 }
-

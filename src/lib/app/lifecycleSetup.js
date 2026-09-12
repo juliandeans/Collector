@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isFileDrag } from "../capture/capture-utils.js";
+import { appendCapturedText } from "../capture/captureTextAppend.js";
 
 export function setupGlobalDragListeners({
     setIsDragging,
@@ -55,6 +56,11 @@ export async function setupCaptureWindowListeners({
     invoke,
     getContent,
     setContent,
+    getIsLoading,
+    getPendingCaptureContent,
+    setPendingCaptureContent,
+    getCaptureModeActive,
+    setCaptureModeActive,
     setStatusMessage,
     focusTextarea,
     freeBlobUrls,
@@ -67,7 +73,23 @@ export async function setupCaptureWindowListeners({
     setUnlistenInsertCaptureText,
     setUnlistenCaptureTextFailed,
     setUnlistenSaveAsNote,
+    setUnlistenCaptureModeStateChanged,
+    setUnlistenCaptureModeAppend,
 }) {
+    function appendText(text, shouldFocus = false) {
+        if (typeof text !== "string" || !text.trim()) return;
+
+        if (getIsLoading()) {
+            setPendingCaptureContent(
+                appendCapturedText(getPendingCaptureContent(), text),
+            );
+            return;
+        }
+
+        setContent(appendCapturedText(getContent(), text));
+        if (shouldFocus) focusTextarea();
+    }
+
     // reset_capture: clear all capture state for a fresh start, then restore
     // a persisted draft if one exists (only written when the user has
     // "Keep unsaved text after closing" enabled in Settings).
@@ -76,14 +98,29 @@ export async function setupCaptureWindowListeners({
     // NOT emitted by capture-text (Cmd+Shift+C) — that must append.
     setUnlistenReset(
         await listen("reset_capture", async () => {
-            freeBlobUrls();
-            resetCaptureState();
+            let captureModeActive = getCaptureModeActive();
+            try {
+                captureModeActive = await invoke("get_capture_mode_state");
+                setCaptureModeActive(captureModeActive);
+            } catch (e) {
+                console.error("Failed to read capture mode state:", e);
+            }
+
+            if (!captureModeActive) {
+                freeBlobUrls();
+                resetCaptureState();
+            }
             setStatusMessage("");
             closeAppendPicker();
 
+            if (captureModeActive) return;
+
             try {
                 const draft = await invoke("load_capture_draft");
-                if (draft) {
+                // Capture Mode may have been toggled on while this load was
+                // in flight; if so, live clipboard appends already own the
+                // buffer and a stale draft must not overwrite them.
+                if (draft && !(await invoke("get_capture_mode_state"))) {
                     setContent(draft);
                 }
             } catch (e) {
@@ -102,19 +139,19 @@ export async function setupCaptureWindowListeners({
     setUnlistenInsertCaptureText(
         await listen("insert_capture_text", (event) => {
             const text = typeof event.payload === "string" ? event.payload : "";
-            if (!text.trim()) return;
-            const content = getContent();
-            // Append captured text to existing content instead of replacing it.
-            // If content is empty, set directly; otherwise add spacing then append.
-            if (!content.trim()) {
-                setContent(text);
-            } else {
-                // Add spacing: if content doesn't end with a blank line, insert two newlines.
-                // If it already ends with a blank line, insert one newline.
-                const endsWithBlank = /\n\s*\n$/.test(content);
-                setContent(content + (endsWithBlank ? "\n" : "\n\n") + text);
-            }
-            focusTextarea();
+            appendText(text, true);
+        }),
+    );
+
+    setUnlistenCaptureModeStateChanged(
+        await listen("capture_mode_state_changed", (event) => {
+            setCaptureModeActive(Boolean(event.payload?.active));
+        }),
+    );
+
+    setUnlistenCaptureModeAppend(
+        await listen("capture_mode_append", (event) => {
+            appendText(event.payload);
         }),
     );
 

@@ -30,6 +30,7 @@
     import AppendToPicker from "./lib/reader/AppendToPicker.svelte";
     import CaptureWikilinkOverlay from "./lib/capture/CaptureWikilinkOverlay.svelte";
     import CaptureActionBar from "./lib/capture/CaptureActionBar.svelte";
+    import CaptureModeButton from "./lib/capture/CaptureModeButton.svelte";
     import CaptureStatus from "./lib/capture/CaptureStatus.svelte";
     import CaptureLoadingIndicator from "./lib/capture/CaptureLoadingIndicator.svelte";
     import ResizeHandle from "./lib/ResizeHandle.svelte";
@@ -51,10 +52,14 @@
         appendToDailyNoteAction,
         saveAsNoteAction,
         closeCaptureAction,
+        hideCaptureWhileCollectingAction,
     } from "./lib/capture/capture-actions.js";
+    import { appendCapturedText } from "./lib/capture/captureTextAppend.js";
 
     let textareaRef = $state();
     let content = $state("");
+    let captureModeActive = $state(false);
+    let pendingCaptureContent = $state("");
     let draftSaveTimer;
     let isDragging = $state(false);
     let isLoading = $state(false);
@@ -77,6 +82,8 @@
     let unlistenInsertCaptureText;
     let unlistenCaptureTextFailed;
     let unlistenSaveAsNote;
+    let unlistenCaptureModeStateChanged;
+    let unlistenCaptureModeAppend;
     let unlistenSettingsChanged;
     let unlistenDragDrop;
     let cleanupResizeFlicker;
@@ -109,6 +116,14 @@
                 console.error("Failed to persist capture draft:", e);
             });
         }, 400);
+    });
+
+    $effect(() => {
+        if (isLoading || !pendingCaptureContent.trim()) return;
+
+        const pending = pendingCaptureContent;
+        pendingCaptureContent = "";
+        content = appendCapturedText(content, pending);
     });
 
     function applyAppendPickerState(patch) {
@@ -195,6 +210,15 @@
                     setContent: (v) => {
                         content = v;
                     },
+                    getIsLoading: () => isLoading,
+                    getPendingCaptureContent: () => pendingCaptureContent,
+                    setPendingCaptureContent: (v) => {
+                        pendingCaptureContent = v;
+                    },
+                    getCaptureModeActive: () => captureModeActive,
+                    setCaptureModeActive: (v) => {
+                        captureModeActive = v;
+                    },
                     setStatusMessage: (v) => {
                         statusMessage = v;
                     },
@@ -221,6 +245,12 @@
                     setUnlistenSaveAsNote: (fn) => {
                         unlistenSaveAsNote = fn;
                     },
+                    setUnlistenCaptureModeStateChanged: (fn) => {
+                        unlistenCaptureModeStateChanged = fn;
+                    },
+                    setUnlistenCaptureModeAppend: (fn) => {
+                        unlistenCaptureModeAppend = fn;
+                    },
                 });
                 unlistenSettingsChanged = await setupSettingsListener({
                     getAppSettings: () => appSettings,
@@ -242,6 +272,7 @@
                         appSettings = settings;
                     },
                 });
+                captureModeActive = await invoke("get_capture_mode_state");
                 preloadVaultNotes();
             } catch (e) {
                 console.error("Failed to listen to events:", e);
@@ -255,6 +286,8 @@
         unlistenInsertCaptureText?.();
         unlistenCaptureTextFailed?.();
         unlistenSaveAsNote?.();
+        unlistenCaptureModeStateChanged?.();
+        unlistenCaptureModeAppend?.();
         unlistenSettingsChanged?.();
         unlistenDragDrop?.();
         cleanupResizeFlicker?.();
@@ -401,12 +434,28 @@
     }
 
     async function handleClose() {
+        if (captureModeActive) {
+            await hideCaptureWhileCollectingAction({
+                content,
+                invoke,
+            });
+            return;
+        }
+
         await closeCaptureAction({
             content,
             invoke,
             freeBlobUrls,
             resetCaptureState,
         });
+    }
+
+    async function toggleCaptureMode() {
+        try {
+            captureModeActive = await invoke("toggle_capture_mode");
+        } catch (e) {
+            showStatus("✗ " + e.toString(), "error");
+        }
     }
 
     async function handleSaveAsNote() {
@@ -750,6 +799,13 @@
         onAppend={openAppendPicker}
     />
 
+    <CaptureModeButton
+        show={appSettings.show_capture_mode_button}
+        active={captureModeActive}
+        shortcut={appSettings.capture_mode_shortcut}
+        onToggle={toggleCaptureMode}
+    />
+
     <ResizeHandle onResizeStart={armResize} />
 
     <CaptureDropOverlay show={isDragging && !isOcrModifierHeld} />
@@ -882,7 +938,8 @@
     .capture-container.append-picker-open .content-wrapper,
     .capture-container.append-picker-open :global(.action-bar),
     .capture-container.append-picker-open :global(.status-toast),
-    .capture-container.append-picker-open :global(.resize-handle) {
+    .capture-container.append-picker-open :global(.resize-handle),
+    .capture-container.append-picker-open :global(.capture-mode-button) {
         filter: blur(4px) brightness(0.62);
         opacity: 0.56;
         transform: scale(0.997);

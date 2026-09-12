@@ -52,6 +52,22 @@
         {/if}
     </Section>
 
+    <Section title="Capture Mode">
+        <div class="field">
+            <label for="capture_mode_shortcut">Toggle Collect Mode</label>
+            <input
+                class="shortcut-input"
+                type="text"
+                id="capture_mode_shortcut"
+                bind:value={settings.capture_mode_shortcut}
+                placeholder="Cmd+Shift+M"
+                onkeydown={(e) =>
+                    handleShortcutKeyDown(e, "capture_mode_shortcut")}
+            />
+            <FieldIssue issue={validation.capture_mode_shortcut} />
+        </div>
+    </Section>
+
     <Section title="Save Actions">
         <div class="field">
             <label for="save_to_daily_shortcut">Save to Daily Note</label>
