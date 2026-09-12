@@ -7,10 +7,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+#### Capture Window
+
 - Clear Capture Shortcut: `Cmd+Backspace` (configurable under Settings → Shortcuts) empties the Capture window in one keystroke — text, images and the persisted draft — even when draft persistence is on; if the draft file cannot be removed, an error status is shown instead of the success banner.
 - List continuation: pressing Enter at the end of a list item (`-`, `*`, `+`, `1.`) in the Capture window starts the next item automatically — checkbox items restart as unchecked, empty items are removed instead of continued, indentation is preserved.
-- Reader: "Show Daily Note" checkbox (Settings → Reader → Pinned Notes, on by default) — when off, the Daily Note tab is not shown in the Reader window.
-- Reader: pinned notes can be reordered in Settings with ↑/↓ buttons (same pattern as capture rules); tab order follows the list order.
 - List indentation: Tab / Shift+Tab on a list item in the Capture window indents/outdents one step, aligned under the parent item's content column.
 - Markdown basics: `Cmd+B` / `Cmd+I` in the Capture window wrap the selection with **bold** / *italic* markers, toggle them off when already applied, and insert an empty marker pair on empty selection.
 - Capture Rules: capture text containing a user-defined trigger (word or
@@ -25,21 +25,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Capture draft persistence: unsubmitted text in the Capture window is
   now preserved across closes (Escape, clicking outside, toggle shortcut)
   and restored when reopening. Can be disabled in Settings → Capture.
-- Window geometry memory: Capture and Reader windows can now remember their
-  custom size and position across sessions (configurable in Settings).
-- OCR (image to text): a configurable shortcut (default Cmd+Shift+T) extracts
-  text from a clipboard image at the cursor, in both Capture and the Reader.
-  Dragging an image while holding a configurable modifier key (default
-  Option) does the same instead of the normal image import. Runs fully
-  locally via Apple's Vision framework — no image ever leaves the device.
+
+#### Reader
+
+- Reader: "Show Daily Note" checkbox (Settings → Reader → Pinned Notes, on by default) — when off, the Daily Note tab is not shown in the Reader window.
+- Reader: pinned notes can be reordered in Settings with ↑/↓ buttons (same pattern as capture rules); tab order follows the list order.
 - Configurable "Next Tab" / "Previous Tab" keyboard shortcuts in the Reader
   (default: Option+Right / Option+Left).
-- Configurable "Toggle Keep Unsaved Text" shortcut (default: Cmd+Shift+D)
-  to toggle draft persistence on and off from anywhere or inside Capture,
-  configurable in Settings → Shortcuts → Capture Window.
-- Keyboard shortcuts in Settings can now be disabled: press Backspace or
-  Delete inside any shortcut field, or click the clear button (✕) that
-  appears on hover or focus.
+
+#### Editor & Autocomplete
+
 - Tag autocomplete: typing `#` in the Capture textarea or the Reader editor
   opens a suggestion dropdown with every tag found in the vault (inline
   `#hashtags` plus frontmatter `tags:`), filterable while typing and
@@ -48,6 +43,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   Tags are indexed once per session in the background (best-effort: files
   that cannot be read, e.g. not-yet-downloaded iCloud items, are skipped);
   the list refreshes on window show and manual reindex.
+
+#### Shortcuts & More
+
+- Configurable "Toggle Keep Unsaved Text" shortcut (default: Cmd+Shift+D)
+  to toggle draft persistence on and off from anywhere or inside Capture,
+  configurable in Settings → Shortcuts → Capture Window.
+- Keyboard shortcuts in Settings can now be disabled: press Backspace or
+  Delete inside any shortcut field, or click the clear button (✕) that
+  appears on hover or focus.
+- Window geometry memory: Capture and Reader windows can now remember their
+  custom size and position across sessions (configurable in Settings).
+- OCR (image to text): a configurable shortcut (default Cmd+Shift+T) extracts
+  text from a clipboard image at the cursor, in both Capture and the Reader.
+  Dragging an image while holding a configurable modifier key (default
+  Option) does the same instead of the normal image import. Runs fully
+  locally via Apple's Vision framework — no image ever leaves the device.
 
 ### Changed
 
