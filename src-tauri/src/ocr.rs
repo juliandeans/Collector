@@ -245,6 +245,30 @@ pub fn read_clipboard_image_bytes() -> Result<Vec<u8>, String> {
             return Ok(bytes);
         }
 
+        let file_url_type = NSString::alloc(nil).init_str("public.file-url");
+        let file_url_data: id = msg_send![pboard, dataForType: file_url_type];
+        let _: () = msg_send![file_url_type, release];
+
+        if file_url_data != nil {
+            let ns_url_cls = class!(NSURL);
+            let url: id = msg_send![ns_url_cls, URLFromPasteboard: pboard];
+            if url != nil {
+                let path: id = msg_send![url, path];
+                if path != nil {
+                    let path_bytes: *const std::os::raw::c_char = msg_send![path, UTF8String];
+                    if !path_bytes.is_null() {
+                        let path_str = std::ffi::CStr::from_ptr(path_bytes).to_string_lossy().to_string();
+                        if let Ok(valid_path) = validate_image_file_path(&path_str) {
+                            if let Ok(bytes) = std::fs::read(valid_path) {
+                                let _: () = msg_send![pool, drain];
+                                return Ok(bytes);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let _: () = msg_send![pool, drain];
         if found_oversized {
             Err("Clipboard image exceeds 20 MB limit".to_string())

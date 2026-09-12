@@ -150,6 +150,14 @@ pub(crate) async fn save_settings(
         log::warn!("Failed to update capture_mode shortcut (non-fatal): {}", e);
     }
 
+    if let Err(e) = state
+        .ocr_shortcut_manager
+        .register_ocr(&app, &new_settings)
+        .await
+    {
+        log::warn!("Failed to update OCR shortcut (non-fatal): {}", e);
+    }
+
     Ok(())
 }
 

@@ -58,6 +58,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   heading.
 - Prevented potential race conditions and dropped changes during settings
   auto-save and window geometry debouncing.
+- Fixed OCR shortcut (Cmd+Shift+T) not responding globally or when copying image
+  files directly in Finder.
 - Fixed off-screen window restore bugs on multi-monitor setups.
 - The shortcut recorder in Settings now shows "Option" instead of "Alt"
   when capturing a key combo that uses the Option key.

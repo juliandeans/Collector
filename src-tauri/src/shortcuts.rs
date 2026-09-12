@@ -335,6 +335,92 @@ impl ShortcutManager {
         Ok(())
     }
 
+    pub async fn register_ocr(
+        &self,
+        app: &AppHandle,
+        settings: &Settings,
+    ) -> Result<(), String> {
+        let shortcut_str = normalize_shortcut(&settings.ocr_shortcut);
+        if shortcut_str.trim().is_empty() {
+            self.unregister_current_shortcuts(app, "ocr").await;
+            return Ok(());
+        }
+
+        self.unregister_current_shortcuts(app, "ocr").await;
+
+        let shortcut: Shortcut = shortcut_str.parse().map_err(|e| {
+            let err_msg = format!("Invalid ocr shortcut '{}': {:?}", shortcut_str, e);
+            log::error!("{}", err_msg);
+            err_msg
+        })?;
+
+        let app_handle = app.clone();
+        app.global_shortcut()
+            .on_shortcut(shortcut, move |_app, _shortcut, event| {
+                if event.state == ShortcutState::Pressed {
+                    let app_handle2 = app_handle.clone();
+
+                    tauri::async_runtime::spawn(async move {
+                        let ocr_result = tauri::async_runtime::spawn_blocking(
+                            crate::ocr::ocr_clipboard,
+                        )
+                        .await;
+
+                        warn_if_failed(
+                            app_handle2.emit("show_capture", ()),
+                            "Failed to emit show_capture",
+                        );
+                        if let Some(window) = app_handle2.get_webview_window("capture") {
+                            warn_if_failed(window.show(), "Failed to show capture window");
+                            warn_if_failed(window.set_focus(), "Failed to focus capture window");
+                        }
+
+                        match ocr_result {
+                            Ok(Ok(ocr)) => {
+                                log::info!(
+                                    "OCR text extracted length={}",
+                                    summarize_text_len(&ocr.text)
+                                );
+                                tokio::time::sleep(tokio::time::Duration::from_millis(
+                                    CAPTURE_TEXT_INSERT_DELAY_MS,
+                                ))
+                                .await;
+                                warn_if_failed(
+                                    app_handle2.emit("insert_capture_text", ocr.text),
+                                    "Failed to emit insert_capture_text",
+                                );
+                            }
+                            Ok(Err(err_msg)) => {
+                                log::warn!("OCR failed: {}", err_msg);
+                                warn_if_failed(
+                                    app_handle2.emit("capture_text_failed", err_msg),
+                                    "Failed to emit capture_text_failed",
+                                );
+                            }
+                            Err(e) => {
+                                log::error!("OCR task join error: {}", e);
+                                warn_if_failed(
+                                    app_handle2.emit(
+                                        "capture_text_failed",
+                                        "OCR failed to process image",
+                                    ),
+                                    "Failed to emit capture_text_failed",
+                                );
+                            }
+                        }
+                    });
+                }
+            })
+            .map_err(|e| {
+                let err_msg = format!("Failed to register ocr shortcut '{}': {:?}", shortcut_str, e);
+                log::error!("{}", err_msg);
+                err_msg
+            })?;
+
+        *self.current_shortcuts.lock().await = vec![shortcut_str];
+        Ok(())
+    }
+
     pub async fn register_reader(
         &self,
         app: &AppHandle,

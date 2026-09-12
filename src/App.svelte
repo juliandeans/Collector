@@ -514,6 +514,8 @@
     }
 
     async function handleKeydown(e) {
+        if (showAppendPicker) return;
+
         if (wikiAutocompleteOpen) {
             if (e.key === "ArrowDown") {
                 e.preventDefault();
@@ -724,6 +726,8 @@
     }
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
+
 <div
     class="capture-container"
     class:demo-fake-bg={DEMO_FAKE_BG}
@@ -779,7 +783,6 @@
             bind:content
             bind:textareaRef
             {isLoading}
-            onKeydown={handleKeydown}
             onInput={handleWikiInput}
             onBlur={closeWikiAutocomplete}
             onDrop={handleDrop}

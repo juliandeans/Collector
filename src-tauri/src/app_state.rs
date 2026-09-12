@@ -17,5 +17,6 @@ pub(crate) struct AppState {
     pub(crate) save_as_note_shortcut_manager: Arc<ShortcutManager>,
     pub(crate) capture_mode_controller: Arc<CaptureModeController>,
     pub(crate) capture_mode_shortcut_manager: Arc<ShortcutManager>,
+    pub(crate) ocr_shortcut_manager: Arc<ShortcutManager>,
     pub(crate) vault_index: Arc<RwLock<Option<VaultIndex>>>,
 }

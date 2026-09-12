@@ -108,6 +108,7 @@ fn main() {
     let save_as_note_shortcut_manager = Arc::new(ShortcutManager::new());
     let capture_mode_controller = Arc::new(capture_mode::CaptureModeController::new());
     let capture_mode_shortcut_manager = Arc::new(ShortcutManager::new());
+    let ocr_shortcut_manager = Arc::new(ShortcutManager::new());
     let window_geometry_debounce = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let reader_window_geometry_debounce = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
@@ -120,6 +121,7 @@ fn main() {
         save_as_note_shortcut_manager: save_as_note_shortcut_manager.clone(),
         capture_mode_controller: capture_mode_controller.clone(),
         capture_mode_shortcut_manager: capture_mode_shortcut_manager.clone(),
+        ocr_shortcut_manager: ocr_shortcut_manager.clone(),
         vault_index: Arc::new(RwLock::new(None)),
     };
 
@@ -232,6 +234,18 @@ fn main() {
                     .await
                 {
                     log::error!("Failed to register capture_mode shortcut: {}", e);
+                }
+            });
+
+            let ocr_mgr = ocr_shortcut_manager.clone();
+            let app_handle_ocr = app_handle.clone();
+            let settings_for_ocr = settings.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = ocr_mgr
+                    .register_ocr(&app_handle_ocr, &settings_for_ocr)
+                    .await
+                {
+                    log::error!("Failed to register OCR shortcut: {}", e);
                 }
             });
 

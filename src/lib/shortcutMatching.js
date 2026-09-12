@@ -98,8 +98,14 @@ export function matchesShortcut(event, shortcutString) {
   const shortcut = parseShortcut(shortcutString);
   if (!shortcut) return false;
 
-  return (
-    modifiersMatch(event, shortcut) &&
-    normalizeToken(event.key) === shortcut.key
-  );
+  const normalizedKey = normalizeToken(event.key);
+  const codeKey = event.code
+    ? normalizeToken(event.code.toLowerCase().replace(/^key/, ""))
+    : "";
+
+  const keyMatches =
+    normalizedKey === shortcut.key ||
+    (codeKey !== "" && codeKey === shortcut.key);
+
+  return modifiersMatch(event, shortcut) && keyMatches;
 }
