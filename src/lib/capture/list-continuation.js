@@ -5,7 +5,7 @@
  *   the next list prefix. Empty list items ("just a marker") are removed
  *   instead of continued. Checkboxes ("- [ ]") restart as unchecked.
  * - Tab on a list item indents it by the marker width (nested item);
- *   Shift+Tab outdents. Selection must stay within one line.
+ * Shift+Tab outdents. Selection must stay within one line.
  * Pure functions — no DOM access.
  */
 
@@ -101,7 +101,8 @@ function getCheckboxPrefix(itemText) {
 /**
  * Tab / Shift+Tab indentation for list items. Indent inserts one level of
  * spaces equal to the current marker width (so the item aligns under its
- * content); outdent removes up to that many leading spaces. The selection
+ * content); outdent removes up to that many leading whitespace characters
+ * (spaces and tabs). The selection
  * must be within a single line. Non-list lines are not handled.
  *
  * @returns {{ nextContent: string, nextCursorPosition: number } | null}
