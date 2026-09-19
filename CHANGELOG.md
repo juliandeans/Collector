@@ -24,7 +24,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   the "Collect" button in the action bar or a global keyboard shortcut.
 - Capture draft persistence: unsubmitted text in the Capture window is
   now preserved across closes (Escape, clicking outside, toggle shortcut)
-  and restored when reopening. Can be disabled in Settings → Capture.
+  and restored when reopening. Emptying the window clears the saved draft
+  so an empty state is preserved as well. Can be disabled in Settings → Capture.
 
 #### Reader
 
