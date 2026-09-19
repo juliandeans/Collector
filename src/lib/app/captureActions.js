@@ -25,6 +25,7 @@ export function createCaptureActions({
     tick,
     getAppSettings,
     setAppSettings,
+    setIsRestoringDraft,
 }) {
     function deferHideCapture() {
         setTimeout(async () => {
@@ -157,6 +158,7 @@ export function createCaptureActions({
             draftCleared = false;
         }
         await tick();
+        setIsRestoringDraft?.(false);
         getTextarea()?.focus();
         if (draftCleared) {
             showStatus("Capture cleared", "success", 1800);

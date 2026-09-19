@@ -29,6 +29,7 @@
     } from "./lib/app/wikiAutocomplete.js";
     import { computeListContinuation, computeListIndentation } from "./lib/capture/list-continuation.js";
     import { computeMarkdownWrap } from "./lib/capture/markdownWrap.js";
+    import { computeDraftAction } from "./lib/capture/draftState.js";
     import {
         createCaptureActions,
         handleAppShortcut,
@@ -94,6 +95,7 @@
     let armResize = $state(() => {});
     let isResizing = $state(false);
     let isTauri = false;
+    let isRestoringDraft = true;
     let cleanupGlobalDragListeners;
     let cleanupCmdWindowDrag;
     let statusTimeout;
@@ -146,6 +148,9 @@
         setAppSettings: (v) => {
             appSettings = v;
         },
+        setIsRestoringDraft: (v) => {
+            isRestoringDraft = v;
+        },
     });
 
     const modifierWatcher = createModifierWatcher({
@@ -157,14 +162,45 @@
         },
     });
 
+    function flushPendingDraft() {
+        const action = computeDraftAction({
+            content,
+            isTauri,
+            isRestoringDraft,
+        });
+        clearTimeout(draftSaveTimer);
+        if (action.action === "clear") {
+            invoke("save_capture_draft", { content: "" }).catch((e) => {
+                console.error("Failed to clear capture draft on blur:", e);
+            });
+        } else if (action.action === "save") {
+            invoke("save_capture_draft", { content: action.content }).catch((e) => {
+                console.error("Failed to persist capture draft on blur:", e);
+            });
+        }
+    }
+
     $effect(() => {
         const currentContent = content;
         clearTimeout(draftSaveTimer);
 
-        if (!isTauri || !currentContent.trim()) return;
+        const action = computeDraftAction({
+            content: currentContent,
+            isTauri,
+            isRestoringDraft,
+        });
+
+        if (action.action === "ignore") return;
+
+        if (action.action === "clear") {
+            invoke("save_capture_draft", { content: "" }).catch((e) => {
+                console.error("Failed to clear capture draft:", e);
+            });
+            return;
+        }
 
         draftSaveTimer = setTimeout(() => {
-            invoke("save_capture_draft", { content: currentContent }).catch((e) => {
+            invoke("save_capture_draft", { content: action.content }).catch((e) => {
                 console.error("Failed to persist capture draft:", e);
             });
         }, 400);
@@ -330,6 +366,10 @@
                     setUnlistenTogglePersistDraft: (fn) => {
                         unlistenTogglePersistDraft = fn;
                     },
+                    setIsRestoringDraft: (v) => {
+                        isRestoringDraft = v;
+                    },
+                    tick,
                 });
                 unlistenSettingsChanged = await setupSettingsListener({
                     getAppSettings: () => appSettings,
@@ -357,9 +397,12 @@
                 console.error("Failed to listen to events:", e);
             }
         }
+
+        window.addEventListener("blur", flushPendingDraft);
     });
 
     onDestroy(() => {
+        window.removeEventListener("blur", flushPendingDraft);
         unlistenReset?.();
         unlistenShow?.();
         unlistenInsertCaptureText?.();
@@ -398,6 +441,8 @@
     }
 
     function resetCaptureState() {
+        isRestoringDraft = true;
+        clearTimeout(draftSaveTimer);
         content = "";
         uploadedImages = [];
         isDragging = false;
@@ -578,6 +623,7 @@
     }
 
     function handleWikiInput() {
+        isRestoringDraft = false;
         const state = computeInputState({
             textarea: textareaRef,
             notes: appendPickerNotes,
@@ -589,6 +635,7 @@
     }
 
     function insertWikilink(note) {
+        isRestoringDraft = false;
         const newContent = computeInsertion({
             textarea: textareaRef,
             query: wikiAutocompleteQuery,

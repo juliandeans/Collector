@@ -77,6 +77,8 @@ export async function setupCaptureWindowListeners({
     setUnlistenCaptureModeAppend,
     handleToggleDraftPersistence,
     setUnlistenTogglePersistDraft,
+    setIsRestoringDraft,
+    tick,
 }) {
     function appendText(text, shouldFocus = false) {
         if (typeof text !== "string" || !text.trim()) return;
@@ -100,33 +102,39 @@ export async function setupCaptureWindowListeners({
     // NOT emitted by capture-text (Cmd+Shift+C) — that must append.
     setUnlistenReset(
         await listen("reset_capture", async () => {
-            let captureModeActive = getCaptureModeActive();
+            setIsRestoringDraft?.(true);
             try {
-                captureModeActive = await invoke("get_capture_mode_state");
-                setCaptureModeActive(captureModeActive);
-            } catch (e) {
-                console.error("Failed to read capture mode state:", e);
-            }
-
-            if (!captureModeActive) {
-                freeBlobUrls();
-                resetCaptureState();
-            }
-            setStatusMessage("");
-            closeAppendPicker();
-
-            if (captureModeActive) return;
-
-            try {
-                const draft = await invoke("load_capture_draft");
-                // Capture Mode may have been toggled on while this load was
-                // in flight; if so, live clipboard appends already own the
-                // buffer and a stale draft must not overwrite them.
-                if (draft && !(await invoke("get_capture_mode_state"))) {
-                    setContent(draft);
+                let captureModeActive = getCaptureModeActive();
+                try {
+                    captureModeActive = await invoke("get_capture_mode_state");
+                    setCaptureModeActive(captureModeActive);
+                } catch (e) {
+                    console.error("Failed to read capture mode state:", e);
                 }
-            } catch (e) {
-                console.error("Failed to load capture draft:", e);
+
+                if (!captureModeActive) {
+                    freeBlobUrls();
+                    resetCaptureState();
+                }
+                setStatusMessage("");
+                closeAppendPicker();
+
+                if (captureModeActive) return;
+
+                try {
+                    const draft = await invoke("load_capture_draft");
+                    // Capture Mode may have been toggled on while this load was
+                    // in flight; if so, live clipboard appends already own the
+                    // buffer and a stale draft must not overwrite them.
+                    if (draft && !(await invoke("get_capture_mode_state"))) {
+                        setContent(draft);
+                    }
+                } catch (e) {
+                    console.error("Failed to load capture draft:", e);
+                }
+            } finally {
+                if (tick) await tick();
+                setIsRestoringDraft?.(false);
             }
         }),
     );
