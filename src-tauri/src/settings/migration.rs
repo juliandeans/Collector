@@ -203,8 +203,7 @@ impl Settings {
         // Migration: if old field names exist in raw config, trigger a save so serde
         // writes only the new names (overlay_color, overlay_strength). serde aliases
         // handle deserialization, so the values are already loaded correctly.
-        if raw_settings.is_some() {
-            let raw = raw_settings.as_ref().unwrap();
+        if let Some(raw) = raw_settings.as_ref() {
             if raw.get("background_color").is_some() && raw.get("overlay_color").is_none() {
                 log::info!("Marking config for re-save: background_color → overlay_color");
                 needs_save = true;

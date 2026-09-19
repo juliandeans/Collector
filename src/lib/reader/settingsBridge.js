@@ -47,8 +47,7 @@ export function applySettings(currentSettings = {}, settings = {}) {
     ...currentSettings,
     vault_name: settings.vault_name ?? currentSettings.vault_name,
     vault_path: settings.vault_path ?? currentSettings.vault_path,
-    overlay_color:
-      settings.overlay_color ?? currentSettings.overlay_color,
+    overlay_color: settings.overlay_color ?? currentSettings.overlay_color,
     font_family: settings.font_family ?? currentSettings.font_family,
     font_size: settings.font_size ?? currentSettings.font_size,
     border_radius: settings.border_radius ?? currentSettings.border_radius,
@@ -72,15 +71,16 @@ export function applySettings(currentSettings = {}, settings = {}) {
     show_note_paths:
       settings.show_note_paths ?? currentSettings.show_note_paths ?? true,
     autocomplete_results:
-      settings.autocomplete_results ?? currentSettings.autocomplete_results ?? 20,
+      settings.autocomplete_results ??
+      currentSettings.autocomplete_results ??
+      20,
     daily_note_create_if_missing:
       settings.daily_note_create_if_missing ??
       currentSettings.daily_note_create_if_missing,
     reader_show_daily_note:
       settings.reader_show_daily_note ?? currentSettings.reader_show_daily_note,
     save_to_daily_shortcut:
-      settings.save_to_daily_shortcut ??
-      currentSettings.save_to_daily_shortcut,
+      settings.save_to_daily_shortcut ?? currentSettings.save_to_daily_shortcut,
     reader_open_in_obsidian_shortcut:
       settings.reader_open_in_obsidian_shortcut ??
       currentSettings.reader_open_in_obsidian_shortcut,
@@ -110,7 +110,8 @@ export function applySettings(currentSettings = {}, settings = {}) {
     reader_hide_inline_fields:
       settings.reader_hide_inline_fields ??
       currentSettings.reader_hide_inline_fields,
-    reader_hide_html: settings.reader_hide_html ?? currentSettings.reader_hide_html,
+    reader_hide_html:
+      settings.reader_hide_html ?? currentSettings.reader_hide_html,
     reader_hide_callouts:
       settings.reader_hide_callouts ?? currentSettings.reader_hide_callouts,
     ocr_shortcut: settings.ocr_shortcut ?? currentSettings.ocr_shortcut,

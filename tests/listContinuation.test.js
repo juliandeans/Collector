@@ -113,13 +113,24 @@ test("marker without following space is not a list item", () => {
 });
 
 test("modifier keys are not handled", () => {
-    for (const extra of [{ metaKey: true }, { ctrlKey: true }, { shiftKey: true }, { altKey: true }]) {
-        assert.equal(computeListContinuation({ ...cursorAt("- item"), ...extra }), null);
+    for (const extra of [
+        { metaKey: true },
+        { ctrlKey: true },
+        { shiftKey: true },
+        { altKey: true },
+    ]) {
+        assert.equal(
+            computeListContinuation({ ...cursorAt("- item"), ...extra }),
+            null,
+        );
     }
 });
 
 test("non-Enter keys are not handled", () => {
-    assert.equal(computeListContinuation({ ...cursorAt("- item"), key: "Tab" }), null);
+    assert.equal(
+        computeListContinuation({ ...cursorAt("- item"), key: "Tab" }),
+        null,
+    );
 });
 
 test("collapsed selection is required", () => {
@@ -145,7 +156,12 @@ test("enter between two list items continues the touched item", () => {
 
 test("out-of-range cursor is rejected", () => {
     assert.equal(
-        computeListContinuation({ content: "- x", selectionStart: 99, selectionEnd: 99, key: "Enter" }),
+        computeListContinuation({
+            content: "- x",
+            selectionStart: 99,
+            selectionEnd: 99,
+            key: "Enter",
+        }),
         null,
     );
 });
@@ -162,8 +178,6 @@ test("Shift+Tab removes leading tab characters from pasted content", () => {
         nextCursorPosition: 6,
     });
 });
-
-
 
 test("Tab indents a bullet item by its marker width", () => {
     const result = computeListIndentation({

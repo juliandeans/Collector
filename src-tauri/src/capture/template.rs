@@ -17,8 +17,8 @@ where
 {
     // 12h-Zeitwerte vorbereiten
     let hour_12 = dt.format("%I").to_string();
-    let hour_12_nopad = if hour_12.starts_with('0') {
-        hour_12[1..].to_string()
+    let hour_12_nopad = if let Some(stripped) = hour_12.strip_prefix('0') {
+        stripped.to_string()
     } else {
         hour_12.clone()
     };

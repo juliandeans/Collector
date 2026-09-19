@@ -116,6 +116,7 @@ impl ShortcutManager {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn register_window_shortcuts<F>(
         &self,
         app: &AppHandle,

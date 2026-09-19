@@ -1,5 +1,8 @@
 import { getDailyNotePath } from "./tabIO.js";
-import { rebuildTabsFromSettings, getPinnedNotesSignature } from "./tabState.js";
+import {
+  rebuildTabsFromSettings,
+  getPinnedNotesSignature,
+} from "./tabState.js";
 import {
   applyColorSettings,
   applySettings,
@@ -10,7 +13,15 @@ import { clearImageCache } from "./contentProcessing.js";
 
 export async function applyTabSettings(settings, options = {}, bag) {
   const { preserveOpened = true, forceReloadActive = false } = options;
-  const { getTabs, setTabs, getActiveTab, setActiveTabIndex, loadTab, loadEditorContent, setMissingFileMessage } = bag;
+  const {
+    getTabs,
+    setTabs,
+    getActiveTab,
+    setActiveTabIndex,
+    loadTab,
+    loadEditorContent,
+    setMissingFileMessage,
+  } = bag;
 
   const dailyPath = await getDailyNotePath(settings);
   const nextState = rebuildTabsFromSettings(settings, getTabs(), {
@@ -31,15 +42,26 @@ export async function applyTabSettings(settings, options = {}, bag) {
   }
 
   await loadEditorContent(currentTab.content);
-  setMissingFileMessage(currentTab.missing ? currentTab.missingMessage || "" : "");
+  setMissingFileMessage(
+    currentTab.missing ? currentTab.missingMessage || "" : "",
+  );
 }
 
 export async function handleSettingsChanged(settings, bag) {
-  const { getAppSettings, setAppSettings, getRawContent, getEditorComponent, flushPendingSave, renderContentToEditor } = bag;
+  const {
+    getAppSettings,
+    setAppSettings,
+    getRawContent,
+    getEditorComponent,
+    flushPendingSave,
+    renderContentToEditor,
+  } = bag;
 
   const previousSettings = getAppSettings();
   const previousFilters = getReaderFilterSettings(previousSettings);
-  const previousPinnedNotes = getPinnedNotesSignature(previousSettings.pinned_notes);
+  const previousPinnedNotes = getPinnedNotesSignature(
+    previousSettings.pinned_notes,
+  );
   const nextSettings = applySettings(previousSettings, settings);
   setAppSettings(nextSettings);
   applyColorSettings(nextSettings);
@@ -53,7 +75,11 @@ export async function handleSettingsChanged(settings, bag) {
 
   if (previousPinnedNotes !== nextPinnedNotes || dailyNoteVisibilityChanged) {
     await flushPendingSave(false);
-    await applyTabSettings(settings, { preserveOpened: true, forceReloadActive: false }, bag);
+    await applyTabSettings(
+      settings,
+      { preserveOpened: true, forceReloadActive: false },
+      bag,
+    );
     return;
   }
 
@@ -70,5 +96,9 @@ export async function buildInitialTabs(bag) {
   const merged = applySettings(getAppSettings(), settings);
   setAppSettings(merged);
   applyColorSettings(merged);
-  await applyTabSettings(settings, { preserveOpened: false, forceReloadActive: true }, bag);
+  await applyTabSettings(
+    settings,
+    { preserveOpened: false, forceReloadActive: true },
+    bag,
+  );
 }

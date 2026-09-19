@@ -59,7 +59,7 @@ pub(crate) fn position_window_logical(
 
     let x = match settings.edge_side.as_str() {
         "left" => monitor.x as f64,
-        "right" | _ => monitor.x as f64 + monitor.width as f64 - width,
+        _ => monitor.x as f64 + monitor.width as f64 - width,
     };
 
     window
@@ -193,7 +193,7 @@ pub(crate) fn position_reader_window_logical(
 
     let x = match settings.reader_edge_side.as_str() {
         "left" => monitor.x as f64,
-        "right" | _ => monitor.x as f64 + monitor.width as f64 - width,
+        _ => monitor.x as f64 + monitor.width as f64 - width,
     };
 
     window
