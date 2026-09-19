@@ -20,10 +20,10 @@ Features may shift between versions based on feedback.
 
 ### Capture
 
-- **Smart capture routing rules** — user-defined rules that automatically route captured content based on text patterns. Example: any capture containing #random is appended to a configured note; any capture containing @badezimmer is routed to the note "Renovierung" under the section "## Badezimmer". Intended for power users who want context-aware capture destinations without manual selection.
-- OCR: capture text from a screen region to note window
+- **Smart capture routing rules** — user-defined rules that automatically route captured content based on text patterns *(umgesetzt in 1.3.0)*
+- OCR: capture text from image/clipboard to note window *(umgesetzt in 1.3.0)*
 - Source URL: automatically append the active browser tab URL
-- basic markdown support (bold, italic, etc.)
+- basic markdown support (bold, italic, list continuation/indentation) *(umgesetzt in 1.3.0)*
 
 ### Vault
 
