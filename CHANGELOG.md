@@ -3,6 +3,18 @@
 All notable changes to Collector are documented here.  
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+
+#### Settings
+
+- Font Family now lists every font family installed on your Mac, with "System (Default)" at the top. To use a custom font, install it in Font Book and pick it in Settings → Look → Typography. If a chosen font is removed later, Collector falls back to the system font and marks it "(not installed)".
+
+### Fixed
+
+- The Font Family picker no longer shows an empty selection when the default system font is in use.
+
 ## [1.3.0] - 2026-09-29
 
 ### Added
