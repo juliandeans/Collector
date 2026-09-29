@@ -15,6 +15,7 @@
         handleEditorPaste as onEditorPaste,
         insertPlainTextAtSelection,
     } from "./editorMouseAndPaste.js";
+    import { handleListKey } from "./editorListKeys.js";
 
     import "./reader-editor.css";
 
@@ -242,6 +243,13 @@
 
         if (autocompleteManager.handleAutocompleteKeydown(event)) {
             event.stopPropagation();
+            return;
+        }
+
+        if (handleListKey(event, { editorRef, blockManager })) {
+            event.stopPropagation();
+            onChange?.();
+            autocompleteManager.checkAutocomplete();
             return;
         }
 
