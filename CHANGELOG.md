@@ -36,6 +36,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Lists in the Reader: nested items are shown indented, `*`, `+` and
   numbered (`1.`) lists are recognized, and Enter / Tab / Shift+Tab continue,
   indent and outdent list items exactly like in the Capture window.
+- Numbered lists (Capture and Reader): Tab restarts the indented item at
+  `1.`, Shift+Tab moves it back to its parent's level and continues that
+  level's numbering — like Obsidian.
 
 #### Editor & Autocomplete
 

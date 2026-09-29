@@ -18,7 +18,7 @@ export {
 
 import { getCachedImageSrc } from "./imageProcessing.js";
 import { normalizeNewlines } from "./contentPreprocess.js";
-import { parseListLine } from "../capture/list-continuation.js";
+import { indentColumnWidth, parseListLine } from "../capture/list-continuation.js";
 
 function escHtml(text = "") {
   return text
@@ -243,20 +243,12 @@ function processCallout(lines = [], appSettings = {}) {
   return `<div class="callout callout-${colorClass}" data-raw="${escAttr(raw)}"><div class="callout-title"><span class="callout-icon">${icon}</span><span class="callout-label">${escHtml(title)}</span></div>${content ? `<div class="callout-content">${content}</div>` : ""}</div>`;
 }
 
-function listIndentColumns(indent = "") {
-  let columns = 0;
-  for (const char of indent) {
-    columns += char === "\t" ? 4 : 1;
-  }
-  return columns;
-}
-
 function listItemToHtml({ indent, marker, spacing, checkbox, checkboxSpacing, text }) {
   const attrs = [
     `data-indent="${escAttr(indent)}"`,
     `data-marker="${escAttr(marker)}"`,
     `data-spacing="${escAttr(spacing)}"`,
-    `style="--list-indent: ${listIndentColumns(indent)}"`,
+    `style="--list-indent: ${indentColumnWidth(indent)}"`,
   ];
 
   if (checkbox === null) {

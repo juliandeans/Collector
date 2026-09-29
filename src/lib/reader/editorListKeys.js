@@ -1,13 +1,16 @@
 import {
+  LIST_PATTERN,
   computeListContinuation,
   computeListIndentation,
 } from "../capture/list-continuation.js";
+import { elementToMarkdownLine } from "./editorSerialization.js";
 
 /**
  * List keys for the Reader editor: Enter / Tab / Shift+Tab on the active
  * raw-mode block, using exactly the Capture window's rules. The active block
  * holds a single raw markdown line, so the Capture functions (which work on
- * text + caret offsets) apply to it directly.
+ * text + caret offsets) apply to it directly. For Tab the markdown lines of
+ * the blocks above are prepended so list renumbering can see the outer list.
  */
 
 export function splitLineEdit({ nextContent, nextCursorPosition }) {
@@ -24,6 +27,7 @@ export function splitLineEdit({ nextContent, nextCursorPosition }) {
 
 export function computeListKeyEdit({
   lineText,
+  precedingLines = [],
   selectionStart,
   selectionEnd,
   key,
@@ -36,10 +40,16 @@ export function computeListKeyEdit({
   if (isComposing) return null;
   if (typeof lineText !== "string" || lineText.includes("\n")) return null;
 
+  // Run the capture functions on a temporary document: the active line plus
+  // the markdown lines above it, so outdenting can continue the numbering of
+  // the outer list. The prefix itself never changes, so it is stripped again
+  // (content and caret offsets) before splitting into per-block lines.
+  const prefix = precedingLines.length > 0 ? `${precedingLines.join("\n")}\n` : "";
+
   const input = {
-    content: lineText,
-    selectionStart,
-    selectionEnd,
+    content: prefix + lineText,
+    selectionStart: selectionStart + prefix.length,
+    selectionEnd: selectionEnd + prefix.length,
     key,
     shiftKey,
     metaKey,
@@ -50,8 +60,30 @@ export function computeListKeyEdit({
   let result = null;
   if (key === "Enter") result = computeListContinuation(input);
   else if (key === "Tab") result = computeListIndentation(input);
+  if (!result) return null;
 
-  return result ? splitLineEdit(result) : null;
+  return splitLineEdit({
+    nextContent: result.nextContent.slice(prefix.length),
+    nextCursorPosition: result.nextCursorPosition - prefix.length,
+  });
+}
+
+/**
+ * Markdown lines of the list blocks directly above `block`, top-to-bottom,
+ * for list renumbering.
+ */
+function collectPrecedingLines(block) {
+  const lines = [];
+  let sibling = block.previousElementSibling;
+  while (sibling) {
+    const line = elementToMarkdownLine(sibling);
+    // The renumbering scan stops at the first non-list line anyway, so the
+    // walk ends at the list's boundary (blank line, paragraph, code block).
+    if (line === null || !LIST_PATTERN.test(line)) break;
+    lines.push(line);
+    sibling = sibling.previousElementSibling;
+  }
+  return lines.reverse();
 }
 
 function selectionOffsetsIn(block) {
@@ -110,6 +142,11 @@ export function handleListKey(event, { editorRef, blockManager }) {
 
   const edit = computeListKeyEdit({
     lineText: block.textContent ?? "",
+    // Only Tab on a list line needs the outer list; skip the DOM walk otherwise.
+    precedingLines:
+      event.key === "Tab" && LIST_PATTERN.test(block.textContent ?? "")
+        ? collectPrecedingLines(block)
+        : [],
     selectionStart: offsets.start,
     selectionEnd: offsets.end,
     key: event.key,

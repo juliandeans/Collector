@@ -6,7 +6,9 @@
  *   the next list prefix. Empty list items ("just a marker") are removed
  *   instead of continued. Checkboxes ("- [ ]") restart as unchecked.
  * - Tab on a list item indents it by the marker width (nested item);
- * Shift+Tab outdents. Selection must stay within one line.
+ *   numbered items restart at "1.". Shift+Tab outdents and continues the
+ *   numbering of the list level above (Obsidian-style). Selection must stay
+ *   within one line.
  * Pure functions — no DOM access.
  */
 
@@ -155,22 +157,131 @@ export function computeListIndentation({
 
     if (!shiftKey) {
         const insertion = " ".repeat(step);
+        if (!isNumberedMarker(marker)) {
+            const nextContent =
+                content.slice(0, startLineStart) + insertion + content.slice(startLineStart);
+            return { nextContent, nextCursorPosition: selectionStart + step };
+        }
+        // Indenting a numbered item restarts the nested list at "1.".
         const nextContent =
-            content.slice(0, startLineStart) + insertion + content.slice(startLineStart);
-        return { nextContent, nextCursorPosition: selectionStart + step };
+            content.slice(0, startLineStart) +
+            insertion +
+            indent +
+            "1." +
+            content.slice(startLineStart + indent.length + marker.length);
+        const nextCaretInLine = mapCaretInLine(selectionStart - startLineStart, {
+            oldIndentLength: indent.length,
+            oldMarkerLength: marker.length,
+            newIndentLength: step + indent.length,
+            newMarkerLength: "1.".length,
+        });
+        return { nextContent, nextCursorPosition: startLineStart + nextCaretInLine };
     }
 
-    const leadingWhitespace = /^[\t ]*/.exec(line)[0].length;
-    const removable = Math.min(step, leadingWhitespace);
-    if (removable === 0) {
-        return null;
+    // Outdent lands on the level of the parent item (the nearest list line
+    // above with a smaller indent), like Obsidian. Without a parent in the
+    // same list, remove up to one marker width of leading whitespace.
+    const parentIndent = findParentIndent(content, startLineStart, indentColumnWidth(indent));
+    let nextIndent;
+    if (parentIndent !== null) {
+        nextIndent = parentIndent;
+    } else {
+        const removable = Math.min(step, indent.length);
+        if (removable === 0) {
+            return null;
+        }
+        nextIndent = indent.slice(removable);
     }
+
+    // Numbered items continue the numbering of the level they land on.
+    const nextMarker = isNumberedMarker(marker)
+        ? `${findNumberAfterOutdent(content, startLineStart, indentColumnWidth(nextIndent))}.`
+        : marker;
+
     const nextContent =
-        content.slice(0, startLineStart) + content.slice(startLineStart + removable);
-    return {
-        nextContent,
-        nextCursorPosition: Math.max(startLineStart, selectionStart - removable),
-    };
+        content.slice(0, startLineStart) +
+        nextIndent +
+        nextMarker +
+        content.slice(startLineStart + indent.length + marker.length);
+
+    const nextCaretInLine = mapCaretInLine(selectionStart - startLineStart, {
+        oldIndentLength: indent.length,
+        oldMarkerLength: marker.length,
+        newIndentLength: nextIndent.length,
+        newMarkerLength: nextMarker.length,
+    });
+
+    return { nextContent, nextCursorPosition: startLineStart + nextCaretInLine };
+}
+
+/**
+ * Maps a caret offset within a list line whose indent and marker were
+ * replaced. Regions are classified by the ORIGINAL boundaries: inside the
+ * indent the caret moves with the indent change (clamped to the new indent),
+ * inside the marker it goes right after the new marker, after the marker it
+ * keeps its place in the item text.
+ */
+function mapCaretInLine(
+    caretInLine,
+    { oldIndentLength, oldMarkerLength, newIndentLength, newMarkerLength },
+) {
+    const indentDelta = newIndentLength - oldIndentLength;
+    if (caretInLine <= oldIndentLength) {
+        return Math.min(Math.max(caretInLine + indentDelta, 0), newIndentLength);
+    }
+    if (caretInLine < oldIndentLength + oldMarkerLength) {
+        return newIndentLength + newMarkerLength;
+    }
+    return caretInLine + indentDelta + (newMarkerLength - oldMarkerLength);
+}
+
+/**
+ * Indent string of the nearest list line above `lineStart` whose indent is
+ * narrower than `currentWidth` columns, or null when a non-list line comes
+ * first (the item has no parent in this list).
+ */
+function findParentIndent(content, lineStart, currentWidth) {
+    // lineStart - 1 drops the newline directly before the current line.
+    const linesAbove = content.slice(0, Math.max(0, lineStart - 1)).split("\n");
+    if (lineStart === 0) return null;
+    for (let i = linesAbove.length - 1; i >= 0; i--) {
+        const parsed = parseListLine(linesAbove[i]);
+        if (!parsed) return null;
+        if (indentColumnWidth(parsed.indent) < currentWidth) return parsed.indent;
+    }
+    return null;
+}
+
+/**
+ * Visual width of indentation in columns: a tab counts as 4, every other
+ * whitespace character as 1.
+ */
+export function indentColumnWidth(indent) {
+    let width = 0;
+    for (const char of indent) {
+        width += char === "\t" ? 4 : 1;
+    }
+    return width;
+}
+
+/**
+ * Number for a numbered item after outdenting to `outdentedWidth` columns:
+ * the next number after the numbered item directly above on that level.
+ * Scanning upward stops at the first non-list line, at a shallower line, or
+ * at a bullet on the target level — in all those cases the item restarts at 1.
+ */
+function findNumberAfterOutdent(content, lineStart, outdentedWidth) {
+    // lineStart - 1 drops the newline directly before the current line.
+    const linesAbove = content.slice(0, Math.max(0, lineStart - 1)).split("\n");
+    for (let i = linesAbove.length - 1; i >= 0; i--) {
+        const parsed = parseListLine(linesAbove[i]);
+        if (!parsed) return 1;
+        const width = indentColumnWidth(parsed.indent);
+        if (width < outdentedWidth) return 1;
+        if (width > outdentedWidth) continue;
+        return isNumberedMarker(parsed.marker) ? parseInt(parsed.marker, 10) + 1 : 1;
+    }
+    return 1;
 }
 
 // Captures ALL whitespace after the box so the item text never starts with
