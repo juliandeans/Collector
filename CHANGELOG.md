@@ -3,6 +3,15 @@
 All notable changes to Collector are documented here.  
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Tab in lists (Capture and Reader) now indents exactly like Obsidian: with a
+  tab by default, or with 4 spaces if "Indent using tabs" is turned off in the
+  vault's Obsidian settings. Previously Collector inserted spaces matching the
+  marker width.
+
 ## [1.3.0] - 2026-09-29
 
 ### Added
