@@ -29,6 +29,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 #### Reader
 
+- Notes created in Obsidian now appear in Collector without a restart: the vault note list is re-read (at most every 3 seconds) when the Reader palette opens (`Cmd+P`), when the Reader or Capture window is shown, and when the Capture append picker opens; a `[[link]]` to a note Collector does not know yet triggers one fresh read before "Note not found".
 - Reader: "Show Daily Note" checkbox (Settings → Reader → Pinned Notes, on by default) — when off, the Daily Note tab is not shown in the Reader window.
 - Reader: pinned notes can be reordered in Settings with ↑/↓ buttons (same pattern as capture rules); tab order follows the list order.
 - Configurable "Next Tab" / "Previous Tab" keyboard shortcuts in the Reader
