@@ -25,6 +25,7 @@
      * @property {any} [appSettings]
      * @property {any} [vaultNotes]
      * @property {any} [vaultTags]
+     * @property {string} [indentUnit]
      * @property {string} [missingFileMessage]
      * @property {string} [activeTabKind]
      * @property {boolean} [showSearch]
@@ -54,6 +55,7 @@
         appSettings = {},
         vaultNotes = [],
         vaultTags = [],
+        indentUnit = "\t",
         missingFileMessage = "",
         activeTabKind = "",
         showSearch = false,
@@ -272,7 +274,7 @@
             return;
         }
 
-        if (handleListKey(event, { editorRef, blockManager })) {
+        if (handleListKey(event, { editorRef, blockManager, indentUnit })) {
             event.stopPropagation();
             onChange?.();
             autocompleteManager.checkAutocomplete();

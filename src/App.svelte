@@ -28,6 +28,7 @@
         handleWikiKeydown,
     } from "./lib/app/wikiAutocomplete.js";
     import { computeListContinuation, computeListIndentation } from "./lib/capture/list-continuation.js";
+    import { createIndentUnitRefresher } from "./lib/obsidianIndent.js";
     import { computeMarkdownWrap } from "./lib/capture/markdownWrap.js";
     import { computeDraftAction } from "./lib/capture/draftState.js";
     import {
@@ -95,6 +96,12 @@
             );
         },
     });
+    const refreshIndentUnit = createIndentUnitRefresher({
+        invoke,
+        setUnit: (unit) => {
+            indentUnit = unit;
+        },
+    });
     let appendPickerSelectedIndex = $state(0);
     let appendPickerStep = $state(1);
     let appendPickerSelectedNote = $state(null);
@@ -128,6 +135,7 @@
     let wikiAnchorPos = 0;
     let wikiAutocompleteMode = $state(null);
     let vaultTags = $state([]);
+    let indentUnit = $state("\t");
 
     let appSettings = $state({ ...defaultSettings });
 
@@ -289,6 +297,7 @@
     }
 
     function refreshCaptureVaultData() {
+        refreshIndentUnit();
         // Non-fatal on error: the append picker reports load errors when it opens.
         refreshCaptureNotes("ifStale").catch(() => {});
         refreshVaultTags();
@@ -569,6 +578,7 @@
             content,
             selectionStart: textarea.selectionStart,
             selectionEnd: textarea.selectionEnd,
+            indentUnit,
             metaKey: e.metaKey,
             ctrlKey: e.ctrlKey,
             altKey: e.altKey,

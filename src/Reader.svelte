@@ -23,6 +23,7 @@
   import { createReaderOcr } from "./lib/reader/readerOcr.js";
   import { createSearchCoordinator } from "./lib/reader/readerSearchCoordinator.js";
   import { setupCmdWindowDrag } from "./lib/windowDrag.js";
+  import { createIndentUnitRefresher } from "./lib/obsidianIndent.js";
   import { clearImageCache } from "./lib/reader/contentProcessing.js";
   import * as editorBridge from "./lib/reader/editorBridge.js";
   import * as tabLifecycle from "./lib/reader/tabLifecycle.js";
@@ -56,6 +57,7 @@
     },
   });
   let vaultTags = $state([]);
+  let indentUnit = $state("\t");
   let isSaving = false;
   let rawContent = $state("");
   let strippedFrontmatter = $state("");
@@ -121,6 +123,13 @@
   let isDragging = $state(false);
   let isOcrModifierHeld = $state(false);
   let unlistenDragDrop;
+
+  const refreshIndentUnit = createIndentUnitRefresher({
+    invoke,
+    setUnit: (unit) => {
+      indentUnit = unit;
+    },
+  });
 
   let modifierSymbol = $derived.by(() => {
     const mod = appSettings?.ocr_drag_modifier || "Option";
@@ -483,6 +492,7 @@
   }
 
   async function handleShowReader() {
+    refreshIndentUnit();
     refreshVaultTags();
     navigationGlue.refreshVaultNotesInBackground(navigationGlueBag());
     saveScrollPosition();
@@ -529,6 +539,7 @@
     cleanupCmdWindowDrag = setupCmdWindowDrag();
     try {
       await buildInitialTabs();
+      refreshIndentUnit();
       refreshVaultNotes("ifStale")
         .then(() => {
           refreshVaultTags();
@@ -685,6 +696,7 @@
     {appSettings}
     {vaultNotes}
     {vaultTags}
+    {indentUnit}
     {showSearch}
     {showAutocomplete}
     activeTabKind={activeTab?.kind ?? ""}
