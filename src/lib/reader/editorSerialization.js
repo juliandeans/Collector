@@ -38,6 +38,19 @@ export function listItemToMarkdown(dataset = {}, { checked = null, text = "" } =
   });
 }
 
+/**
+ * Turns a plain paragraph's text into its markdown line. Leading whitespace is
+ * kept (an indented paragraph belongs to the list item above it in Obsidian);
+ * non-breaking spaces the editor put into that indentation become plain spaces.
+ * Trailing whitespace is dropped; a whitespace-only paragraph becomes "".
+ */
+export function paragraphToMarkdownLine(text = "") {
+  const trimmedEnd = text.trimEnd();
+  const indentLength = trimmedEnd.length - trimmedEnd.trimStart().length;
+  const indent = trimmedEnd.slice(0, indentLength).replace(/ /g, " ");
+  return indent + trimmedEnd.slice(indentLength);
+}
+
 export function elementInnerToMarkdown(el) {
   let result = "";
 
@@ -329,7 +342,7 @@ export function htmlToMarkdown(el) {
         return;
       }
 
-      const text = elementInnerToMarkdown(element).trim();
+      const text = paragraphToMarkdownLine(elementInnerToMarkdown(element));
       const hasOnlyBreak =
         element.childNodes.length === 1 &&
         element.firstChild?.nodeType === Node.ELEMENT_NODE &&

@@ -23,6 +23,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The Capture window shows tabs 4 columns wide, like Obsidian and the Reader
   (previously 8).
 - The Font Family picker no longer shows an empty selection when the default system font is in use.
+- Saving a note in the Reader no longer removes the indentation of indented
+  text lines that are not list items (e.g. a note line under a list item), so
+  they stay attached to their list item in Obsidian.
 
 ## [1.3.0] - 2026-09-29
 
