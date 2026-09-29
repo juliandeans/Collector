@@ -2,6 +2,7 @@ use tokio::time::{timeout, Duration};
 
 use crate::app_state::AppState;
 use crate::note_metadata_cache::NoteMetadataCache;
+use crate::obsidian_config::{parse_obsidian_indent, ObsidianIndent};
 use crate::vault_index;
 use crate::vault_index_refresh::{self, NoteListRefresh};
 use crate::vault_paths::{build_image_data_url, resolve_vault_read_path, resolve_vault_write_path};
@@ -192,4 +193,24 @@ pub(crate) async fn reindex_vault(state: tauri::State<'_, AppState>) -> Result<u
     log::info!("Vault reindex complete: {} files", count);
 
     Ok(count)
+}
+
+/// Obsidian's list indentation for the configured vault. Never fails: a missing,
+/// unreadable or slow (iCloud) `.obsidian/app.json` yields Obsidian's defaults.
+#[tauri::command]
+pub(crate) async fn get_obsidian_indent(
+    state: tauri::State<'_, AppState>,
+) -> Result<ObsidianIndent, String> {
+    let vault_path = state.settings.read().await.vault_path.clone();
+    if vault_path.trim().is_empty() {
+        return Ok(ObsidianIndent::default());
+    }
+
+    let app_json = std::path::Path::new(&vault_path)
+        .join(".obsidian")
+        .join("app.json");
+    match timeout(Duration::from_secs(5), tokio::fs::read_to_string(&app_json)).await {
+        Ok(Ok(content)) => Ok(parse_obsidian_indent(&content)),
+        _ => Ok(ObsidianIndent::default()),
+    }
 }

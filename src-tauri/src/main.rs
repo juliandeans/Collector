@@ -16,6 +16,7 @@ mod log_safety;
 mod markdown_sections;
 mod note_metadata;
 mod note_metadata_cache;
+mod obsidian_config;
 mod ocr;
 #[cfg(all(debug_assertions, target_os = "macos"))]
 mod resize_diagnostics;
@@ -403,6 +404,7 @@ fn main() {
             commands::vault::list_vault_tags,
             commands::capture::get_daily_note_path,
             commands::vault::reindex_vault,
+            commands::vault::get_obsidian_indent,
             commands::images::save_image,
             commands::images::save_image_from_bytes,
             commands::ocr::ocr_clipboard_image,
