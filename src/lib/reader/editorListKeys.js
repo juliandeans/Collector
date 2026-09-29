@@ -35,6 +35,7 @@ export function computeListKeyEdit({
   metaKey = false,
   ctrlKey = false,
   altKey = false,
+  indentUnit,
   isComposing = false,
 }) {
   if (isComposing) return null;
@@ -55,6 +56,7 @@ export function computeListKeyEdit({
     metaKey,
     ctrlKey,
     altKey,
+    indentUnit,
   };
 
   let result = null;
@@ -129,7 +131,7 @@ function placeCaret(block, offset) {
   selection.addRange(range);
 }
 
-export function handleListKey(event, { editorRef, blockManager }) {
+export function handleListKey(event, { editorRef, blockManager, indentUnit }) {
   if (event.key !== "Enter" && event.key !== "Tab") return false;
 
   const block = blockManager.getActiveParagraph();
@@ -155,6 +157,7 @@ export function handleListKey(event, { editorRef, blockManager }) {
     metaKey: event.metaKey,
     ctrlKey: event.ctrlKey,
     altKey: event.altKey,
+    indentUnit,
     isComposing: event.isComposing,
   });
   if (!edit) return false;

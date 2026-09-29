@@ -179,7 +179,7 @@ test("Shift+Tab removes leading tab characters from pasted content", () => {
     });
 });
 
-test("Tab indents a bullet item by its marker width", () => {
+test("Tab indents a bullet item by one tab", () => {
     const result = computeListIndentation({
         content: "- item",
         selectionStart: 6,
@@ -187,8 +187,8 @@ test("Tab indents a bullet item by its marker width", () => {
         key: "Tab",
     });
     assert.deepEqual(result, {
-        nextContent: "  - item",
-        nextCursorPosition: 8,
+        nextContent: "\t- item",
+        nextCursorPosition: 7,
     });
 });
 
@@ -200,12 +200,12 @@ test("Tab on a nested item adds another level", () => {
         key: "Tab",
     });
     assert.deepEqual(result, {
-        nextContent: "    - sub",
-        nextCursorPosition: 9,
+        nextContent: "\t  - sub",
+        nextCursorPosition: 8,
     });
 });
 
-test("Tab on a numbered item aligns under the content column", () => {
+test("Tab on a numbered item indents by one tab", () => {
     const result = computeListIndentation({
         content: "1. a",
         selectionStart: 4,
@@ -213,8 +213,8 @@ test("Tab on a numbered item aligns under the content column", () => {
         key: "Tab",
     });
     assert.deepEqual(result, {
-        nextContent: "   1. a",
-        nextCursorPosition: 7,
+        nextContent: "\t1. a",
+        nextCursorPosition: 5,
     });
 });
 

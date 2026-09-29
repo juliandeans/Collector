@@ -15,15 +15,15 @@ function tabAtEnd(content, shiftKey = false) {
 
 test("Tab on a numbered item restarts the nested list at 1.", () => {
     assert.deepEqual(tabAtEnd("1. a\n2. b"), {
-        nextContent: "1. a\n   1. b",
-        nextCursorPosition: 12,
+        nextContent: "1. a\n\t1. b",
+        nextCursorPosition: 10,
     });
 });
 
 test("Tab on a two-digit numbered item restarts at 1. and keeps the caret after the text", () => {
     assert.deepEqual(tabAtEnd("9. x\n10. y"), {
-        nextContent: "9. x\n    1. y",
-        nextCursorPosition: 13,
+        nextContent: "9. x\n\t1. y",
+        nextCursorPosition: 10,
     });
 });
 
@@ -36,7 +36,7 @@ test("Tab with the caret at the line start keeps the caret before the marker", (
             selectionEnd: 5,
             key: "Tab",
         }),
-        { nextContent: "1. a\n   1. b", nextCursorPosition: 8 },
+        { nextContent: "1. a\n\t1. b", nextCursorPosition: 6 },
     );
 });
 
@@ -70,8 +70,8 @@ test("Shift+Tab does not look past a blank line", () => {
 
 test("bullets keep their marker on Tab and Shift+Tab", () => {
     assert.deepEqual(tabAtEnd("1. a\n- b"), {
-        nextContent: "1. a\n  - b",
-        nextCursorPosition: 10,
+        nextContent: "1. a\n\t- b",
+        nextCursorPosition: 9,
     });
     assert.deepEqual(tabAtEnd("1. a\n  - b", true), {
         nextContent: "1. a\n- b",
@@ -92,9 +92,9 @@ function readerKey(lineText, precedingLines, shiftKey = false) {
 
 test("Reader: Tab on a numbered block restarts at 1.", () => {
     assert.deepEqual(readerKey("2. b", ["1. a"]), {
-        lines: ["   1. b"],
+        lines: ["\t1. b"],
         caretLine: 0,
-        caretOffset: 7,
+        caretOffset: 5,
     });
 });
 
@@ -129,7 +129,7 @@ test("Reader: outdenting a long marker with the caret inside it never yields a n
 
 test("Tab then Shift+Tab on item 10 returns to the original level", () => {
     const indented = tabAtEnd("9. x\n10. y");
-    assert.equal(indented.nextContent, "9. x\n    1. y");
+    assert.equal(indented.nextContent, "9. x\n\t1. y");
     assert.deepEqual(tabAtEnd(indented.nextContent, true), {
         nextContent: "9. x\n10. y",
         nextCursorPosition: 10,
@@ -151,7 +151,7 @@ test("Tab with the caret inside a two-digit marker puts it right after the new 1
             selectionEnd: 1,
             key: "Tab",
         }),
-        { nextContent: "    1. y", nextCursorPosition: 6 },
+        { nextContent: "\t1. y", nextCursorPosition: 3 },
     );
 });
 

@@ -42,11 +42,11 @@ test("Enter on an empty item ends the list", () => {
     assert.deepEqual(key("   - ", "Enter"), { lines: [""], caretLine: 0, caretOffset: 0 });
 });
 
-test("Tab indents by the marker width, Shift+Tab outdents", () => {
+test("Tab indents by one tab, Shift+Tab outdents", () => {
     assert.deepEqual(key("- item", "Tab", { caret: 3 }), {
-        lines: ["  - item"],
+        lines: ["\t- item"],
         caretLine: 0,
-        caretOffset: 5,
+        caretOffset: 4,
     });
     assert.deepEqual(key("  - item", "Tab", { caret: 5, shiftKey: true }), {
         lines: ["- item"],

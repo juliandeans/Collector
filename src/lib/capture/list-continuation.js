@@ -6,14 +6,16 @@
  *   the next list prefix. An empty nested item moves up one level; an empty
  *   top-level item is removed instead of continued. Checkboxes ("- [ ]")
  *   restart as unchecked.
- * - Tab on a list item indents it by the marker width (nested item);
- *   numbered items restart at "1.". Shift+Tab outdents and continues the
- *   numbering of the list level above (Obsidian-style). Selection must stay
- *   within one line.
+ * - Tab on a list item indents it by one level (a tab, or the vault's Obsidian
+ *   space setting); numbered items restart at "1.". Shift+Tab outdents and
+ *   continues the numbering of the list level above (Obsidian-style).
+ *   Selection must stay within one line.
  * Pure functions — no DOM access.
  */
 
 export const LIST_PATTERN = /^(\s*)([-*+]|\d+\.)([ \t]+)(.*)$/;
+/** Obsidian's default indentation (`useTab: true`). */
+export const DEFAULT_INDENT_UNIT = "\t";
 const CHECKBOX_PATTERN = /^\[( |x|X)\]\s?/;
 
 /**
@@ -38,6 +40,7 @@ export function computeListContinuation({
     ctrlKey = false,
     shiftKey = false,
     altKey = false,
+    indentUnit = DEFAULT_INDENT_UNIT,
 }) {
     if (key !== "Enter" || metaKey || ctrlKey || shiftKey || altKey) {
         return null;
@@ -79,6 +82,7 @@ export function computeListContinuation({
                 selectionEnd: lineEnd,
                 key: "Tab",
                 shiftKey: true,
+                indentUnit,
             });
         }
         const prefixLength =
@@ -113,11 +117,10 @@ function getCheckboxPrefix(itemText) {
 }
 
 /**
- * Tab / Shift+Tab indentation for list items. Indent inserts one level of
- * spaces equal to the current marker width (so the item aligns under its
- * content); outdent removes up to that many leading whitespace characters
- * (spaces and tabs). The selection
- * must be within a single line. Non-list lines are not handled.
+ * Tab / Shift+Tab indentation for list items. `indentUnit` is the vault's
+ * Obsidian indentation unit (a tab or spaces); outdent lands on the parent
+ * level when one exists and otherwise removes one trailing indentation unit.
+ * The selection must be within a single line. Non-list lines are not handled.
  *
  * @returns {{ nextContent: string, nextCursorPosition: number } | null}
  */
@@ -130,6 +133,7 @@ export function computeListIndentation({
     metaKey = false,
     ctrlKey = false,
     altKey = false,
+    indentUnit = DEFAULT_INDENT_UNIT,
 }) {
     if (key !== "Tab" || metaKey || ctrlKey || altKey) {
         return null;
@@ -160,30 +164,27 @@ export function computeListIndentation({
         return null;
     }
 
-    const [, indent, marker, spaces = ""] = match;
-    // One indentation step aligns the nested marker under the current
-    // item's content column: marker + following spaces (indent excluded,
-    // else nested levels double).
-    const step = marker.length + spaces.length;
+    const [, indent, marker] = match;
 
     if (!shiftKey) {
-        const insertion = " ".repeat(step);
+        // One level = the vault's Obsidian indent unit (tab or N spaces),
+        // inserted at the line start.
         if (!isNumberedMarker(marker)) {
             const nextContent =
-                content.slice(0, startLineStart) + insertion + content.slice(startLineStart);
-            return { nextContent, nextCursorPosition: selectionStart + step };
+                content.slice(0, startLineStart) + indentUnit + content.slice(startLineStart);
+            return { nextContent, nextCursorPosition: selectionStart + indentUnit.length };
         }
         // Indenting a numbered item restarts the nested list at "1.".
         const nextContent =
             content.slice(0, startLineStart) +
-            insertion +
+            indentUnit +
             indent +
             "1." +
             content.slice(startLineStart + indent.length + marker.length);
         const nextCaretInLine = mapCaretInLine(selectionStart - startLineStart, {
             oldIndentLength: indent.length,
             oldMarkerLength: marker.length,
-            newIndentLength: step + indent.length,
+            newIndentLength: indentUnit.length + indent.length,
             newMarkerLength: "1.".length,
         });
         return { nextContent, nextCursorPosition: startLineStart + nextCaretInLine };
@@ -191,17 +192,16 @@ export function computeListIndentation({
 
     // Outdent lands on the level of the parent item (the nearest list line
     // above with a smaller indent), like Obsidian. Without a parent in the
-    // same list, remove up to one marker width of leading whitespace.
+    // same list, remove one indent unit from the end of the indent.
     const parentIndent = findParentIndent(content, startLineStart, indentColumnWidth(indent));
     let nextIndent;
     if (parentIndent !== null) {
         nextIndent = parentIndent;
     } else {
-        const removable = Math.min(step, indent.length);
-        if (removable === 0) {
+        nextIndent = removeOneIndentUnit(indent, indentUnit);
+        if (nextIndent === indent) {
             return null;
         }
-        nextIndent = indent.slice(removable);
     }
 
     // Numbered items continue the numbering of the level they land on.
@@ -261,6 +261,20 @@ function findParentIndent(content, lineStart, currentWidth) {
         if (indentColumnWidth(parsed.indent) < currentWidth) return parsed.indent;
     }
     return null;
+}
+
+/**
+ * Removes one indentation level from the end of `indent`: a trailing tab,
+ * else up to one unit of trailing spaces (a tab unit counts as 4 spaces).
+ */
+function removeOneIndentUnit(indent, indentUnit) {
+    if (indent.endsWith("\t")) return indent.slice(0, -1);
+    const maxSpaces = indentUnit === "\t" ? 4 : indentUnit.length;
+    let end = indent.length;
+    while (end > 0 && indent.length - end < maxSpaces && indent[end - 1] === " ") {
+        end -= 1;
+    }
+    return indent.slice(0, end);
 }
 
 /**
