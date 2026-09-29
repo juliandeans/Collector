@@ -3,40 +3,21 @@ use tokio::time::{timeout, Duration};
 use crate::app_state::AppState;
 use crate::note_metadata_cache::NoteMetadataCache;
 use crate::vault_index;
+use crate::vault_index_refresh::{self, NoteListRefresh};
 use crate::vault_paths::{build_image_data_url, resolve_vault_read_path, resolve_vault_write_path};
 
-async fn get_or_build_index(state: &tauri::State<'_, AppState>) -> Result<(), String> {
-    let vault_path = {
-        let settings = state.settings.read().await;
-        settings.vault_path.clone()
-    };
-
-    {
-        let index = state.vault_index.read().await;
-        if let Some(ref idx) = *index {
-            // Compare against the original vault path used to build the index.
-            // Avoiding fs::canonicalize here prevents potential blocking on iCloud paths.
-            if idx.vault_path == vault_path {
-                return Ok(());
-            }
-        }
-    }
-
-    log::info!(
-        "Building vault index for: {}",
-        crate::log_safety::redact_path_str(&vault_path)
-    );
-    let new_index = vault_index::VaultIndex::build(&vault_path)?;
-    let build_duration_ms = new_index.built_at.elapsed().as_millis();
-    let _ = new_index.resolve_note("");
-    log::info!(
-        "Vault index built: {} files in {} ms",
-        new_index.file_count,
-        build_duration_ms
-    );
-
-    *state.vault_index.write().await = Some(new_index);
-    Ok(())
+async fn ensure_index(
+    state: &tauri::State<'_, AppState>,
+    max_age: Option<Duration>,
+) -> Result<(), String> {
+    vault_index_refresh::ensure_vault_index(
+        &state.vault_index,
+        &state.vault_index_rebuild,
+        &state.settings,
+        max_age,
+        vault_index::VaultIndex::build,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -72,7 +53,7 @@ pub(crate) async fn load_image_data_url(
     path: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    get_or_build_index(&state).await?;
+    ensure_index(&state, None).await?;
 
     let resolved = {
         let index = state.vault_index.read().await;
@@ -93,7 +74,7 @@ pub(crate) async fn load_images_batch(
     paths: Vec<String>,
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<(String, String)>, String> {
-    get_or_build_index(&state).await?;
+    ensure_index(&state, None).await?;
 
     let index = state.vault_index.read().await;
     let idx = index
@@ -120,9 +101,22 @@ pub(crate) async fn load_images_batch(
 
 #[tauri::command]
 pub(crate) async fn list_vault_notes(
+    refresh: Option<NoteListRefresh>,
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<vault_index::NoteEntry>, String> {
-    get_or_build_index(&state).await?;
+    match refresh {
+        Some(mode) => {
+            vault_index_refresh::refresh_keeping_stale(
+                &state.vault_index,
+                &state.vault_index_rebuild,
+                &state.settings,
+                mode.max_age(),
+                vault_index::VaultIndex::build,
+            )
+            .await?
+        }
+        None => ensure_index(&state, None).await?,
+    }
 
     let index = state.vault_index.read().await;
     let idx = index
@@ -136,7 +130,7 @@ pub(crate) async fn list_vault_notes(
 pub(crate) async fn list_vault_tags(
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
-    get_or_build_index(&state).await?;
+    ensure_index(&state, None).await?;
 
     let vault_path = {
         let settings = state.settings.read().await;
@@ -184,23 +178,18 @@ pub(crate) async fn list_vault_tags(
 
 #[tauri::command]
 pub(crate) async fn reindex_vault(state: tauri::State<'_, AppState>) -> Result<usize, String> {
-    let vault_path = {
-        let settings = state.settings.read().await;
-        settings.vault_path.clone()
-    };
-
     log::info!("Manual vault reindex requested");
-    let new_index = vault_index::VaultIndex::build(&vault_path)?;
-    let count = new_index.file_count;
-    let build_duration_ms = new_index.built_at.elapsed().as_millis();
-    let _ = new_index.resolve_note("");
-    *state.vault_index.write().await = Some(new_index);
+    ensure_index(&state, Some(Duration::ZERO)).await?;
     *state.note_metadata.write().await = None;
-    log::info!(
-        "Vault reindex complete: {} files in {} ms",
-        count,
-        build_duration_ms
-    );
+
+    let count = state
+        .vault_index
+        .read()
+        .await
+        .as_ref()
+        .map(|index| index.file_count)
+        .ok_or_else(|| "Vault index not available".to_string())?;
+    log::info!("Vault reindex complete: {} files", count);
 
     Ok(count)
 }

@@ -280,14 +280,17 @@ fn main() {
                 };
 
                 if !vault_path.is_empty() {
-                    match vault_index::VaultIndex::build(&vault_path) {
-                        Ok(index) => {
-                            *state.vault_index.write().await = Some(index);
-                            log::info!("Vault index ready at startup");
-                        }
-                        Err(error) => {
-                            log::warn!("Startup vault index failed: {}", error);
-                        }
+                    match vault_index_refresh::ensure_vault_index(
+                        &state.vault_index,
+                        &state.vault_index_rebuild,
+                        &state.settings,
+                        None,
+                        vault_index::VaultIndex::build,
+                    )
+                    .await
+                    {
+                        Ok(()) => log::info!("Vault index ready at startup"),
+                        Err(error) => log::warn!("Startup vault index failed: {}", error),
                     }
                 }
             });

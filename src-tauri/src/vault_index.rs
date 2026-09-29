@@ -91,6 +91,9 @@ impl VaultIndex {
         self.images_by_name.get(&normalized)
     }
 
+    // No production caller since note lookups moved to the frontend list; kept as the
+    // Rust-side counterpart of the wikilink resolution rules.
+    #[allow(dead_code)]
     pub fn resolve_note(&self, name: &str) -> Option<&PathBuf> {
         let normalized = normalize_lookup_path(name);
         if normalized.contains('/') {

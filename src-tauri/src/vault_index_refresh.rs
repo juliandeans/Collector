@@ -100,6 +100,59 @@ where
     Ok(())
 }
 
+/// Refresh mode requested by the frontend for `list_vault_notes`.
+#[derive(serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum NoteListRefresh {
+    /// Usage-triggered: rebuild if the index is older than `AUTO_REFRESH_MAX_AGE`.
+    IfStale,
+    /// Rebuild unless a walk started after this request (unknown wikilink, manual reindex).
+    Force,
+}
+
+impl NoteListRefresh {
+    pub(crate) fn max_age(self) -> Duration {
+        match self {
+            Self::IfStale => AUTO_REFRESH_MAX_AGE,
+            Self::Force => Duration::ZERO,
+        }
+    }
+}
+
+/// Like `ensure_vault_index`, but a failed rebuild keeps a usable previous index
+/// for the current vault path instead of failing the request.
+pub(crate) async fn refresh_keeping_stale<B>(
+    index: &RwLock<Option<VaultIndex>>,
+    rebuild_lock: &Mutex<()>,
+    settings: &RwLock<Settings>,
+    max_age: Duration,
+    build: B,
+) -> Result<(), String>
+where
+    B: FnOnce(&str) -> Result<VaultIndex, String> + Send + 'static,
+{
+    let Err(error) = ensure_vault_index(index, rebuild_lock, settings, Some(max_age), build).await
+    else {
+        return Ok(());
+    };
+
+    let vault_path = settings.read().await.vault_path.clone();
+    let has_usable_index = index
+        .read()
+        .await
+        .as_ref()
+        .is_some_and(|existing| existing.vault_path == vault_path);
+    if has_usable_index {
+        log::warn!(
+            "Vault index refresh failed, keeping previous index: {}",
+            error
+        );
+        Ok(())
+    } else {
+        Err(error)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,9 +178,10 @@ mod tests {
     }
 
     fn settings_for(path: &Path) -> RwLock<Settings> {
-        let mut settings = Settings::default();
-        settings.vault_path = vault_path_string(path);
-        RwLock::new(settings)
+        RwLock::new(Settings {
+            vault_path: vault_path_string(path),
+            ..Settings::default()
+        })
     }
 
     async fn note_names(index: &RwLock<Option<VaultIndex>>) -> Vec<String> {
@@ -395,5 +449,50 @@ mod tests {
 
         assert_eq!(result.unwrap_err(), "Vault path changed while indexing");
         assert!(index.read().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn keeps_previous_index_when_refresh_fails() {
+        let vault = temp_vault("keep-stale");
+        let path = vault_path_string(&vault);
+        let old = backdated(VaultIndex::build(&path).unwrap(), Duration::from_secs(10));
+        let index = RwLock::new(Some(old));
+        let lock = Mutex::new(());
+        let settings = settings_for(&vault);
+
+        refresh_keeping_stale(&index, &lock, &settings, AUTO_REFRESH_MAX_AGE, |_: &str| {
+            Err("boom".to_string())
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(note_names(&index).await, vec!["First".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn refresh_failure_without_usable_index_is_an_error() {
+        let vault = temp_vault("no-index");
+        let index = RwLock::new(None);
+        let lock = Mutex::new(());
+        let settings = settings_for(&vault);
+
+        let result =
+            refresh_keeping_stale(&index, &lock, &settings, AUTO_REFRESH_MAX_AGE, |_: &str| {
+                Err("boom".to_string())
+            })
+            .await;
+
+        assert_eq!(result.unwrap_err(), "boom");
+    }
+
+    #[test]
+    fn note_list_refresh_wire_format() {
+        let if_stale: NoteListRefresh = serde_json::from_str("\"ifStale\"").unwrap();
+        let force: NoteListRefresh = serde_json::from_str("\"force\"").unwrap();
+        assert_eq!(if_stale, NoteListRefresh::IfStale);
+        assert_eq!(force, NoteListRefresh::Force);
+        assert_eq!(if_stale.max_age(), AUTO_REFRESH_MAX_AGE);
+        assert_eq!(force.max_age(), Duration::ZERO);
+        assert!(serde_json::from_str::<NoteListRefresh>("\"always\"").is_err());
     }
 }
