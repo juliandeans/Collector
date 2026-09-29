@@ -3,7 +3,7 @@
 All notable changes to Collector are documented here.  
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [1.3.0] - 2026-09-12
+## [1.3.0] - 2026-09-29
 
 ### Added
 
