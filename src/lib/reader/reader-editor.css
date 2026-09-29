@@ -156,10 +156,28 @@
     border-top: 1px solid var(--border-color);
 }
 
+.editor-body p.list-item {
+    padding-left: calc(var(--list-indent, 0) * 1ch);
+}
+
 .editor-body p.list-item::before {
     content: "•";
     margin-right: 8px;
     color: var(--text-secondary);
+}
+
+.editor-body p.list-item[data-marker$="."]::before {
+    content: attr(data-marker);
+}
+
+.editor-body p.list-item.task::before,
+.editor-body p.list-item.raw-mode::before {
+    content: none;
+}
+
+/* The active block shows the raw line, which already carries the indent. */
+.editor-body p.list-item.raw-mode {
+    padding-left: 4px;
 }
 
 .editor-body .md-checkbox {

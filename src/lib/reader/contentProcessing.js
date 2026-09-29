@@ -18,6 +18,7 @@ export {
 
 import { getCachedImageSrc } from "./imageProcessing.js";
 import { normalizeNewlines } from "./contentPreprocess.js";
+import { parseListLine } from "../capture/list-continuation.js";
 
 function escHtml(text = "") {
   return text
@@ -242,6 +243,34 @@ function processCallout(lines = [], appSettings = {}) {
   return `<div class="callout callout-${colorClass}" data-raw="${escAttr(raw)}"><div class="callout-title"><span class="callout-icon">${icon}</span><span class="callout-label">${escHtml(title)}</span></div>${content ? `<div class="callout-content">${content}</div>` : ""}</div>`;
 }
 
+function listIndentColumns(indent = "") {
+  let columns = 0;
+  for (const char of indent) {
+    columns += char === "\t" ? 4 : 1;
+  }
+  return columns;
+}
+
+function listItemToHtml({ indent, marker, spacing, checkbox, checkboxSpacing, text }) {
+  const attrs = [
+    `data-indent="${escAttr(indent)}"`,
+    `data-marker="${escAttr(marker)}"`,
+    `data-spacing="${escAttr(spacing)}"`,
+    `style="--list-indent: ${listIndentColumns(indent)}"`,
+  ];
+
+  if (checkbox === null) {
+    return `<p class="list-item" ${attrs.join(" ")}>${inlineMarkdown(text)}</p>`;
+  }
+
+  attrs.push(
+    `data-checkbox="${escAttr(checkbox)}"`,
+    `data-checkbox-spacing="${escAttr(checkboxSpacing)}"`,
+  );
+  const checked = checkbox === " " ? "" : " checked";
+  return `<p class="list-item task" ${attrs.join(" ")}><input type="checkbox" class="md-checkbox" contenteditable="false"${checked}> ${inlineMarkdown(text)}</p>`;
+}
+
 export function markdownLineToHtml(line) {
   if (line === null || line === undefined) return "";
   const trimmed = line.trim();
@@ -266,22 +295,11 @@ export function markdownLineToHtml(line) {
   if (line.trim() === "") return "<p><br></p>";
   if (/^---+$/.test(line.trim())) return "<hr>";
 
-  if (/^- \[ \] /.test(line)) {
-    const label = line.slice(6);
-    return `<p><input type="checkbox" class="md-checkbox" contenteditable="false"> ${inlineMarkdown(label)}</p>`;
-  }
-
-  if (/^- \[x\] /i.test(line)) {
-    const label = line.slice(6);
-    return `<p><input type="checkbox" class="md-checkbox" contenteditable="false" checked> ${inlineMarkdown(label)}</p>`;
-  }
+  const listItem = parseListLine(line);
+  if (listItem) return listItemToHtml(listItem);
 
   if (/^> /.test(line)) {
     return `<blockquote>${inlineMarkdown(line.slice(2))}</blockquote>`;
-  }
-
-  if (/^- /.test(line)) {
-    return `<p class="list-item">${inlineMarkdown(line.slice(2))}</p>`;
   }
 
   return `<p>${inlineMarkdown(line)}</p>`;
