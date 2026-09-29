@@ -33,6 +33,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Reader: pinned notes can be reordered in Settings with ↑/↓ buttons (same pattern as capture rules); tab order follows the list order.
 - Configurable "Next Tab" / "Previous Tab" keyboard shortcuts in the Reader
   (default: Option+Right / Option+Left).
+- Lists in the Reader: nested items are shown indented, `*`, `+` and
+  numbered (`1.`) lists are recognized, and Enter / Tab / Shift+Tab continue,
+  indent and outdent list items exactly like in the Capture window.
 
 #### Editor & Autocomplete
 
@@ -103,6 +106,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- The Reader no longer flattens nested lists: editing any line of a note used
+  to rewrite every indented list item as a top-level item. Indentation (spaces
+  or tabs) and list markers are now saved unchanged.
 - Fixed draft persistence shortcut toggle order so switching on immediately writes unsubmitted text to disk before background gates check setting state.
 - Tag suggestion dropdowns no longer let the scrollbar poke into the panel's
   rounded corners: the scroll area is inset inside the glass panel
