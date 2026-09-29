@@ -14,21 +14,21 @@ function isObsidianOnlyPath(path = "") {
   );
 }
 
-export async function ensureVaultNotes(vaultNotes = []) {
-  if (vaultNotes.length > 0) return vaultNotes;
-  return await invoke("list_vault_notes");
-}
-
-export function resolveWikilink(target, vaultNotes = []) {
+function normalizeWikilinkLookup(target = "") {
   const cleanTarget = normalizeTarget(target);
   if (!cleanTarget) return null;
+  return cleanTarget.toLowerCase().replace(/\\/g, "/");
+}
 
-  const normalizedTarget = cleanTarget.toLowerCase().replace(/\\/g, "/");
+export function findExactWikilinkNote(target, vaultNotes = []) {
+  const normalizedTarget = normalizeWikilinkLookup(target);
+  if (!normalizedTarget) return null;
+
   const withExtension = normalizedTarget.endsWith(".md")
     ? normalizedTarget
     : `${normalizedTarget}.md`;
 
-  let found = vaultNotes.find((note) => {
+  const found = vaultNotes.find((note) => {
     const relativePath = note.relative_path.toLowerCase().replace(/\\/g, "/");
     return (
       note.name.toLowerCase() === normalizedTarget ||
@@ -37,11 +37,19 @@ export function resolveWikilink(target, vaultNotes = []) {
     );
   });
 
-  if (!found) {
-    found = vaultNotes.find((note) =>
-      note.name.toLowerCase().includes(normalizedTarget),
-    );
-  }
+  return found ?? null;
+}
+
+export function resolveWikilink(target, vaultNotes = []) {
+  const exact = findExactWikilinkNote(target, vaultNotes);
+  if (exact) return exact;
+
+  const normalizedTarget = normalizeWikilinkLookup(target);
+  if (!normalizedTarget) return null;
+
+  const found = vaultNotes.find((note) =>
+    note.name.toLowerCase().includes(normalizedTarget),
+  );
 
   return found ?? null;
 }

@@ -1,4 +1,4 @@
-import { ensureVaultNotes, navigateToWikilink, openInObsidian } from "./navigation.js";
+import { findExactWikilinkNote, navigateToWikilink, openInObsidian } from "./navigation.js";
 import { createTab, fileLabel } from "./tabState.js";
 import { getOpenVaultNoteIntent } from "./paletteLogic.js";
 import { normalizeError } from "./errorHandling.js";
@@ -33,15 +33,20 @@ export async function applyOpenVaultNoteIntent(intent, bag) {
 }
 
 export async function handleNavigateToWikilink(target, forceNewTab = false, bag) {
-  const { getVaultNotes, setVaultNotes, getTabs, setTabs, getActiveTabIndex, getAppSettings, showStatus, forceSave, loadTab, saveScrollPosition } = bag;
+  const { getVaultNotes, refreshVaultNotes, getTabs, setTabs, getActiveTabIndex, getAppSettings, showStatus, forceSave, loadTab, saveScrollPosition } = bag;
 
-  let vaultNotes;
-  try {
-    vaultNotes = await ensureVaultNotes(getVaultNotes());
-    setVaultNotes(vaultNotes);
-  } catch (error) {
-    showStatus(normalizeError(error), "error", 2200);
-    return;
+  let vaultNotes = getVaultNotes();
+  if (!findExactWikilinkNote(target, vaultNotes)) {
+    // The note may have been created in Obsidian since the list was last read.
+    try {
+      vaultNotes = await refreshVaultNotes("force");
+    } catch (error) {
+      if (vaultNotes.length === 0) {
+        showStatus(normalizeError(error), "error", 2200);
+        return;
+      }
+      console.warn("Vault note refresh failed:", error);
+    }
   }
 
   const tabs = getTabs();
@@ -117,17 +122,26 @@ export async function navigateBack(bag) {
 }
 
 export function openPalette(bag) {
-  const { setShowPalette, setPaletteQuery, setSelectedPaletteIndex, focusPaletteInput, getVaultNotes, setVaultNotes, showStatus } = bag;
+  const { setShowPalette, setPaletteQuery, setSelectedPaletteIndex, focusPaletteInput, getVaultNotes, refreshVaultNotes, showStatus } = bag;
   setShowPalette(true);
   setPaletteQuery("");
   setSelectedPaletteIndex(0);
   focusPaletteInput();
 
-  if (getVaultNotes().length === 0) {
-    ensureVaultNotes(getVaultNotes())
-      .then((notes) => setVaultNotes(notes))
-      .catch((error) => showStatus(normalizeError(error), "error", 2200));
-  }
+  // Open immediately with the current list; notes created in Obsidian appear when the refresh returns.
+  refreshVaultNotes("ifStale").catch((error) => {
+    if (getVaultNotes().length === 0) {
+      showStatus(normalizeError(error), "error", 2200);
+    } else {
+      console.warn("Vault note refresh failed:", error);
+    }
+  });
+}
+
+export function refreshVaultNotesInBackground(bag) {
+  bag.refreshVaultNotes("ifStale").catch((error) => {
+    console.warn("Vault note refresh failed:", error);
+  });
 }
 
 export function closePalette(bag) {

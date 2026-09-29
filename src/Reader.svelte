@@ -29,19 +29,32 @@
   import * as tabSettingsSync from "./lib/reader/tabSettingsSync.js";
   import { setupListeners } from "./lib/reader/lifecycleSetup.js";
   import * as navigationGlue from "./lib/reader/navigationGlue.js";
-  import { ensureVaultNotes } from "./lib/reader/navigation.js";
   import { createDebouncedJob } from "./lib/reader/saveLoadPipeline.js";
   import { computeBrightnessFilter } from "./lib/reader/settingsBridge.js";
   import { getDailyNotePath } from "./lib/reader/tabIO.js";
   import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
   import { defaultSettings } from "./lib/stores.js";
   import { normalizeError } from "./lib/reader/errorHandling.js";
+  import {
+    createVaultNotesRefresher,
+    findNoteIndex,
+    vaultPathChanged,
+  } from "./lib/vaultNotesRefresh.js";
 
   let tabs = $state([]);
   let activeTabIndex = $state(0);
   let showPalette = $state(false);
   let paletteQuery = $state("");
   let vaultNotes = $state([]);
+  const refreshVaultNotes = createVaultNotesRefresher({
+    fetchNotes: (mode) => invoke("list_vault_notes", { refresh: mode }),
+    setNotes: (notes) => {
+      // Keep the keyboard selection on the same note when the list changes under an open palette.
+      const selectedNote = filteredVaultNotes[selectedPaletteIndex];
+      vaultNotes = notes;
+      selectedPaletteIndex = findNoteIndex(filteredVaultNotes, selectedNote);
+    },
+  });
   let vaultTags = $state([]);
   let isSaving = false;
   let rawContent = $state("");
@@ -301,7 +314,7 @@
       getActiveTab: () => activeTab,
       getActiveTabIndex: () => activeTabIndex,
       getVaultNotes: () => vaultNotes,
-      setVaultNotes: (value) => { vaultNotes = value; },
+      refreshVaultNotes,
       getAppSettings: () => appSettings,
       activateTab: (index, force) => tabLifecycle.activateTab(index, force, tabLifecycleBag()),
       loadTab: (index, force) => tabLifecycle.loadTab(index, force, tabLifecycleBag()),
@@ -471,6 +484,7 @@
 
   async function handleShowReader() {
     refreshVaultTags();
+    navigationGlue.refreshVaultNotesInBackground(navigationGlueBag());
     saveScrollPosition();
     editorComponent?.finalizeBlock?.();
     await flushPendingSave(false);
@@ -496,7 +510,13 @@
   }
 
   async function handleSettingsChanged(settings) {
+    const previousSettings = appSettings;
     await tabSettingsSync.handleSettingsChanged(settings, tabSettingsSyncBag());
+    if (vaultPathChanged(previousSettings, appSettings)) {
+      // Never offer the previous vault's notes for the new vault.
+      vaultNotes = [];
+      navigationGlue.refreshVaultNotesInBackground(navigationGlueBag());
+    }
   }
 
   async function buildInitialTabs() {
@@ -509,9 +529,8 @@
     cleanupCmdWindowDrag = setupCmdWindowDrag();
     try {
       await buildInitialTabs();
-      ensureVaultNotes(vaultNotes)
-        .then((notes) => {
-          vaultNotes = notes;
+      refreshVaultNotes("ifStale")
+        .then(() => {
           refreshVaultTags();
         })
         .catch((error) => {
