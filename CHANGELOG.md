@@ -12,6 +12,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   vault's Obsidian settings. Previously Collector inserted spaces matching the
   marker width.
 
+### Fixed
+
+- The Capture window shows tabs 4 columns wide, like Obsidian and the Reader
+  (previously 8).
+
 ## [1.3.0] - 2026-09-29
 
 ### Added
