@@ -35,6 +35,7 @@
   import { getDailyNotePath } from "./lib/reader/tabIO.js";
   import { filterPaletteNotes } from "./lib/reader/paletteLogic.js";
   import { defaultSettings } from "./lib/stores.js";
+  import { fontFamilyCss } from "./lib/fontFamily.js";
   import { normalizeError } from "./lib/reader/errorHandling.js";
   import {
     createVaultNotesRefresher,
@@ -647,7 +648,7 @@
   ondrop={(e) => e.preventDefault()}
   style="
     --app-background: {appSettings.overlay_color};
-    --app-font-family: {appSettings.font_family};
+    --app-font-family: {fontFamilyCss(appSettings.font_family)};
     --app-font-size: {appSettings.font_size}px;
     --app-border-radius: {appSettings.border_radius}px;
     --app-corner-radius: {cornerRadiusCss(appSettings.border_radius, appSettings.reader_edge_side, appSettings.round_all_corners)};

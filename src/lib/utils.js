@@ -118,28 +118,6 @@ export function isValidHexColor(color) {
 }
 
 /**
- * Get system fonts available on macOS
- * @returns {string[]}
- */
-export function getSystemFonts() {
-  return [
-    'SF Pro',
-    'SF Pro Display',
-    'SF Pro Text',
-    'SF Mono',
-    'Avenir Next',
-    'Helvetica Neue',
-    'Helvetica',
-    'Arial',
-    'Georgia',
-    'Times New Roman',
-    'Courier New',
-    'Monaco',
-    'Menlo',
-  ];
-}
-
-/**
  * Parse shortcut string for display
  * @param {string} shortcut 
  * @returns {string}

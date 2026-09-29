@@ -5,6 +5,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+#### Settings
+
+- Font Family now lists every font family installed on your Mac, with "System (Default)" at the top. To use a custom font, install it in Font Book and pick it in Settings → Look → Typography. If a chosen font is removed later, Collector falls back to the system font and marks it "(not installed)".
+
 ### Changed
 
 - Tab in lists (Capture and Reader) now indents exactly like Obsidian: with a
@@ -16,6 +22,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - The Capture window shows tabs 4 columns wide, like Obsidian and the Reader
   (previously 8).
+- The Font Family picker no longer shows an empty selection when the default system font is in use.
 
 ## [1.3.0] - 2026-09-29
 

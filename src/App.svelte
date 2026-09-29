@@ -7,6 +7,7 @@
     import { getCurrentWindow } from "@tauri-apps/api/window";
     import { defaultSettings } from "./lib/stores.js";
     import { cornerRadiusCss } from "./lib/cornerRadius.js";
+    import { fontFamilyCss } from "./lib/fontFamily.js";
     import { setupResizeFlicker } from "./lib/resizeFlicker.js";
     import {
         applyColorSettings,
@@ -790,7 +791,7 @@
     class:append-picker-open={showAppendPicker}
     style="
     --app-background: {appSettings.overlay_color};
-    --app-font-family: {appSettings.font_family};
+    --app-font-family: {fontFamilyCss(appSettings.font_family)};
     --app-font-size: {appSettings.font_size}px;
     --app-border-radius: {appSettings.border_radius}px;
     --app-corner-radius: {cornerRadiusCss(appSettings.border_radius, appSettings.edge_side, appSettings.round_all_corners)};
