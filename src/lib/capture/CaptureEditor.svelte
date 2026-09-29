@@ -66,6 +66,8 @@
     font-family: inherit;
     font-size: var(--app-font-size, 15px);
     line-height: 1.6;
+    /* Tabs render 4 columns wide, like Obsidian's default and the Reader. */
+    tab-size: 4;
     color: var(--app-text-color, #ffffff);
     caret-color: var(--accent-color, #8b5cf6);
   }
