@@ -407,6 +407,7 @@
                             // Never offer the previous vault's notes for the new vault.
                             appendPickerNotes = [];
                             refreshCaptureNotes("ifStale").catch(() => {});
+                            refreshIndentUnit();
                         }
                     },
                     applyColorSettings,

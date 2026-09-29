@@ -30,6 +30,14 @@ test("fontFamilyCss leaves a comma list unquoted", () => {
   assert.equal(fontFamilyCss("Inter, sans-serif"), "Inter, sans-serif");
 });
 
+test("fontFamilyCss strips CSS comment delimiters so later declarations survive", () => {
+  assert.equal(
+    fontFamilyCss("Inter, /*"),
+    '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
+  );
+  assert.equal(fontFamilyCss("Inter */"), '"Inter", -apple-system, BlinkMacSystemFont, sans-serif');
+});
+
 test("fontFamilyCss strips characters that could break out of the CSS value", () => {
   assert.equal(
     fontFamilyCss("Menlo; color: red"),

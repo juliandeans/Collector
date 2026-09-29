@@ -5,8 +5,9 @@ export const SYSTEM_FONT_VALUE = "-apple-system, BlinkMacSystemFont, SF Pro Disp
 const SYSTEM_FONT_CSS = '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif';
 const FALLBACK_TAIL = "-apple-system, BlinkMacSystemFont, sans-serif";
 
-// Characters that could end the CSS value or the style attribute.
-const UNSAFE_CHARS = /["'\\;{}<>\r\n]/g;
+// Characters that could end the CSS value or the style attribute,
+// or open a comment that swallows the declarations after it (/*).
+const UNSAFE_CHARS = /["'\\;{}<>\r\n/*]/g;
 
 // Shown when the installed families cannot be read (command failed, browser preview).
 export const FALLBACK_FONT_FAMILIES = [
@@ -33,7 +34,10 @@ export const FALLBACK_FONT_FAMILIES = [
  * @returns {string}
  */
 export function fontFamilyCss(value) {
-  const cleaned = typeof value === "string" ? value.replace(UNSAFE_CHARS, "").trim() : "";
+  const cleaned =
+    typeof value === "string"
+      ? value.replace(UNSAFE_CHARS, "").replace(/[\s,]+$/, "").trim()
+      : "";
   if (!cleaned || cleaned === SYSTEM_FONT_VALUE) return SYSTEM_FONT_CSS;
   if (cleaned.includes(",")) return cleaned;
   return `"${cleaned}", ${FALLBACK_TAIL}`;

@@ -527,6 +527,7 @@
       // Never offer the previous vault's notes for the new vault.
       vaultNotes = [];
       navigationGlue.refreshVaultNotesInBackground(navigationGlueBag());
+      refreshIndentUnit();
     }
   }
 
