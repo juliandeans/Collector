@@ -1,5 +1,6 @@
 /**
- * List key handling for the Capture textarea.
+ * List syntax and list key handling, shared by the Capture textarea and the
+ * Reader editor.
  *
  * - Enter at a list item ("-", "*", "+" or "1." style) inserts a newline plus
  *   the next list prefix. Empty list items ("just a marker") are removed
@@ -9,7 +10,7 @@
  * Pure functions — no DOM access.
  */
 
-const LIST_PATTERN = /^(\s*)([-*+]|\d+\.)([ \t]+)(.*)$/;
+export const LIST_PATTERN = /^(\s*)([-*+]|\d+\.)([ \t]+)(.*)$/;
 const CHECKBOX_PATTERN = /^\[( |x|X)\]\s?/;
 
 /**
@@ -170,4 +171,53 @@ export function computeListIndentation({
         nextContent,
         nextCursorPosition: Math.max(startLineStart, selectionStart - removable),
     };
+}
+
+// Captures ALL whitespace after the box so the item text never starts with
+// whitespace (the Reader trims item text when saving; `- [x]  a` must still
+// round-trip).
+const CHECKBOX_PARTS_PATTERN = /^\[( |x|X)\]([ \t]*)/;
+
+/**
+ * Splits a markdown list line into its raw parts so it can be rebuilt
+ * byte-identically with formatListLine. Returns null for non-list lines.
+ *
+ * @param {string} line
+ * @returns {{ indent: string, marker: string, spacing: string,
+ *   checkbox: null | " " | "x" | "X", checkboxSpacing: string,
+ *   text: string } | null}
+ */
+export function parseListLine(line) {
+    if (typeof line !== "string") return null;
+    const match = LIST_PATTERN.exec(line);
+    if (!match) return null;
+
+    const [, indent, marker, spacing, rest = ""] = match;
+    const box = CHECKBOX_PARTS_PATTERN.exec(rest);
+    if (!box) {
+        return { indent, marker, spacing, checkbox: null, checkboxSpacing: "", text: rest };
+    }
+    return {
+        indent,
+        marker,
+        spacing,
+        checkbox: /** @type {" " | "x" | "X"} */ (box[1]),
+        checkboxSpacing: box[2],
+        text: rest.slice(box[0].length),
+    };
+}
+
+/**
+ * Inverse of parseListLine.
+ */
+export function formatListLine({
+    indent = "",
+    marker = "-",
+    spacing = " ",
+    checkbox = null,
+    checkboxSpacing = "",
+    text = "",
+} = {}) {
+    const box = checkbox === null ? "" : `[${checkbox}]${checkboxSpacing}`;
+    return `${indent}${marker}${spacing}${box}${text}`;
 }
