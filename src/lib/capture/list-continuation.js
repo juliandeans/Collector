@@ -3,8 +3,9 @@
  * Reader editor.
  *
  * - Enter at a list item ("-", "*", "+" or "1." style) inserts a newline plus
- *   the next list prefix. Empty list items ("just a marker") are removed
- *   instead of continued. Checkboxes ("- [ ]") restart as unchecked.
+ *   the next list prefix. An empty nested item moves up one level; an empty
+ *   top-level item is removed instead of continued. Checkboxes ("- [ ]")
+ *   restart as unchecked.
  * - Tab on a list item indents it by the marker width (nested item);
  *   numbered items restart at "1.". Shift+Tab outdents and continues the
  *   numbering of the list level above (Obsidian-style). Selection must stay
@@ -65,11 +66,21 @@ export function computeListContinuation({
 
     const [, indent, marker, spaces = "", itemText = ""] = match;
 
-    // Empty item (plain or checkbox-only): remove the list prefix instead of
-    // spawning another one.
+    // Empty item (plain or checkbox-only): a nested one moves up to its
+    // parent's level (like Shift+Tab, numbering included), like Obsidian; a
+    // top-level one ends the list by removing the prefix.
     const checkboxToken = CHECKBOX_PATTERN.exec(itemText)?.[0] ?? "";
     const withoutCheckbox = itemText.slice(checkboxToken.length);
     if (withoutCheckbox.trim() === "") {
+        if (findParentIndent(content, lineStart, indentColumnWidth(indent)) !== null) {
+            return computeListIndentation({
+                content,
+                selectionStart: lineEnd,
+                selectionEnd: lineEnd,
+                key: "Tab",
+                shiftKey: true,
+            });
+        }
         const prefixLength =
             indent.length + marker.length + spaces.length + checkboxToken.length;
         const nextContent =

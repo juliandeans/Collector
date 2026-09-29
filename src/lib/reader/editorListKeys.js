@@ -142,9 +142,10 @@ export function handleListKey(event, { editorRef, blockManager }) {
 
   const edit = computeListKeyEdit({
     lineText: block.textContent ?? "",
-    // Only Tab on a list line needs the outer list; skip the DOM walk otherwise.
+    // Only list lines need the outer list (renumbering, empty nested items);
+    // skip the DOM walk otherwise.
     precedingLines:
-      event.key === "Tab" && LIST_PATTERN.test(block.textContent ?? "")
+      LIST_PATTERN.test(block.textContent ?? "")
         ? collectPrecedingLines(block)
         : [],
     selectionStart: offsets.start,

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { computeListIndentation } from "../src/lib/capture/list-continuation.js";
+import { computeListContinuation, computeListIndentation } from "../src/lib/capture/list-continuation.js";
 import { computeListKeyEdit } from "../src/lib/reader/editorListKeys.js";
 
 function tabAtEnd(content, shiftKey = false) {
@@ -168,5 +168,48 @@ test("Shift+Tab with mixed tab/space indentation keeps the caret after the marke
             shiftKey: true,
         }),
         { nextContent: "   1. a\n   2. b", nextCursorPosition: 8 + 5 },
+    );
+});
+
+function enterAtEnd(content) {
+    return computeListContinuation({
+        content,
+        selectionStart: content.length,
+        selectionEnd: content.length,
+        key: "Enter",
+    });
+}
+
+test("Enter on an empty nested numbered item continues the outer list", () => {
+    assert.deepEqual(enterAtEnd("3. q\n   1. a\n   2. "), {
+        nextContent: "3. q\n   1. a\n4. ",
+        nextCursorPosition: 16,
+    });
+});
+
+test("Enter on an empty nested bullet moves it up one level", () => {
+    assert.deepEqual(enterAtEnd("- a\n  - b\n  - "), {
+        nextContent: "- a\n  - b\n- ",
+        nextCursorPosition: 12,
+    });
+});
+
+test("Enter on an empty top-level item still ends the list", () => {
+    assert.deepEqual(enterAtEnd("1. a\n2. "), {
+        nextContent: "1. a\n",
+        nextCursorPosition: 5,
+    });
+});
+
+test("Reader: Enter on an empty nested item uses the blocks above", () => {
+    assert.deepEqual(
+        computeListKeyEdit({
+            lineText: "   2. ",
+            precedingLines: ["3. q", "   1. a"],
+            selectionStart: 6,
+            selectionEnd: 6,
+            key: "Enter",
+        }),
+        { lines: ["4. "], caretLine: 0, caretOffset: 3 },
     );
 });

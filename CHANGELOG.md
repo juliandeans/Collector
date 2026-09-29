@@ -38,7 +38,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   indent and outdent list items exactly like in the Capture window.
 - Numbered lists (Capture and Reader): Tab restarts the indented item at
   `1.`, Shift+Tab moves it back to its parent's level and continues that
-  level's numbering — like Obsidian.
+  level's numbering — like Obsidian. Enter on an empty nested item moves it
+  up one level (continuing the numbering there) instead of ending the list.
 
 #### Editor & Autocomplete
 
