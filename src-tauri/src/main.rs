@@ -27,6 +27,7 @@ mod shortcuts;
 mod tray;
 mod updater;
 mod vault_index;
+mod vault_index_refresh;
 mod vault_paths;
 mod window_geometry;
 #[cfg(target_os = "macos")]
@@ -127,6 +128,7 @@ fn main() {
         ocr_shortcut_manager: ocr_shortcut_manager.clone(),
         persist_draft_shortcut_manager: persist_draft_shortcut_manager.clone(),
         vault_index: Arc::new(RwLock::new(None)),
+        vault_index_rebuild: Arc::new(tokio::sync::Mutex::new(())),
         note_metadata: Arc::new(RwLock::new(None)),
     };
 

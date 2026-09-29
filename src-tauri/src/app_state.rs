@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::capture_mode::CaptureModeController;
 use crate::edge_detect::EdgeDetector;
@@ -21,5 +21,7 @@ pub(crate) struct AppState {
     pub(crate) ocr_shortcut_manager: Arc<ShortcutManager>,
     pub(crate) persist_draft_shortcut_manager: Arc<ShortcutManager>,
     pub(crate) vault_index: Arc<RwLock<Option<VaultIndex>>>,
+    /// Serializes vault index rebuilds so concurrent callers share one walk.
+    pub(crate) vault_index_rebuild: Arc<Mutex<()>>,
     pub(crate) note_metadata: Arc<RwLock<Option<NoteMetadataCache>>>,
 }
