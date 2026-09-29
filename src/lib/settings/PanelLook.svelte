@@ -4,7 +4,9 @@
     import FieldIssue from "./FieldIssue.svelte";
     import SegmentedControl from "./SegmentedControl.svelte";
     import SliderField from "./SliderField.svelte";
-    import { getSystemFonts } from "../utils.js";
+    import { invoke } from "@tauri-apps/api/core";
+    import { onMount } from "svelte";
+    import { buildFontOptions } from "../fontFamily.js";
 
     let {
         settings = $bindable(),
@@ -12,7 +14,17 @@
         onChange = () => {},
     } = $props();
 
-    const systemFonts = getSystemFonts();
+    let installedFonts = $state([]);
+    const fontOptions = $derived(buildFontOptions(installedFonts, settings.font_family));
+
+    onMount(() => {
+        // Falls back to the fixed list in buildFontOptions when this fails (e.g. browser preview).
+        invoke("list_font_families")
+            .then((families) => {
+                installedFonts = families;
+            })
+            .catch(() => {});
+    });
 
     const BLUR_OPTIONS = [
         { label: "Off", value: 0 },
@@ -181,8 +193,8 @@
         <div class="field">
             <label for="font_family">Font Family</label>
             <select id="font_family" bind:value={settings.font_family}>
-                {#each systemFonts as font}
-                    <option value={font}>{font}</option>
+                {#each fontOptions as option (option.value)}
+                    <option value={option.value}>{option.label}</option>
                 {/each}
             </select>
         </div>
