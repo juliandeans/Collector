@@ -29,6 +29,8 @@
     line-height: 1.7;
     word-break: break-word;
     white-space: pre-wrap;
+    /* A tab counts as 4 indent columns, matching --list-indent. */
+    tab-size: 4;
     caret-color: var(--accent-color, #8b5cf6);
     -webkit-user-modify: read-write;
 }
@@ -156,18 +158,27 @@
     border-top: 1px solid var(--border-color);
 }
 
+/*
+ * Rendered list items line up with the raw line shown while editing:
+ * --space-width / --dash-width are measured in the current font by
+ * ReaderEditor.svelte, so N indent columns = N spaces, the bullet takes the
+ * width of "-", and the gap after the marker equals the raw spacing.
+ */
 .editor-body p.list-item {
-    padding-left: calc(var(--list-indent, 0) * 1ch);
+    padding-left: calc(var(--list-indent, 0) * var(--space-width, 0.3em));
 }
 
 .editor-body p.list-item::before {
     content: "•";
-    margin-right: 8px;
+    display: inline-block;
+    width: var(--dash-width, auto);
+    margin-right: calc(var(--list-spacing, 1) * var(--space-width, 0.3em));
     color: var(--text-secondary);
 }
 
 .editor-body p.list-item[data-marker$="."]::before {
     content: attr(data-marker);
+    width: auto;
 }
 
 .editor-body p.list-item.task::before,

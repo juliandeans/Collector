@@ -248,7 +248,7 @@ function listItemToHtml({ indent, marker, spacing, checkbox, checkboxSpacing, te
     `data-indent="${escAttr(indent)}"`,
     `data-marker="${escAttr(marker)}"`,
     `data-spacing="${escAttr(spacing)}"`,
-    `style="--list-indent: ${indentColumnWidth(indent)}"`,
+    `style="--list-indent: ${indentColumnWidth(indent)}; --list-spacing: ${indentColumnWidth(spacing)}"`,
   ];
 
   if (checkbox === null) {

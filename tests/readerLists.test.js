@@ -7,8 +7,8 @@ import { parseListLine } from "../src/lib/capture/list-continuation.js";
 test("nested list from the user feedback renders both levels as list items", () => {
     assert.equal(
         markdownToHtml("- parent\n   - child"),
-        '<p class="list-item" data-indent="" data-marker="-" data-spacing=" " style="--list-indent: 0">parent</p>' +
-            '<p class="list-item" data-indent="   " data-marker="-" data-spacing=" " style="--list-indent: 3">child</p>',
+        '<p class="list-item" data-indent="" data-marker="-" data-spacing=" " style="--list-indent: 0; --list-spacing: 1">parent</p>' +
+            '<p class="list-item" data-indent="   " data-marker="-" data-spacing=" " style="--list-indent: 3; --list-spacing: 1">child</p>',
     );
 });
 
@@ -22,14 +22,14 @@ test("star, plus and numbered markers are list items", () => {
 test("tab indentation counts as 4 columns and is kept raw", () => {
     assert.equal(
         markdownToHtml("\t- tab child"),
-        '<p class="list-item" data-indent="\t" data-marker="-" data-spacing=" " style="--list-indent: 4">tab child</p>',
+        '<p class="list-item" data-indent="\t" data-marker="-" data-spacing=" " style="--list-indent: 4; --list-spacing: 1">tab child</p>',
     );
 });
 
 test("task items keep checkbox state and raw parts", () => {
     assert.equal(
         markdownToHtml("  - [X] done"),
-        '<p class="list-item task" data-indent="  " data-marker="-" data-spacing=" " style="--list-indent: 2" data-checkbox="X" data-checkbox-spacing=" ">' +
+        '<p class="list-item task" data-indent="  " data-marker="-" data-spacing=" " style="--list-indent: 2; --list-spacing: 1" data-checkbox="X" data-checkbox-spacing=" ">' +
             '<input type="checkbox" class="md-checkbox" contenteditable="false" checked> done</p>',
     );
     assert.match(markdownToHtml("- [ ] open"), /data-checkbox=" "[^>]*><input type="checkbox" class="md-checkbox" contenteditable="false"> open<\/p>/);

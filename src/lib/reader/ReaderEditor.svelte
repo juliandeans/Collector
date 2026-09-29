@@ -161,6 +161,31 @@
         return normalizeNewlines(htmlToMarkdown(editorRef));
     }
 
+    // Measures the space and "-" widths of the current font so rendered list
+    // items line up with the raw line shown while editing (reader-editor.css).
+    // The probe goes into the scroll container, never into the editable body.
+    function updateListMetrics() {
+        if (!editorRef || !scrollRef) return;
+        const probe = document.createElement("span");
+        probe.style.cssText =
+            "position:absolute;visibility:hidden;white-space:pre;pointer-events:none;";
+        scrollRef.appendChild(probe);
+        probe.textContent = " ".repeat(20);
+        const spaceWidth = probe.getBoundingClientRect().width / 20;
+        probe.textContent = "-";
+        const dashWidth = probe.getBoundingClientRect().width;
+        probe.remove();
+        if (spaceWidth > 0) editorRef.style.setProperty("--space-width", `${spaceWidth}px`);
+        if (dashWidth > 0) editorRef.style.setProperty("--dash-width", `${dashWidth}px`);
+    }
+
+    $effect(() => {
+        // Re-measure whenever the Reader font changes.
+        appSettings?.font_family;
+        appSettings?.font_size;
+        tick().then(updateListMetrics);
+    });
+
     export async function renderContent(raw = "") {
         const processed = preprocessContent(raw, {
             appSettings,
@@ -177,6 +202,7 @@
         isRenderingContent = true;
         editorRef.innerHTML = markdownToHtml(processed, appSettings);
         isRenderingContent = false;
+        updateListMetrics();
 
         const loadedAnyMissingImages = await warmImagesInText(processed);
         if (!loadedAnyMissingImages) {
