@@ -1,6 +1,7 @@
 pub mod autostart;
 pub mod capture;
 pub mod capture_mode;
+pub mod fonts;
 pub mod images;
 pub mod ocr;
 pub mod settings;

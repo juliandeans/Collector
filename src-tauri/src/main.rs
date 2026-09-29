@@ -398,6 +398,7 @@ fn main() {
             commands::system::open_external_url,
             commands::system::get_running_apps,
             commands::system::list_applications,
+            commands::fonts::list_font_families,
             commands::vault::load_image_data_url,
             commands::vault::load_images_batch,
             commands::vault::list_vault_notes,
