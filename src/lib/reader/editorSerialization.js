@@ -1,4 +1,5 @@
 import { normalizeNewlines } from "./contentProcessing.js";
+import { formatListLine } from "../capture/list-continuation.js";
 
 export function imageNodeToMarkdown(node) {
   const alt = node.getAttribute?.("alt") ?? "";
@@ -11,6 +12,30 @@ export function imageNodeToMarkdown(node) {
   }
 
   return `![${alt}](${alt})`;
+}
+
+/**
+ * Rebuilds a list line from the raw parts the renderer stored on the element
+ * (see listItemToHtml in contentProcessing.js). `checked === null` means the
+ * item has no checkbox.
+ */
+export function listItemToMarkdown(dataset = {}, { checked = null, text = "" } = {}) {
+  let checkbox = null;
+  let checkboxSpacing = "";
+  if (checked !== null) {
+    const original = dataset.checkbox ?? " ";
+    checkbox = checked ? (original === " " ? "x" : original) : " ";
+    checkboxSpacing = dataset.checkboxSpacing ?? " ";
+  }
+
+  return formatListLine({
+    indent: dataset.indent ?? "",
+    marker: dataset.marker ?? "-",
+    spacing: dataset.spacing ?? " ",
+    checkbox,
+    checkboxSpacing,
+    text,
+  });
 }
 
 export function elementInnerToMarkdown(el) {
@@ -102,13 +127,17 @@ export function elementToMarkdownLine(el) {
 
   if (tag === "p") {
     const checkbox = el.querySelector('input[type="checkbox"]');
+
+    if (el.classList.contains("list-item")) {
+      return listItemToMarkdown(el.dataset, {
+        checked: checkbox ? checkbox.checked : null,
+        text: elementInnerToMarkdown(el).trim(),
+      });
+    }
+
     if (checkbox) {
       const text = (el.innerText ?? "").trim();
       return `${checkbox.checked ? "- [x] " : "- [ ] "}${text}`;
-    }
-
-    if (el.classList.contains("list-item")) {
-      return `- ${elementInnerToMarkdown(el)}`;
     }
 
     const paragraphMarkdown = elementInnerToMarkdown(el);
@@ -279,15 +308,24 @@ export function htmlToMarkdown(el) {
 
     if (tag === "p" || tag === "div") {
       const checkbox = element.querySelector('input[type="checkbox"]');
+
+      if (element.classList.contains("list-item")) {
+        const text = checkbox
+          ? serializeChildren(element, { skipCheckbox: true }).trim()
+          : elementInnerToMarkdown(element).trim();
+        lines.push(
+          listItemToMarkdown(element.dataset, {
+            checked: checkbox ? checkbox.checked : null,
+            text,
+          }),
+        );
+        return;
+      }
+
       if (checkbox) {
         const checked = checkbox.checked;
         const text = serializeChildren(element, { skipCheckbox: true }).trim();
         lines.push(`${checked ? "- [x] " : "- [ ] "}${text}`);
-        return;
-      }
-
-      if (element.classList.contains("list-item")) {
-        lines.push(`- ${elementInnerToMarkdown(element).trim()}`);
         return;
       }
 
