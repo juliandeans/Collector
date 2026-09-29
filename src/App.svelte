@@ -37,6 +37,11 @@
     import { createModifierWatcher } from "./lib/ocr/modifierWatcher.js";
     import { setupCmdWindowDrag } from "./lib/windowDrag.js";
     import * as appendPicker from "./lib/app/appendPicker.js";
+    import {
+        createVaultNotesRefresher,
+        findNoteIndex,
+        vaultPathChanged,
+    } from "./lib/vaultNotesRefresh.js";
     import AppendToPicker from "./lib/reader/AppendToPicker.svelte";
     import CaptureWikilinkOverlay from "./lib/capture/CaptureWikilinkOverlay.svelte";
     import CaptureActionBar from "./lib/capture/CaptureActionBar.svelte";
@@ -74,6 +79,22 @@
     let showAppendPicker = $state(false);
     let appendPickerQuery = $state("");
     let appendPickerNotes = $state([]);
+    const refreshCaptureNotes = createVaultNotesRefresher({
+        fetchNotes: (mode) => invoke("list_vault_notes", { refresh: mode }),
+        setNotes: (notes) => {
+            // Keep the picker's keyboard selection on the same note when the list changes.
+            const selectedNote = filterPaletteNotes(
+                appendPickerNotes,
+                appendPickerQuery,
+                autocompleteResults,
+            )[appendPickerSelectedIndex];
+            appendPickerNotes = notes;
+            appendPickerSelectedIndex = findNoteIndex(
+                filterPaletteNotes(notes, appendPickerQuery, autocompleteResults),
+                selectedNote,
+            );
+        },
+    });
     let appendPickerSelectedIndex = $state(0);
     let appendPickerStep = $state(1);
     let appendPickerSelectedNote = $state(null);
@@ -267,13 +288,9 @@
         });
     }
 
-    function preloadVaultNotes() {
-        appendPicker.preloadVaultNotes({
-            invoke,
-            setNotes: (v) => {
-                appendPickerNotes = v;
-            },
-        });
+    function refreshCaptureVaultData() {
+        // Non-fatal on error: the append picker reports load errors when it opens.
+        refreshCaptureNotes("ifStale").catch(() => {});
         refreshVaultTags();
     }
 
@@ -333,7 +350,7 @@
                     // Required: after the native Tauri capture events, macOS needs a
                     // short delay before the textarea reliably accepts focus.
                     focusTextarea: () => {
-                        refreshVaultTags();
+                        refreshCaptureVaultData();
                         setTimeout(() => textareaRef?.focus(), 50);
                     },
                     freeBlobUrls,
@@ -374,7 +391,13 @@
                 unlistenSettingsChanged = await setupSettingsListener({
                     getAppSettings: () => appSettings,
                     setAppSettings: (v) => {
+                        const vaultChanged = vaultPathChanged(appSettings, v);
                         appSettings = v;
+                        if (vaultChanged) {
+                            // Never offer the previous vault's notes for the new vault.
+                            appendPickerNotes = [];
+                            refreshCaptureNotes("ifStale").catch(() => {});
+                        }
                     },
                     applyColorSettings,
                     applySettingsUpdate,
@@ -392,7 +415,7 @@
                     },
                 });
                 captureModeActive = await invoke("get_capture_mode_state");
-                preloadVaultNotes();
+                refreshCaptureVaultData();
             } catch (e) {
                 console.error("Failed to listen to events:", e);
             }
@@ -456,12 +479,9 @@
         applyAppendPickerState(appendPicker.computeOpenPickerState());
         appendPickerInputRef?.focus();
 
-        appendPicker.loadVaultNotesIfEmpty({
-            invoke,
+        appendPicker.refreshPickerNotes({
+            refresh: refreshCaptureNotes,
             getNotes: () => appendPickerNotes,
-            setNotes: (v) => {
-                appendPickerNotes = v;
-            },
             showStatus,
         });
     }

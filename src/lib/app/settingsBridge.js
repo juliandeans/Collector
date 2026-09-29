@@ -62,6 +62,7 @@ export function buildInitialAppSettings(settings) {
             : [],
         show_note_paths:
             settings.show_note_paths ?? defaultSettings.show_note_paths,
+        vault_path: settings.vault_path ?? "",
         autocomplete_results:
             settings.autocomplete_results ??
             defaultSettings.autocomplete_results,
@@ -100,6 +101,7 @@ export async function loadInitialSettings({ invoke, setAppSettings }) {
 export function applySettingsUpdate(current, incoming) {
     return {
         ...current,
+        vault_path: incoming.vault_path ?? current.vault_path,
         overlay_color: incoming.overlay_color ?? current.overlay_color,
         font_family: incoming.font_family ?? current.font_family,
         font_size: incoming.font_size ?? current.font_size,

@@ -33,27 +33,18 @@ export function computeOpenPickerState() {
     };
 }
 
-export function loadVaultNotesIfEmpty({ invoke, getNotes, setNotes, showStatus }) {
-    if (getNotes().length !== 0) return;
-
-    invoke("list_vault_notes")
-        .then((notes) => {
-            setNotes(notes);
-        })
-        .catch(() => {
-            showStatus("✗ Could not load vault notes", "error");
-        });
-}
-
-export function preloadVaultNotes({ invoke, setNotes }) {
-    // Preload vault notes so the append picker can open immediately.
-    invoke("list_vault_notes")
-        .then((notes) => {
-            setNotes(notes);
-        })
-        .catch(() => {
-            // Non-fatal: the picker can still lazy-load later.
-        });
+export function refreshPickerNotes({ refresh, getNotes, showStatus }) {
+    // Opens with the current list; notes created in Obsidian appear when the refresh returns.
+    return refresh("ifStale").then(
+        () => {},
+        (error) => {
+            if (getNotes().length === 0) {
+                showStatus("✗ Could not load vault notes", "error");
+            } else {
+                console.warn("Vault note refresh failed:", error);
+            }
+        },
+    );
 }
 
 export async function insertAfterHeading({
