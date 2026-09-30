@@ -3,7 +3,7 @@
 All notable changes to Collector are documented here.  
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [1.3.1] - 2026-09-30
 
 ### Added
 
@@ -26,6 +26,9 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Saving a note in the Reader no longer removes the indentation of indented
   text lines that are not list items (e.g. a note line under a list item), so
   they stay attached to their list item in Obsidian.
+- Nested lists in the Reader are indented in the installed app (since 1.3.0
+  they showed flat outside development builds); image widths like
+  `![[image.png|200]]` now take effect there as well.
 
 ## [1.3.0] - 2026-09-29
 
