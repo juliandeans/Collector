@@ -2,6 +2,7 @@
     import { onMount, onDestroy, tick } from "svelte";
     import {
         getCachedImageSrc,
+        applyDataStyles,
         markdownToHtml,
         normalizeNewlines,
         preprocessContent,
@@ -203,6 +204,7 @@
         const requestId = ++renderRequestId;
         isRenderingContent = true;
         editorRef.innerHTML = markdownToHtml(processed, appSettings);
+        applyDataStyles(editorRef);
         isRenderingContent = false;
         updateListMetrics();
 

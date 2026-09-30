@@ -1,5 +1,5 @@
 import { elementToMarkdownLine } from "./editorSerialization.js";
-import { markdownLineToHtml } from "./contentProcessing.js";
+import { applyDataStyles, markdownLineToHtml } from "./contentProcessing.js";
 
 export function placeCursorAtEnd(el) {
   if (!el) return;
@@ -25,6 +25,7 @@ export function rerenderBlock(el, editorRef) {
   const newEl = tempDiv.firstElementChild;
   if (!newEl) return el;
 
+  applyDataStyles(newEl);
   el.replaceWith(newEl);
   return newEl;
 }

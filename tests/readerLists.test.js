@@ -1,14 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { markdownToHtml } from "../src/lib/reader/contentProcessing.js";
+import { applyDataStyles, markdownToHtml } from "../src/lib/reader/contentProcessing.js";
 import { listItemToMarkdown } from "../src/lib/reader/editorSerialization.js";
 import { parseListLine } from "../src/lib/capture/list-continuation.js";
 
 test("nested list from the user feedback renders both levels as list items", () => {
     assert.equal(
         markdownToHtml("- parent\n   - child"),
-        '<p class="list-item" data-indent="" data-marker="-" data-spacing=" " style="--list-indent: 0; --list-spacing: 1">parent</p>' +
-            '<p class="list-item" data-indent="   " data-marker="-" data-spacing=" " style="--list-indent: 3; --list-spacing: 1">child</p>',
+        '<p class="list-item" data-indent="" data-marker="-" data-spacing=" " data-style="--list-indent: 0; --list-spacing: 1">parent</p>' +
+            '<p class="list-item" data-indent="   " data-marker="-" data-spacing=" " data-style="--list-indent: 3; --list-spacing: 1">child</p>',
     );
 });
 
@@ -22,14 +22,14 @@ test("star, plus and numbered markers are list items", () => {
 test("tab indentation counts as 4 columns and is kept raw", () => {
     assert.equal(
         markdownToHtml("\t- tab child"),
-        '<p class="list-item" data-indent="\t" data-marker="-" data-spacing=" " style="--list-indent: 4; --list-spacing: 1">tab child</p>',
+        '<p class="list-item" data-indent="\t" data-marker="-" data-spacing=" " data-style="--list-indent: 4; --list-spacing: 1">tab child</p>',
     );
 });
 
 test("task items keep checkbox state and raw parts", () => {
     assert.equal(
         markdownToHtml("  - [X] done"),
-        '<p class="list-item task" data-indent="  " data-marker="-" data-spacing=" " style="--list-indent: 2; --list-spacing: 1" data-checkbox="X" data-checkbox-spacing=" ">' +
+        '<p class="list-item task" data-indent="  " data-marker="-" data-spacing=" " data-style="--list-indent: 2; --list-spacing: 1" data-checkbox="X" data-checkbox-spacing=" ">' +
             '<input type="checkbox" class="md-checkbox" contenteditable="false" checked> done</p>',
     );
     assert.match(markdownToHtml("- [ ] open"), /data-checkbox=" "[^>]*><input type="checkbox" class="md-checkbox" contenteditable="false"> open<\/p>/);
@@ -88,4 +88,30 @@ test("toggling a task checkbox writes the new state", () => {
 test("elements without list data fall back to a plain dash item", () => {
     assert.equal(listItemToMarkdown({}, { checked: null, text: "x" }), "- x");
     assert.equal(listItemToMarkdown({}, { checked: true, text: "x" }), "- [x] x");
+});
+
+// Minimal stand-in for a DOM element: attributes plus a style object.
+function fakeElement(attrs = {}, children = []) {
+    const attributes = { ...attrs };
+    return {
+        style: { cssText: "" },
+        hasAttribute: (name) => name in attributes,
+        getAttribute: (name) => attributes[name] ?? null,
+        removeAttribute: (name) => delete attributes[name],
+        querySelectorAll: () => children.filter((child) => child.hasAttribute("data-style")),
+    };
+}
+
+test("applyDataStyles moves data-style into the style object and drops the attribute", () => {
+    const child = fakeElement({ "data-style": "--list-indent: 4; --list-spacing: 1" });
+    const plain = fakeElement();
+    const root = fakeElement({ "data-style": "max-width:100%;" }, [child, plain]);
+
+    applyDataStyles(root);
+
+    assert.equal(root.style.cssText, "max-width:100%;");
+    assert.equal(child.style.cssText, "--list-indent: 4; --list-spacing: 1");
+    assert.equal(child.hasAttribute("data-style"), false);
+    assert.equal(plain.style.cssText, "");
+    assert.doesNotThrow(() => applyDataStyles(null));
 });

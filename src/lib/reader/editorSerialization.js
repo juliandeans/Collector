@@ -3,7 +3,8 @@ import { formatListLine } from "../capture/list-continuation.js";
 
 export function imageNodeToMarkdown(node) {
   const alt = node.getAttribute?.("alt") ?? "";
-  const style = node.getAttribute?.("style") ?? "";
+  const style =
+    node.getAttribute?.("style") || node.getAttribute?.("data-style") || "";
   const widthMatch = style.match(/width:\s*(\d+)px/i);
   const width = widthMatch ? widthMatch[1] : null;
   const isWikilink = !alt.includes("http") && !alt.startsWith("/");

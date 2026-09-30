@@ -80,7 +80,7 @@ export function inlineMarkdown(text = "") {
     const style = widthValue
       ? `width:${widthValue};max-width:100%;min-height:20px;`
       : "max-width:100%;min-height:20px;";
-    const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(cleanPath)}" data-path="${escAttr(cleanPath)}" style="${escAttr(style)}" class="md-image" loading="lazy">`;
+    const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(cleanPath)}" data-path="${escAttr(cleanPath)}" data-style="${escAttr(style)}" class="md-image" loading="lazy">`;
     imageTokens.push(imageTag);
     return `\u0000IMG${imageTokens.length - 1}\u0000`;
   });
@@ -88,7 +88,7 @@ export function inlineMarkdown(text = "") {
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, path) => {
     const cleanPath = path.trim();
     const src = getCachedImageSrc(cleanPath) ?? "";
-    const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(alt)}" data-path="${escAttr(cleanPath)}" style="max-width:100%;min-height:20px;" class="md-image" loading="lazy">`;
+    const imageTag = `<img src="${escAttr(src)}" alt="${escAttr(alt)}" data-path="${escAttr(cleanPath)}" data-style="max-width:100%;min-height:20px;" class="md-image" loading="lazy">`;
     imageTokens.push(imageTag);
     return `\u0000IMG${imageTokens.length - 1}\u0000`;
   });
@@ -248,7 +248,7 @@ function listItemToHtml({ indent, marker, spacing, checkbox, checkboxSpacing, te
     `data-indent="${escAttr(indent)}"`,
     `data-marker="${escAttr(marker)}"`,
     `data-spacing="${escAttr(spacing)}"`,
-    `style="--list-indent: ${indentColumnWidth(indent)}; --list-spacing: ${indentColumnWidth(spacing)}"`,
+    `data-style="--list-indent: ${indentColumnWidth(indent)}; --list-spacing: ${indentColumnWidth(spacing)}"`,
   ];
 
   if (checkbox === null) {
@@ -261,6 +261,22 @@ function listItemToHtml({ indent, marker, spacing, checkbox, checkboxSpacing, te
   );
   const checked = checkbox === " " ? "" : " checked";
   return `<p class="list-item task" ${attrs.join(" ")}><input type="checkbox" class="md-checkbox" contenteditable="false"${checked}> ${inlineMarkdown(text)}</p>`;
+}
+
+// The built app's CSP blocks style attributes; CSSOM writes remain allowed.
+export function applyDataStyles(root) {
+  if (!root) return;
+
+  const elements = [];
+  if (root.hasAttribute?.("data-style")) {
+    elements.push(root);
+  }
+  elements.push(...(root.querySelectorAll?.("[data-style]") ?? []));
+
+  for (const element of elements) {
+    element.style.cssText = element.getAttribute("data-style");
+    element.removeAttribute("data-style");
+  }
 }
 
 export function markdownLineToHtml(line) {
